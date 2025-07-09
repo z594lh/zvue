@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import JsonTools from '../views/JsonToolstView.vue'
+import Video from '../views/VideoLibrary.vue'
 
 const routes = [
   {
@@ -12,6 +13,11 @@ const routes = [
     path: '/json',
     name: 'JsonTools',
     component: JsonTools
+  },
+  {
+    path: '/v',
+    name: 'Video',
+    component: Video
   }
 ]
 
