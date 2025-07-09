@@ -52,6 +52,7 @@ export const videoApi = {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
+      timeout: 600000,  // 10分钟超时（600,000毫秒）
       // 移除返回对象的逻辑，仅计算进度（不返回值）
       onUploadProgress: (progressEvent) => {
         // 只计算进度，不返回对象
