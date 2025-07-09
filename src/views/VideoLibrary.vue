@@ -20,13 +20,40 @@
     
     <hr class="divider" />
     
+    <!-- 上传进度 -->
+    <div v-if="uploading" class="upload-progress">
+      <el-card shadow="hover">
+        <div class="progress-header">
+          <h3>{{ uploadFileName }}</h3>
+          <el-button 
+            size="small" 
+            type="danger" 
+            icon="el-icon-close" 
+            @click="cancelUpload"
+          >取消</el-button>
+        </div>
+        
+        <el-progress 
+          :percentage="uploadPercent" 
+          :color="progressColor" 
+          status="active"
+        ></el-progress>
+        
+        <div class="progress-info">
+          <span>{{ uploadSpeed }} MB/s</span>
+          <span>{{ uploadPercent }}%</span>
+          <span>{{ remainingTime }}</span>
+        </div>
+      </el-card>
+    </div>
+    
     <!-- 加载状态 -->
-    <div v-if="loading" class="loading">
+    <div v-if="loading && !uploading" class="loading">
       <el-skeleton animated />
     </div>
     
     <!-- 空状态 -->
-    <div v-else-if="videos.length === 0" class="empty-state">
+    <div v-else-if="videos.length === 0 && !uploading" class="empty-state">
       <el-empty description="暂无视频，请上传视频" />
     </div>
     
@@ -54,27 +81,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElButton, ElUpload, ElSkeleton, ElEmpty, ElTooltip, ElNotification } from 'element-plus'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { ElNotification ,ElButton, ElUpload, ElSkeleton, ElEmpty, ElTooltip, ElProgress, ElCard } from 'element-plus'
 import { videoApi } from '@/services/api';
 
 // 状态管理
 const videos = ref([])
 const loading = ref(false)
+const uploading = ref(false)
+const uploadFileName = ref('')
+const uploadPercent = ref(0)
+const uploadSpeed = ref('0')
+const remainingTime = ref('计算中...')
+const progressColor = ref('#409EFF')
+let uploadAbortController = null  // 用于取消上传
+let uploadStartTime = 0
+let uploadLastBytes = 0
+let speedTimer = null
 
 // 获取视频列表
 async function fetchVideos() {
   loading.value = true
   try {
-    const res = await videoApi.getVideoList();
-    if (res.data.error) {
-      throw new Error(res.data.error)
-    }
+    const res = await videoApi.getVideoList()
     videos.value = res.data
   } catch (err) {
-    // 确保错误信息是字符串
-    const errMsg = err.message || '获取视频列表失败'
-    showNotification('错误', errMsg, 'error')
+    showNotification('错误', `获取视频列表失败: ${err.message}`, 'error')
   } finally {
     loading.value = false
   }
@@ -82,33 +114,96 @@ async function fetchVideos() {
 
 // 自定义上传方法
 async function customUpload({ file }) {
+  if (uploading.value) {
+    showNotification('提示', '已有正在上传的文件，请等待完成', 'warning')
+    return
+  }
+  
+  // 初始化上传状态
+  uploading.value = true
+  uploadFileName.value = file.name
+  uploadPercent.value = 0
+  uploadSpeed.value = '0'
+  remainingTime.value = '计算中...'
+  progressColor.value = '#409EFF'
+  
+  // 创建AbortController用于取消上传
+  uploadAbortController = new AbortController()
+  uploadStartTime = Date.now()
+  uploadLastBytes = 0
+  
+  // 启动速度计算定时器
+  speedTimer = setInterval(() => {
+    calculateSpeed()
+  }, 1000)
+  
   try {
-    // 显示上传中通知
-    const uploadNotice = ElNotification({
-      title: '上传中',
-      message: `正在上传 ${file.name}`,
-      type: 'info',
-      duration: 0 // 不自动关闭
-    });
-    
-    // 调用上传接口
     await videoApi.uploadVideo(file, {
+      signal: uploadAbortController.signal,  // 关联取消信号
       onUploadProgress: (progressEvent) => {
-        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-        // 更新通知内容（字符串格式）
-        uploadNotice.message = `正在上传 ${file.name}: ${percent}%`
+        const total = progressEvent.total
+        const loaded = progressEvent.loaded
+        uploadPercent.value = Math.round((loaded / total) * 100)
+        
+        // 根据进度调整颜色
+        if (uploadPercent.value >= 90) {
+          progressColor.value = '#67C23A'  // 绿色
+        } else if (uploadPercent.value >= 60) {
+          progressColor.value = '#E6A23C'  // 黄色
+        }
       }
-    });
+    })
     
-    // 上传成功
-    ElNotification.closeAll() // 关闭上传中通知
     showNotification('成功', '视频上传成功', 'success')
-    fetchVideos() // 刷新列表
+    fetchVideos()  // 刷新视频列表
   } catch (err) {
-    // 上传失败
-    ElNotification.closeAll()
-    const errMsg = err.message || '上传失败，请重试'
-    showNotification('错误', errMsg, 'error')
+    if (err.name === 'AbortError') {
+      showNotification('提示', '已取消上传', 'info')
+    } else {
+      showNotification('错误', `上传失败: ${err.message}`, 'error')
+    }
+  } finally {
+    // 清理上传状态
+    uploading.value = false
+    clearInterval(speedTimer)
+    uploadAbortController = null
+  }
+}
+
+// 计算上传速度和剩余时间
+function calculateSpeed() {
+  if (!uploading.value || uploadPercent.value <= 0) return
+  
+  const now = Date.now()
+  const elapsed = (now - uploadStartTime) / 1000  // 秒
+  const loadedBytes = (uploadPercent.value / 100) * (uploadLastBytes || 1)
+  
+  // 计算速度 (MB/s)
+  const speed = (loadedBytes / elapsed) / (1024 * 1024)
+  uploadSpeed.value = speed.toFixed(2)
+  
+  // 计算剩余时间
+  if (uploadPercent.value < 100 && speed > 0) {
+    const remainingBytes = (100 - uploadPercent.value) * (loadedBytes / uploadPercent.value)
+    const remainingSeconds = remainingBytes / (speed * 1024 * 1024)
+    
+    if (remainingSeconds < 60) {
+      remainingTime.value = `${Math.round(remainingSeconds)}秒`
+    } else {
+      const minutes = Math.floor(remainingSeconds / 60)
+      const seconds = Math.round(remainingSeconds % 60)
+      remainingTime.value = `${minutes}分${seconds}秒`
+    }
+  }
+  
+  uploadLastBytes = loadedBytes
+}
+
+// 取消上传
+function cancelUpload() {
+  if (uploadAbortController) {
+    uploadAbortController.abort()  // 取消请求
+    clearInterval(speedTimer)
   }
 }
 
@@ -144,19 +239,25 @@ function handleVideoError(filename) {
   showNotification('错误', `视频 ${filename} 加载失败`, 'error')
 }
 
-// 显示通知（使用函数式调用）
-function showNotification(title, message, type = 'success', duration = 3000) {
+// 显示通知
+function showNotification(title, message, type = 'success') {
   ElNotification({
-    title: title,
-    message: message, // 确保是字符串
-    type: type,
-    duration: duration
+    title,
+    message,
+    type,
+    duration: 3000
   })
 }
 
 // 页面加载时获取视频列表
 onMounted(() => {
   fetchVideos()
+})
+
+// 组件卸载时清理资源
+onUnmounted(() => {
+  if (speedTimer) clearInterval(speedTimer)
+  if (uploadAbortController) uploadAbortController.abort()
 })
 </script>
 
@@ -178,6 +279,25 @@ onMounted(() => {
   margin: 20px 0;
   border: 0;
   border-top: 1px solid #eee;
+}
+
+.upload-progress {
+  margin-bottom: 20px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #909399;
 }
 
 .video-grid {
