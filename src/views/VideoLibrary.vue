@@ -2,44 +2,24 @@
   <div class="video-library">
     <div class="header">
       <h2>视频库</h2>
-      <div class="upload-container">
-        <el-upload
-          class="upload-btn"
-          action="/api/upload-video"
-          :show-file-list="false"
-          accept="video/*"
-          :before-upload="beforeUpload"
-          :on-success="handleUploadSuccess"
-          :on-error="handleUploadError"
-          :on-progress="handleUploadProgress"
-        >
-          <el-button type="primary" icon="el-icon-upload">上传视频</el-button>
-        </el-upload>
-        <el-tooltip content="支持 MP4、WebM、MOV、AVI 格式，最大 2GB" placement="bottom">
-          <i class="el-icon-question"></i>
-        </el-tooltip>
-      </div>
     </div>
+
+    <!-- Uppy 上传面板 -->
+    <div ref="uppyContainer" class="uppy-panel"></div>
 
     <hr class="divider" />
 
-    <div v-if="uploading" class="upload-progress">
-      <el-card shadow="hover">
-        <div class="progress-header">
-          <h3>{{ uploadFileName }}</h3>
-        </div>
-        <el-progress :percentage="uploadPercent" :color="progressColor" stroke-width="6"></el-progress>
-      </el-card>
-    </div>
-
-    <div v-if="loading && !uploading" class="loading">
+    <!-- 加载中 -->
+    <div v-if="loading" class="loading">
       <el-skeleton animated />
     </div>
 
-    <div v-else-if="videos.length === 0 && !uploading" class="empty-state">
+    <!-- 空状态 -->
+    <div v-else-if="videos.length === 0" class="empty-state">
       <el-empty description="暂无视频，请上传视频" />
     </div>
 
+    <!-- 视频列表 -->
     <div v-else class="video-grid">
       <div v-for="video in videos" :key="video.filename" class="video-card">
         <div class="video-wrapper">
@@ -63,16 +43,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { ElButton, ElUpload, ElSkeleton, ElEmpty, ElTooltip, ElProgress, ElCard, ElNotification } from 'element-plus'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ElSkeleton, ElEmpty, ElNotification } from 'element-plus'
 import { videoApi } from '@/services/api'
+
+import Uppy from '@uppy/core'
+import Dashboard from '@uppy/dashboard'
+import XHRUpload from '@uppy/xhr-upload'
+import '@uppy/core/dist/style.css'
+import '@uppy/dashboard/dist/style.css'
+import zh_CN from '@uppy/locales/lib/zh_CN.js'
 
 const videos = ref([])
 const loading = ref(false)
-const uploading = ref(false)
-const uploadFileName = ref('')
-const uploadPercent = ref(0)
-const progressColor = ref('#409EFF')
+const uppyContainer = ref(null)
+let uppy = null
 
 // 获取视频列表
 async function fetchVideos() {
@@ -87,46 +72,52 @@ async function fetchVideos() {
   }
 }
 
-// 上传前检查大小
-function beforeUpload(file) {
-  const sizeMB = file.size / 1024 / 1024
-  if (sizeMB > 2048) {
-    showNotification('错误', '视频文件不能超过 2GB', 'error')
-    return false
-  }
-  uploading.value = true
-  uploadFileName.value = file.name
-  uploadPercent.value = 0
-  return true
-}
-
-// 上传中
-function handleUploadProgress(event) {
-  const percent = Math.round((event.loaded / event.total) * 100)
-  uploadPercent.value = percent
-}
-
-// 上传成功
-function handleUploadSuccess() {
-  showNotification('成功', '视频上传成功')
-  uploading.value = false
-  uploadPercent.value = 100
+// 初始化 Uppy 上传
+onMounted(() => {
   fetchVideos()
-}
 
-// 上传失败
-function handleUploadError() {
-  showNotification('错误', '上传失败，请稍后重试', 'error')
-  uploading.value = false
-  uploadPercent.value = 0
-}
+  uppy = new Uppy({
+    restrictions: {
+      maxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
+      allowedFileTypes: ['video/*']
+    },
+    autoProceed: true
+  })
 
-// 视频加载失败
-function handleVideoError(filename) {
-  showNotification('错误', `视频 ${filename} 加载失败`, 'error')
-}
+  uppy
+    .use(Dashboard, {
+      inline: true,
+      target: uppyContainer.value,
+      showProgressDetails: true,
+      proudlyDisplayPoweredByUppy: false,
+      note: '支持 MP4/WebM/MOV/AVI 格式，最大 2GB',
+      height: 280,
+      locale: zh_CN
+    })
+    .use(XHRUpload, {
+      endpoint: '/api/upload-video', // Flask 后端上传接口
+      fieldName: 'file',
+      formData: true
+    })
 
-// 通知封装
+  uppy.on('complete', (result) => {
+    showNotification('成功', `上传成功：${result.successful.length} 个文件`)
+    fetchVideos()
+  })
+
+  uppy.on('upload-error', (file, error) => {
+    console.error('上传失败', file, error)
+    showNotification('错误', `上传 ${file.name} 失败：${error.message}`, 'error')
+  })
+})
+
+onBeforeUnmount(() => {
+  if (uppy) {
+    uppy.close()
+  }
+})
+
+// 通知
 function showNotification(title, message, type = 'success') {
   ElNotification({
     title,
@@ -140,7 +131,7 @@ function showNotification(title, message, type = 'success') {
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes'
   const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
@@ -151,27 +142,15 @@ function formatDateTime(timestamp) {
   return date.toLocaleString()
 }
 
-// 初始化加载
-onMounted(() => {
-  fetchVideos()
-})
-
-// 卸载清理（可留空）
-onUnmounted(() => {
-  uploading.value = false
-})
+// 视频加载失败处理
+function handleVideoError(filename) {
+  showNotification('错误', `视频 ${filename} 加载失败`, 'error')
+}
 </script>
 
 <style scoped>
-.el-progress {
-  margin: 15px 0;
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+.video-library {
+  padding: 20px;
 }
 
 .header {
@@ -181,20 +160,13 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
-.upload-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.uppy-panel {
+  margin-bottom: 20px;
 }
 
 .divider {
   margin: 20px 0;
-  border: 0;
   border-top: 1px solid #eee;
-}
-
-.upload-progress {
-  margin-bottom: 20px;
 }
 
 .video-grid {

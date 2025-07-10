@@ -45,20 +45,16 @@ export const videoApi = {
   },
   
   // 上传视频（单独处理multipart/form-data）
-  uploadVideo: (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/upload-video', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      timeout: 1200000,  // 20分钟超时（1200,000毫秒）
-      // 移除返回对象的逻辑，仅计算进度（不返回值）
+  uploadVideo(file, onProgress) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    return axios.post('/upload-video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (progressEvent) => {
-        // 只计算进度，不返回对象
-        Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        if (onProgress) onProgress(progressEvent)
       }
-    });
+    })
   },
   
   // 获取视频播放地址（生成完整URL）
