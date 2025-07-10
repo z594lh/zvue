@@ -97,7 +97,8 @@ onMounted(() => {
     .use(XHRUpload, {
       endpoint: '/api/upload-video', // Flask 后端上传接口
       fieldName: 'file',
-      formData: true
+      formData: true,
+      timeout: 3600000
     })
 
   uppy.on('complete', (result) => {
