@@ -36,32 +36,3 @@ export const translateAIText = (text, source = 'auto', target = 'zh') => {
 export const translateAIImage = (imageBase64, source = 'auto', target = 'zh') => {
   return api.post('/translate-ai-image', { image: imageBase64, source, target });
 };
-
-// 新增：视频相关接口
-export const videoApi = {
-  // 获取视频列表
-  getVideoList: () => {
-    return api.get('/videos');  // 对应后端 /api/videos 接口
-  },
-  
-  // 上传视频（单独处理multipart/form-data）
-  uploadVideo(file, onProgress) {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    return axios.post('/upload-video', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress) onProgress(progressEvent)
-      }
-    })
-  },
-  
-  // 获取视频播放地址（生成完整URL）
-  getVideoUrl: (filename) => {
-    // 根据环境生成完整播放地址
-    return process.env.NODE_ENV === 'production'
-      ? `${process.env.VUE_APP_API_BASE_URL}/api/video-detail/${filename}`
-      : `/api/video-detail/${filename}`;
-  }
-};
