@@ -8,7 +8,7 @@ module.exports = defineConfig({
     allowedHosts: 'all', // 允许所有 Host 请求
     proxy: {
       '/api': {
-        target: process.env.VUE_APP_API_BASE_URL, // 使用环境变量
+        target: process.env.VUE_APP_API_BASE_URL || 'http://127.0.0.1:5000' , // 使用环境变量
         changeOrigin: true
       }
     }

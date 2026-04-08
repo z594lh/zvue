@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import JsonTools from '../views/JsonToolstView.vue'
+import AiImageView from '../views/AiImageView.vue'
+import ImageGallery from '../views/ImageGallery.vue'
 
 const routes = [
   {
@@ -12,6 +14,16 @@ const routes = [
     path: '/json',
     name: 'JsonTools',
     component: JsonTools
+  },
+  {
+    path: '/ai-image',
+    name: 'AiImage',
+    component: AiImageView
+  },
+  {
+    path: '/gallery',
+    name: 'ImageGallery',
+    component: ImageGallery
   }
 ]
 
