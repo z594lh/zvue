@@ -81,7 +81,8 @@
             <div class="config-item">
               <label>模型选择</label>
               <select v-model="selectedModel" class="custom-select" :disabled="isChatMode && inputSessionId">
-                <option value="gemini-3.1-flash-image-preview">Nano Banana 2 (推荐)</option>
+                <option value="gemini-2.5-flash-image">Nano Banana</option>
+                <option value="gemini-3.1-flash-image-preview">Nano Banana 2</option>
                 <option value="gemini-3-pro-image-preview">Nano Banana Pro</option>
               </select>
             </div>
@@ -225,7 +226,7 @@ export default {
       base64Image: '', 
       imageResults: [],
       lastImage: '', 
-      selectedModel: 'gemini-3.1-flash-image-preview',
+      selectedModel: 'gemini-2.5-flash-image',
       config: { 
         ratio: '1:1',
         num: 1,
