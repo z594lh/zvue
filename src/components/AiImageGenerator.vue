@@ -61,7 +61,7 @@
                 {{ isChatMode ? '当前：多轮对话模式' : (base64Image ? '当前：图生图模式' : '当前：文生图模式') }}
             </small>
             <div style="margin: 5px 0;">
-                <router-link to="/gallery" class="gallery-link">【打开图库】</router-link>
+                <a href="/gallery" target="_blank" class="gallery-link">【打开图库】</a>
             </div>
             </div>
         </div>
