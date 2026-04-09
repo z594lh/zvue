@@ -2,9 +2,6 @@
   <div class="gallery-container">
     <div class="gallery-header">
       <div class="header-left">
-        <button @click="$router.back()" class="back-btn">
-          <span class="arrow">←</span> 返回生成器
-        </button>
         <h2>作品图库</h2>
       </div>
       
