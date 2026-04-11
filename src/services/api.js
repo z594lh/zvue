@@ -46,6 +46,14 @@ export const generateAIImage = (data) => {
 };
 
 /**
+ * AI 多图编辑 / 多参考图生成
+ * @param {Object} data 包含 prompt, model, image_ids(可选), images(可选), session_id(可选)
+ */
+export const editAIImage = (data) => {
+  return api.post('/ai/edit-image-v2', data);
+};
+
+/**
  * 获取图库列表（分页、倒序）
  * @param {number} page 页码
  * @param {number} pageSize 每页数量
@@ -62,4 +70,12 @@ export const getGalleryList = (page = 1, pageSize = 20) => {
  */
 export const deleteImageApi = (filename) => {
   return api.delete(`/ai/gallery/${filename}`);
+};
+
+/**
+ * 提示词优化 / 增强
+ * @param {Object} data 包含 prompt (必填), image (可选，base64)
+ */
+export const enhancePrompt = (data) => {
+  return api.post('/ai/enhance-prompt', data);
 };

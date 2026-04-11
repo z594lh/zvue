@@ -1,5 +1,16 @@
 <template>
   <div class="gallery-container">
+    <!-- 图片预览遮罩层 -->
+    <div v-if="showOverlay" class="image-preview-overlay" @click="showOverlay = false">
+      <div class="overlay-content" @click.stop>
+        <img :src="overlayImgUrl" class="full-img" />
+        <div class="overlay-actions-bar">
+          <button class="overlay-btn" @click="downloadImage(overlayImgUrl)">下载原图</button>
+          <button class="overlay-btn close" @click="showOverlay = false">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <div class="gallery-header">
       <div class="header-left">
         <h2>作品图库</h2>
@@ -30,11 +41,14 @@
         
         <div class="image-overlay">
           <div class="overlay-actions">
-            <button class="action-btn download" @click.stop="downloadImage(url)" title="下载图片">
-              📥
+            <button class="action-btn edit" @click.stop="gotoCreate(url)" title="去创作">
+              ✏️
             </button>
             <button class="action-btn preview" @click.stop="previewImage(url)" title="全屏预览">
               🔍
+            </button>
+            <button class="action-btn download" @click.stop="downloadImage(url)" title="下载图片">
+              📥
             </button>
             <button class="action-btn delete" @click.stop="deleteSingleImage(url, index)" title="删除作品">
               🗑️
@@ -80,7 +94,9 @@ export default {
       loading: false,
       allImages: [],
       total: 0,
-      hasMore: true
+      hasMore: true,
+      showOverlay: false,
+      overlayImgUrl: ''
     };
   },
   watch: {
@@ -107,9 +123,21 @@ export default {
       }
     },
 
-    // 预览
+    // 预览 - 使用遮罩层显示
     previewImage(url) {
-      window.open(url, '_blank');
+      if (!url) return;
+      this.overlayImgUrl = url;
+      this.showOverlay = true;
+    },
+
+    // 去创作 - 跳转到 AI 绘图页面并带上图片 URL
+    gotoCreate(url) {
+      // 从 URL 中提取图片信息，构造 imageItem 对象
+      const filename = url.split('/').pop();
+      // 使用 image_id 作为 filename（去掉扩展名）
+      const imageId = filename.replace(/\.[^/.]+$/, '');
+      // 使用完整页面跳转，确保组件重新加载
+      window.location.href = `/ai-image?refImageUrl=${encodeURIComponent(url)}&refImageId=${imageId}`;
     },
 
     // 下载
@@ -288,6 +316,66 @@ export default {
 
 .action-btn.download:hover { color: #409eff; }
 .action-btn.delete:hover { color: #f56c6c; }
+.action-btn.edit:hover { color: #67c23a; }
+.action-btn.preview:hover { color: #e6a23c; }
+
+/* 图片预览遮罩层样式 */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(5px);
+}
+
+.image-preview-overlay .overlay-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.image-preview-overlay .full-img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.image-preview-overlay .overlay-actions-bar {
+  margin-top: 20px;
+  display: flex;
+  gap: 15px;
+}
+
+.image-preview-overlay .overlay-btn {
+  padding: 10px 25px;
+  border-radius: 20px;
+  border: none;
+  background: #409eff;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.image-preview-overlay .overlay-btn.close {
+  background: #909399;
+}
+
+.image-preview-overlay .overlay-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
 
 /* 分页组件 */
 .pagination-container {
