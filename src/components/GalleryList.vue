@@ -36,21 +36,21 @@
     </div>
 
     <div v-else class="image-grid">
-      <div v-for="(url, index) in allImages" :key="index" class="image-item">
-        <img :src="url" @load="onImageLoad" />
-        
+      <div v-for="(item, index) in allImages" :key="getImageId(item)" class="image-item">
+        <img :src="getImageUrl(item)" @load="onImageLoad" />
+
         <div class="image-overlay">
           <div class="overlay-actions">
-            <button class="action-btn edit" @click.stop="gotoCreate(url)" title="去创作">
+            <button class="action-btn edit" @click.stop="gotoCreate(item)" title="去创作">
               ✏️
             </button>
-            <button class="action-btn preview" @click.stop="previewImage(url)" title="全屏预览">
+            <button class="action-btn preview" @click.stop="previewImage(getImageUrl(item))" title="全屏预览">
               🔍
             </button>
-            <button class="action-btn download" @click.stop="downloadImage(url)" title="下载图片">
+            <button class="action-btn download" @click.stop="downloadImage(getImageUrl(item))" title="下载图片">
               📥
             </button>
-            <button class="action-btn delete" @click.stop="deleteSingleImage(url, index)" title="删除作品">
+            <button class="action-btn delete" @click.stop="deleteSingleImage(item, index)" title="删除作品">
               🗑️
             </button>
           </div>
@@ -123,6 +123,21 @@ export default {
       }
     },
 
+    // 辅助方法：获取图片的 URL（兼容对象和字符串）
+    getImageUrl(item) {
+      return typeof item === 'object' ? item.url : item;
+    },
+
+    // 辅助方法：获取图片的 ID
+    getImageId(item) {
+      return typeof item === 'object' ? item.image_id : item;
+    },
+
+    // 图片加载完成
+    onImageLoad() {
+      // 可以在这里添加加载统计或其他逻辑
+    },
+
     // 预览 - 使用遮罩层显示
     previewImage(url) {
       if (!url) return;
@@ -130,12 +145,10 @@ export default {
       this.showOverlay = true;
     },
 
-    // 去创作 - 跳转到 AI 绘图页面并带上图片 URL
-    gotoCreate(url) {
-      // 从 URL 中提取图片信息，构造 imageItem 对象
-      const filename = url.split('/').pop();
-      // 使用 image_id 作为 filename（去掉扩展名）
-      const imageId = filename.replace(/\.[^/.]+$/, '');
+    // 去创作 - 跳转到 AI 绘图页面并带上图片信息
+    gotoCreate(item) {
+      const url = this.getImageUrl(item);
+      const imageId = this.getImageId(item);
       // 使用完整页面跳转，确保组件重新加载
       window.location.href = `/ai-image?refImageUrl=${encodeURIComponent(url)}&refImageId=${imageId}`;
     },
@@ -159,11 +172,11 @@ export default {
     },
 
     // 删除单张
-    async deleteSingleImage(url, index) {
+    async deleteSingleImage(item, index) {
       if (!confirm("确定要永久删除这张作品吗？")) return;
       try {
-        const filename = url.split('/').pop();
-        await deleteImageApi(filename);
+        const imageId = this.getImageId(item);
+        await deleteImageApi(imageId);
         this.allImages.splice(index, 1);
         this.total--;
       } catch (err) {
@@ -175,8 +188,8 @@ export default {
     async deleteCurrentPage() {
       if (!confirm(`确定要清空本页这 ${this.allImages.length} 张图片吗？`)) return;
       try {
-        const filenames = this.allImages.map(url => url.split('/').pop());
-        await Promise.all(filenames.map(name => deleteImageApi(name)));
+        const imageIds = this.allImages.map(item => this.getImageId(item));
+        await Promise.all(imageIds.map(id => deleteImageApi(id)));
         this.fetchGallery(); // 重新加载本页
       } catch (err) {
         alert("批量删除时遇到错误");

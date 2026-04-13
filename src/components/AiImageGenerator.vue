@@ -92,10 +92,12 @@
             <div class="config-item">
               <label>模型选择</label>
               <select v-model="selectedModel" class="custom-select">
+                <option value="doubao-seedream-4-0-250828">豆包 4.0</option>
+                <option value="doubao-seedream-4-5-251128">豆包 4.5</option>
+                <option value="doubao-seedream-5-0-260128">豆包 5.0</option>
                 <option value="gemini-2.5-flash-image">Nano Banana</option>
                 <option value="gemini-3.1-flash-image-preview">Nano Banana 2</option>
                 <option value="gemini-3-pro-image-preview">Nano Banana Pro</option>
-                <option value="doubao-seedream-5-0-260128">豆包</option>
               </select>
             </div>
             <div class="config-item">
@@ -217,7 +219,7 @@
 </template>
 
 <script>
-import { generateAIImage, editAIImage, enhancePrompt } from '@/services/api';
+import { generateAIImage, editAIImage } from '@/services/api';
 
 // 定义缓存键名，统一管理。名称改为 IMAGE_LIST 以区分旧数据
 const CACHE_KEY = 'AI_GENERATOR_IMAGE_HISTORY';
@@ -255,6 +257,19 @@ export default {
           { value: '2K', label: '超清 (2K)' }
         ]
       },
+      'doubao-seedream-4-0-250828': {
+        qualities: [
+          { value: '1K', label: '高清 (1K)' },
+          { value: '2K', label: '超清 (2K)' },
+          { value: '4K', label: '极致 (4K)' }
+        ]
+      },
+      'doubao-seedream-4-5-251128': {
+        qualities: [
+          { value: '2K', label: '超清 (2K)' },
+          { value: '4K', label: '极致 (4K)' }
+        ]
+      },
       'doubao-seedream-5-0-260128': {
         qualities: [
           { value: '2K', label: '超清 (2K)' },
@@ -274,7 +289,7 @@ export default {
       base64Images: [], // 多图参考的 base64 数组
       imageResults: [],
       lastImage: '',
-      selectedModel: 'gemini-2.5-flash-image',
+      selectedModel: 'doubao-seedream-4-0-250828',
       modelConfig, // 模型配置
       config: {
         ratio: '1:1',
@@ -476,39 +491,6 @@ export default {
     // 重置为全新生成模式
     resetToNew() {
       this.clearImage();
-    },
-    
-    async handleEnhancePrompt() {
-      if (!this.currentPrompt) return alert("请输入描述词");
-      this.enhanceLoading = true;
-
-      try {
-        const payload = {
-          prompt: this.currentPrompt,
-          images: this.base64Images.length > 0 ? this.base64Images : null,
-          image_ids: this.currentEditIds.length > 0 ? this.currentEditIds : null
-        };
-
-        const res = await enhancePrompt(payload);
-        const result = res.data || res;
-
-        if (result.status === 'success' && result.enhanced_prompt) {
-          this.currentPrompt = result.enhanced_prompt;
-          // 显示提示，告知用户优化方式
-          const methodText = result.method === 'image_enhanced'
-            ? '已基于参考图优化提示词'
-            : '已优化提示词';
-          // 可选：使用更友好的提示方式
-          console.log(`${methodText}: ${result.original_prompt} -> ${result.enhanced_prompt}`);
-        } else {
-          alert('优化失败，请重试');
-        }
-      } catch (err) {
-        console.error("优化失败:", err);
-        alert(err.message || "优化请求失败");
-      } finally {
-        this.enhanceLoading = false;
-      }
     },
 
     async handleSend() {

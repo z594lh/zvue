@@ -38,7 +38,7 @@ export const translateAIImage = (imageBase64, source = 'auto', target = 'zh') =>
 };
 
 /**
- * AI 生图 / 图生图 / 多轮修改
+ * AI 文生图
  * @param {Object} data 包含 prompt, model, session_id, image(可选)
  */
 export const generateAIImage = (data) => {
@@ -46,7 +46,7 @@ export const generateAIImage = (data) => {
 };
 
 /**
- * AI 多图编辑 / 多参考图生成
+ * AI 图生图
  * @param {Object} data 包含 prompt, model, image_ids(可选), images(可选), session_id(可选)
  */
 export const editAIImage = (data) => {
@@ -66,16 +66,8 @@ export const getGalleryList = (page = 1, pageSize = 20) => {
 
 /**
  * 删除图库中的单张图片
- * @param {string} filename 文件名
+ * @param {string} image_id 图片 ID
  */
-export const deleteImageApi = (filename) => {
-  return api.delete(`/ai/gallery/${filename}`);
-};
-
-/**
- * 提示词优化 / 增强
- * @param {Object} data 包含 prompt (必填), image (可选，base64)
- */
-export const enhancePrompt = (data) => {
-  return api.post('/ai/enhance-prompt', data);
+export const deleteImageApi = (image_id) => {
+  return api.delete(`/ai/gallery/${image_id}`);
 };
