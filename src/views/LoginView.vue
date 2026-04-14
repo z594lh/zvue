@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
-        <h1 class="logo">VueApp</h1>
+        <h1 class="logo">ZywTools</h1>
         <p class="subtitle">欢迎回来</p>
       </div>
 
