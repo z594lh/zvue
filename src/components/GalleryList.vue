@@ -118,6 +118,13 @@ export default {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (e) {
         console.error("加载图库失败:", e);
+        const message = e.response?.data?.message || '';
+        const status = e.response?.data?.status;
+        if (status === 'error' && message.includes('登录')) {
+          this.$message.error({ message: '请先登录', offset: window.innerHeight / 2 - 50 });
+          this.$router.push('/login');
+          return;
+        }
       } finally {
         this.loading = false;
       }

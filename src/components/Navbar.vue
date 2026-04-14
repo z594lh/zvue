@@ -1,0 +1,331 @@
+/* eslint-disable */
+<template>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <router-link to="/" class="brand-link">ZywTools</router-link>
+    </div>
+
+    <div class="nav-links">
+      <router-link to="/" class="nav-link">首页</router-link>
+      <router-link to="/json" class="nav-link">JSON工具</router-link>
+      <router-link to="/ai-image" class="nav-link">AI生图</router-link>
+      <router-link to="/gallery" class="nav-link">图库</router-link>
+    </div>
+
+    <div class="nav-user">
+      <template v-if="isLoggedIn">
+        <div class="user-menu" @click="toggleMenu" ref="menuRef">
+          <div class="user-avatar">
+            {{ userNickname?.charAt(0)?.toUpperCase() || 'U' }}
+          </div>
+          <span class="username">{{ userNickname || '用户' }}</span>
+          <span class="arrow" :class="{ open: showMenu }">▼</span>
+
+          <!-- 下拉菜单 -->
+          <div v-show="showMenu" class="dropdown-menu">
+            <div class="menu-item" @click="goToProfile">
+              <span class="icon">👤</span> 个人中心
+            </div>
+            <div class="menu-divider"></div>
+            <div class="menu-item logout" @click="handleLogout">
+              <span class="icon">🚪</span> 退出登录
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <router-link to="/login" class="login-btn">登录 / 注册</router-link>
+      </template>
+    </div>
+  </nav>
+</template>
+
+<script>
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { isAuthenticated, getUserProfile, logout, setAuthToken } from '@/services/api.js'
+
+export default {
+  name: 'NavBar',
+  setup() {
+    const router = useRouter()
+    const isLoggedIn = ref(false)
+    const userNickname = ref('')
+    const showMenu = ref(false)
+    const menuRef = ref(null)
+
+    // 检查登录状态
+    const checkLoginStatus = async () => {
+      if (isAuthenticated()) {
+        try {
+          const res = await getUserProfile()
+          if (res.data.status === 'success') {
+            isLoggedIn.value = true
+            userNickname.value = res.data.data.nickname || res.data.data.username
+          } else {
+            // token 无效，清除
+            setAuthToken(null)
+            isLoggedIn.value = false
+          }
+        } catch (error) {
+          console.error('获取用户信息失败:', error)
+          setAuthToken(null)
+          isLoggedIn.value = false
+        }
+      } else {
+        isLoggedIn.value = false
+      }
+    }
+
+    // 切换菜单显示
+    const toggleMenu = () => {
+      showMenu.value = !showMenu.value
+    }
+
+    // 点击外部关闭菜单
+    const handleClickOutside = (event) => {
+      if (menuRef.value && !menuRef.value.contains(event.target)) {
+        showMenu.value = false
+      }
+    }
+
+    // 跳转到个人中心
+    const goToProfile = () => {
+      showMenu.value = false
+      // 可以创建一个个人中心页面，暂时用 alert 提示
+      alert('个人中心功能开发中...')
+    }
+
+    // 退出登录
+    const handleLogout = async () => {
+      showMenu.value = false
+      try {
+        await logout()
+      } catch (error) {
+        console.error('登出请求失败:', error)
+      } finally {
+        setAuthToken(null)
+        isLoggedIn.value = false
+        userNickname.value = ''
+        router.push('/login')
+      }
+    }
+
+    // 监听登录成功事件
+    const handleLoginSuccess = () => {
+      checkLoginStatus()
+    }
+
+    onMounted(() => {
+      checkLoginStatus()
+      document.addEventListener('click', handleClickOutside)
+      window.addEventListener('login-success', handleLoginSuccess)
+    })
+
+    onUnmounted(() => {
+      document.removeEventListener('click', handleClickOutside)
+      window.removeEventListener('login-success', handleLoginSuccess)
+    })
+
+    return {
+      isLoggedIn,
+      userNickname,
+      showMenu,
+      menuRef,
+      toggleMenu,
+      goToProfile,
+      handleLogout
+    }
+  }
+}
+</script>
+
+<style scoped>
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 60px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-brand {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.brand-link {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-link {
+  padding: 8px 16px;
+  color: #666;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.3s;
+  font-size: 14px;
+}
+
+.nav-link:hover {
+  color: #667eea;
+  background: #f5f5f5;
+}
+
+.nav-link.router-link-active {
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* 用户区域 */
+.nav-user {
+  display: flex;
+  align-items: center;
+}
+
+.login-btn {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 20px;
+  font-size: 14px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 用户菜单 */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.3s;
+  position: relative;
+}
+
+.user-menu:hover {
+  background: #f5f5f5;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.username {
+  font-size: 14px;
+  color: #333;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrow {
+  font-size: 10px;
+  color: #999;
+  transition: transform 0.3s;
+}
+
+.arrow.open {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单 */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  padding: 8px 0;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menu-item {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background: #f5f5f5;
+}
+
+.menu-item.logout {
+  color: #e74c3c;
+}
+
+.menu-item.logout:hover {
+  background: #fdf2f2;
+}
+
+.icon {
+  font-size: 16px;
+}
+
+.menu-divider {
+  height: 1px;
+  background: #eee;
+  margin: 8px 0;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 16px;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .username {
+    display: none;
+  }
+}
+</style>

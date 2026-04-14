@@ -384,7 +384,7 @@ export default {
       // 检查总数限制（历史图 + 上传图）
       const currentTotal = this.currentEditIds.length + this.previewUrls.length;
       if (currentTotal + files.length > 5) {
-        alert(`最多支持5张参考图，当前已有${currentTotal}张`);
+        this.$message.warning(`最多支持5张参考图，当前已有${currentTotal}张`);
         return;
       }
 
@@ -449,7 +449,7 @@ export default {
         console.log("图片历史缓存已清理");
       } catch (e) {
         console.error("清除缓存失败:", e);
-        alert("清除失败");
+        this.$message.error("清除失败");
       }
     },
 
@@ -494,7 +494,10 @@ export default {
     },
 
     async handleSend() {
-      if (!this.currentPrompt) return alert("请输入描述词");
+      if (!this.currentPrompt) {
+        this.$message.warning("请输入描述词");
+        return;
+      }
       this.loading = true;
 
       try {
@@ -542,7 +545,26 @@ export default {
         }
       } catch (err) {
         console.error("生成失败:", err);
-        alert(err.message.includes('timeout') ? "生成超时" : "请求失败");
+        // 提取后端返回的错误信息
+        const message = err.response?.data?.message || '';
+        const status = err.response?.data?.status;
+
+        // 未登录时跳转登录页
+        if (status === 'error' && message.includes('登录')) {
+          this.$message.error({ message: '请先登录', offset: window.innerHeight / 2 - 50 });
+          this.$router.push('/login');
+          return;
+        }
+
+        let errorMsg = "请求失败";
+        if (message) {
+          errorMsg = message;
+        } else if (err.message?.includes('timeout')) {
+          errorMsg = "生成超时，请稍后重试";
+        } else if (err.message) {
+          errorMsg = err.message;
+        }
+        this.$message.error({ message: errorMsg, offset: window.innerHeight / 2 - 50 });
       } finally {
         this.loading = false;
       }
@@ -597,7 +619,7 @@ export default {
       }
       // 未选中则添加
       if (this.currentEditIds.length + this.base64Images.length >= 5) {
-        alert('最多支持5张参考图');
+        this.$message.warning('最多支持5张参考图');
         return;
       }
       this.currentEditIds.push(imgItem.image_id);

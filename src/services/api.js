@@ -71,3 +71,77 @@ export const getGalleryList = (page = 1, pageSize = 20) => {
 export const deleteImageApi = (image_id) => {
   return api.delete(`/ai/gallery/${image_id}`);
 };
+
+// ==================== 用户认证相关接口 ====================
+
+/**
+ * 用户注册
+ * @param {Object} data {username, password, nickname}
+ */
+export const register = (data) => {
+  return api.post('/user/register', data);
+};
+
+/**
+ * 用户登录
+ * @param {Object} data {username, password}
+ */
+export const login = (data) => {
+  return api.post('/user/login', data);
+};
+
+/**
+ * 用户登出
+ */
+export const logout = () => {
+  return api.post('/user/logout');
+};
+
+/**
+ * 获取当前用户信息
+ */
+export const getUserProfile = () => {
+  return api.get('/user/profile');
+};
+
+/**
+ * 修改用户信息
+ * @param {Object} data {nickname}
+ */
+export const updateUserProfile = (data) => {
+  return api.put('/user/profile', data);
+};
+
+/**
+ * 修改密码
+ * @param {Object} data {old_password, new_password}
+ */
+export const changePassword = (data) => {
+  return api.put('/user/password', data);
+};
+
+// 设置认证token
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    localStorage.setItem('auth_token', token);
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+    localStorage.removeItem('auth_token');
+  }
+};
+
+// 从localStorage恢复token
+export const restoreAuthToken = () => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    return token;
+  }
+  return null;
+};
+
+// 检查是否已登录
+export const isAuthenticated = () => {
+  return !!localStorage.getItem('auth_token');
+};
