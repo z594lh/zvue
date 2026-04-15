@@ -80,7 +80,10 @@
 
       <main class="right-panel">
         <div class="card config-card">
-          <div class="card-title">图片描述 (Prompt)</div>
+          <div class="card-title" style="justify-content: flex-start; gap: 8px;">
+            <span>图片描述 (Prompt)</span>
+            <a href="https://www.volcengine.com/docs/82379/1829186?lang=zh#beece9a1" target="_blank" class="prompt-tips-link">📖 提示词秘籍</a>
+          </div>
           <textarea
             v-model="currentPrompt"
             class="custom-textarea"
@@ -991,6 +994,22 @@ export default {
 
 .gallery-link { color: #409eff; text-decoration: none; font-size: 13px; cursor: pointer; font-weight: bold; }
 .gallery-link:hover { text-decoration: underline; }
+
+.prompt-tips-link {
+  font-size: 12px;
+  color: #409eff;
+  text-decoration: none;
+  padding: 3px 10px;
+  background: #f0f7ff;
+  border: 1px solid #d1e9ff;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+.prompt-tips-link:hover {
+  background: #409eff;
+  color: #fff;
+  border-color: #409eff;
+}
 
 .clear-cache-btn {
   font-size: 12px; font-weight: normal; color: #f56c6c; cursor: pointer; padding: 2px 8px;
