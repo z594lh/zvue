@@ -145,3 +145,71 @@ export const restoreAuthToken = () => {
 export const isAuthenticated = () => {
   return !!localStorage.getItem('auth_token');
 };
+
+// ==================== 记账相关接口 ====================
+
+/**
+ * 获取支出列表
+ * @param {Object} params {month, category, account_type, reimbursed, page, page_size}
+ */
+export const getExpenseList = (params = {}) => {
+  return api.get('/expenses/list', { params });
+};
+
+/**
+ * 新增支出记录
+ * @param {Object} data {date, category, amount, remark, has_invoice, invoice_image, account_type, reimbursed}
+ */
+export const createExpense = (data) => {
+  return api.post('/expenses/add', data);
+};
+
+/**
+ * 更新支出记录
+ * @param {string} id 记录ID
+ * @param {Object} data 更新数据
+ */
+export const updateExpense = (id, data) => {
+  return api.put(`/expenses/${id}`, data);
+};
+
+/**
+ * 切换私账报销状态
+ * @param {string} id 记录ID
+ */
+export const toggleReimburseStatus = (id) => {
+  return api.patch(`/expenses/${id}/reimburse`);
+};
+
+/**
+ * 删除支出记录
+ * @param {string} id 记录ID
+ */
+export const deleteExpense = (id) => {
+  return api.delete(`/expenses/${id}`);
+};
+
+/**
+ * 上传发票图片（独立接口，返回图片URL）
+ * @param {FormData} formData 包含 invoice 文件
+ */
+export const uploadInvoiceImage = (formData) => {
+  return api.post('/expenses/upload-invoice', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+/**
+ * 获取支出记录操作日志
+ * @param {string} id 记录ID
+ */
+export const getExpenseLogs = (id) => {
+  return api.get(`/expenses/${id}/logs`);
+};
+
+/**
+ * 获取支出模块用户列表（创建人筛选用）
+ */
+export const getExpenseUsers = () => {
+  return api.get('/expenses/users');
+};

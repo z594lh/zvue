@@ -4,6 +4,7 @@ import JsonTools from '../views/JsonToolstView.vue'
 import AiImageView from '../views/AiImageView.vue'
 import ImageGallery from '../views/ImageGallery.vue'
 import LoginView from '../views/LoginView.vue'
+import ExpenseView from '../views/ExpenseView.vue'
 
 const routes = [
   {
@@ -30,6 +31,11 @@ const routes = [
     path: '/gallery',
     name: 'ImageGallery',
     component: ImageGallery
+  },
+  {
+    path: '/expense',
+    name: 'Expense',
+    component: ExpenseView
   }
 ]
 

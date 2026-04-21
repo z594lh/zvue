@@ -158,7 +158,7 @@ export default {
           // 触发登录成功事件，通知导航栏更新
           window.dispatchEvent(new CustomEvent('login-success'))
           // 跳转到首页
-          router.push('/ai-image')
+          router.push('/expense')
         } else {
           loginError.value = res.data.message || '登录失败'
         }

@@ -6,10 +6,9 @@
     </div>
 
     <div class="nav-links">
-      <router-link to="/" class="nav-link">首页</router-link>
-      <router-link to="/json" class="nav-link">JSON工具</router-link>
       <router-link to="/ai-image" class="nav-link">AI生图</router-link>
       <router-link to="/gallery" class="nav-link">图库</router-link>
+      <router-link to="/expense" class="nav-link">记账</router-link>
     </div>
 
     <div class="nav-user">
