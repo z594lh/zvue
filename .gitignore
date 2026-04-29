@@ -2,7 +2,6 @@
 node_modules
 /dist
 
-
 # local env files
 .env.local
 .env.*.local
@@ -21,5 +20,15 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
 # 环境配置
 .env*
+
+# Build cache / temp
+.cache/
+.temp/
+*.local
+
+# Coverage
+coverage/
+

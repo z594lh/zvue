@@ -1,4 +1,3 @@
-/* eslint-disable */
 <template>
   <nav class="navbar">
     <div class="nav-brand">
@@ -6,9 +5,42 @@
     </div>
 
     <div class="nav-links">
-      <router-link to="/ai-image" class="nav-link">AI生图</router-link>
-      <router-link to="/gallery" class="nav-link">图库</router-link>
-      <router-link to="/expense" class="nav-link">记账</router-link>
+      <template v-for="group in navGroups" :key="group.label">
+        <!-- 只有一个子项：直接跳转 -->
+        <router-link
+          v-if="group.children.length === 1"
+          :to="group.children[0].path"
+          class="nav-link"
+          :class="{ active: route.path === group.children[0].path }"
+        >
+          {{ group.label }}
+        </router-link>
+
+        <!-- 多个子项：下拉菜单 -->
+        <div
+          v-else
+          class="nav-item"
+          :class="{ active: isGroupActive(group) }"
+          @mouseenter="openGroup = group.label"
+          @mouseleave="openGroup = null"
+        >
+          <span class="nav-label">{{ group.label }}</span>
+
+          <div v-show="openGroup === group.label" class="sub-menu">
+            <div class="sub-menu-inner">
+              <router-link
+                v-for="item in group.children"
+                :key="item.path"
+                :to="item.path"
+                class="sub-link"
+                @click="openGroup = null"
+              >
+                {{ item.label }}
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <div class="nav-user">
@@ -20,7 +52,6 @@
           <span class="username">{{ userNickname || '用户' }}</span>
           <span class="arrow" :class="{ open: showMenu }">▼</span>
 
-          <!-- 下拉菜单 -->
           <div v-show="showMenu" class="dropdown-menu">
             <div class="menu-item" @click="goToProfile">
               <span class="icon">👤</span> 个人中心
@@ -41,19 +72,47 @@
 
 <script>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { isAuthenticated, getUserProfile, logout, setAuthToken } from '@/services/api.js'
+
+const navGroups = [
+  {
+    label: 'AI创作',
+    children: [
+      { label: 'AI生图', path: '/ai-image' },
+      { label: '图库', path: '/gallery' }
+    ]
+  },
+  {
+    label: '记账',
+    children: [
+      { label: '记账', path: '/expense' }
+    ]
+  },
+  {
+    label: '工具',
+    children: [
+      { label: 'FBA标签', path: '/fba-label' },
+      { label: 'PDF工具', path: '/pdf-tools' }
+    ]
+  }
+]
 
 export default {
   name: 'NavBar',
   setup() {
     const router = useRouter()
+    const route = useRoute()
     const isLoggedIn = ref(false)
     const userNickname = ref('')
     const showMenu = ref(false)
     const menuRef = ref(null)
+    const openGroup = ref(null)
 
-    // 检查登录状态
+    const isGroupActive = (group) => {
+      return group.children.some(item => item.path === route.path)
+    }
+
     const checkLoginStatus = async () => {
       if (isAuthenticated()) {
         try {
@@ -62,7 +121,6 @@ export default {
             isLoggedIn.value = true
             userNickname.value = res.data.data.nickname || res.data.data.username
           } else {
-            // token 无效，清除
             setAuthToken(null)
             isLoggedIn.value = false
           }
@@ -76,26 +134,21 @@ export default {
       }
     }
 
-    // 切换菜单显示
     const toggleMenu = () => {
       showMenu.value = !showMenu.value
     }
 
-    // 点击外部关闭菜单
     const handleClickOutside = (event) => {
       if (menuRef.value && !menuRef.value.contains(event.target)) {
         showMenu.value = false
       }
     }
 
-    // 跳转到个人中心
     const goToProfile = () => {
       showMenu.value = false
-      // 可以创建一个个人中心页面，暂时用 alert 提示
       alert('个人中心功能开发中...')
     }
 
-    // 退出登录
     const handleLogout = async () => {
       showMenu.value = false
       try {
@@ -110,7 +163,6 @@ export default {
       }
     }
 
-    // 监听登录成功事件
     const handleLoginSuccess = () => {
       checkLoginStatus()
     }
@@ -127,13 +179,17 @@ export default {
     })
 
     return {
+      navGroups,
+      route,
       isLoggedIn,
       userNickname,
       showMenu,
       menuRef,
+      openGroup,
       toggleMenu,
       goToProfile,
-      handleLogout
+      handleLogout,
+      isGroupActive
     }
   }
 }
@@ -168,23 +224,100 @@ export default {
   gap: 8px;
 }
 
-.nav-link {
+.nav-item {
+  position: relative;
   padding: 8px 16px;
-  color: #666;
-  text-decoration: none;
   border-radius: 6px;
+  cursor: pointer;
   transition: all 0.3s;
-  font-size: 14px;
 }
 
-.nav-link:hover {
+.nav-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: #f5f5f5;
+}
+
+.nav-item:hover .nav-label,
+.nav-item.active .nav-label {
+  color: #667eea;
+}
+
+.nav-item.active .nav-label {
+  font-weight: 500;
+}
+
+.nav-link {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #666;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.nav-link:hover,
+.nav-link.active {
   color: #667eea;
   background: #f5f5f5;
 }
 
-.nav-link.router-link-active {
+.nav-link.active {
+  font-weight: 500;
+}
+
+/* 子菜单 */
+.sub-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: transparent;
+  padding-top: 4px;
+  min-width: 140px;
+  animation: slideDown 0.2s ease;
+}
+
+.sub-menu-inner {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 6px 0;
+}
+
+.sub-link {
+  display: block;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #333;
+  text-decoration: none;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.sub-link:hover {
+  background: #f5f5f5;
+  color: #667eea;
+}
+
+.sub-link.router-link-active {
   color: #667eea;
   font-weight: 500;
+  background: #f0f3ff;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 用户区域 */
@@ -268,17 +401,6 @@ export default {
   min-width: 160px;
   padding: 8px 0;
   animation: slideDown 0.2s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .menu-item {

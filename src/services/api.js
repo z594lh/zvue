@@ -213,3 +213,45 @@ export const getExpenseLogs = (id) => {
 export const getExpenseUsers = () => {
   return api.get('/expenses/users');
 };
+
+// ==================== FBA 标签打印相关接口 ====================
+
+/**
+ * 生成 FBA FNSKU 标签 PDF
+ * @param {Object} data {fnsku, product_name, extra_info, sku, width_mm, height_mm}
+ */
+export const generateFbaLabel = (data) => {
+  return api.post('/fba/label', data);
+};
+
+// ==================== PDF 在线编辑与拆分接口 ====================
+
+/**
+ * 编辑 PDF（真正修改 PDF 内容流）
+ * @param {File} file 原始 PDF 文件
+ * @param {Array} operations 编辑指令数组
+ */
+export const editPdf = (file, operations) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('operations', JSON.stringify(operations));
+  return api.post('/pdf/edit', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    responseType: 'blob'
+  });
+};
+
+/**
+ * 拆分 PDF 页面
+ * @param {File} file 原始 PDF 文件
+ * @param {number[]} pages 要拆分的页面索引数组（从 0 开始）
+ */
+export const splitPdf = (file, pages) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('data', JSON.stringify({ pages }));
+  return api.post('/pdf/split', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    responseType: 'blob'
+  });
+};

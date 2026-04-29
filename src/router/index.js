@@ -5,6 +5,8 @@ import AiImageView from '../views/AiImageView.vue'
 import ImageGallery from '../views/ImageGallery.vue'
 import LoginView from '../views/LoginView.vue'
 import ExpenseView from '../views/ExpenseView.vue'
+import FbaLabelView from '../views/FbaLabelView.vue'
+import PdfToolsView from '../views/PdfToolsView.vue'
 
 const routes = [
   {
@@ -36,6 +38,16 @@ const routes = [
     path: '/expense',
     name: 'Expense',
     component: ExpenseView
+  },
+  {
+    path: '/fba-label',
+    name: 'FbaLabel',
+    component: FbaLabelView
+  },
+  {
+    path: '/pdf-tools',
+    name: 'PdfTools',
+    component: PdfToolsView
   }
 ]
 

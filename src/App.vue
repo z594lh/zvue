@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <NavBar v-if="['/ai-image', '/gallery', '/expense'].includes($route.path)" />
+    <NavBar v-if="['/ai-image', '/gallery', '/expense', '/fba-label', '/pdf-tools'].includes($route.path)" />
     <router-view />
   </div>
 </template>
