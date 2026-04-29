@@ -224,6 +224,24 @@ export const generateFbaLabel = (data) => {
   return api.post('/fba/label', data);
 };
 
+// ==================== 亚马逊货件管理相关接口 ====================
+
+/**
+ * 获取亚马逊货件列表
+ * @param {Object} params {days, status, shipment_id, last_update_after}
+ */
+export const getAmazonShipments = (params = {}) => {
+  return api.get('/amazon/shipments', { params });
+};
+
+/**
+ * 获取货件商品列表
+ * @param {string} shipment_id 货件ID
+ */
+export const getAmazonShipmentItems = (shipment_id) => {
+  return api.get(`/amazon/shipments/${shipment_id}/items`);
+};
+
 // ==================== PDF 在线编辑与拆分接口 ====================
 
 /**

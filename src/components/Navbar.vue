@@ -90,6 +90,12 @@ const navGroups = [
     ]
   },
   {
+    label: 'FBA货件',
+    children: [
+      { label: 'FBA货件', path: '/amazon-shipments' }
+    ]
+  },
+  {
     label: '工具',
     children: [
       { label: 'FBA标签', path: '/fba-label' },

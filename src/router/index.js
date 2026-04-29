@@ -7,6 +7,7 @@ import LoginView from '../views/LoginView.vue'
 import ExpenseView from '../views/ExpenseView.vue'
 import FbaLabelView from '../views/FbaLabelView.vue'
 import PdfToolsView from '../views/PdfToolsView.vue'
+import AmazonShipmentView from '../views/AmazonShipmentView.vue'
 
 const routes = [
   {
@@ -48,6 +49,11 @@ const routes = [
     path: '/pdf-tools',
     name: 'PdfTools',
     component: PdfToolsView
+  },
+  {
+    path: '/amazon-shipments',
+    name: 'AmazonShipments',
+    component: AmazonShipmentView
   }
 ]
 
