@@ -8,6 +8,10 @@ import ExpenseView from '../views/ExpenseView.vue'
 import FbaLabelView from '../views/FbaLabelView.vue'
 import PdfToolsView from '../views/PdfToolsView.vue'
 import AmazonShipmentView from '../views/AmazonShipmentView.vue'
+import AmazonInventoryView from '../views/AmazonInventoryView.vue'
+import SupplierView from '../views/SupplierView.vue'
+import PurchaseOrderView from '../views/PurchaseOrderView.vue'
+import ProductView from '../views/ProductView.vue'
 
 const routes = [
   {
@@ -54,6 +58,26 @@ const routes = [
     path: '/amazon-shipments',
     name: 'AmazonShipments',
     component: AmazonShipmentView
+  },
+  {
+    path: '/amazon-inventory',
+    name: 'AmazonInventory',
+    component: AmazonInventoryView
+  },
+  {
+    path: '/suppliers',
+    name: 'Suppliers',
+    component: SupplierView
+  },
+  {
+    path: '/purchase-orders',
+    name: 'PurchaseOrders',
+    component: PurchaseOrderView
+  },
+  {
+    path: '/products',
+    name: 'Products',
+    component: ProductView
   }
 ]
 

@@ -208,6 +208,12 @@
         <div v-if="shipmentItems && shipmentItems.length > 0">
           <el-table :data="shipmentItems" stripe style="width: 100%">
             <el-table-column prop="seller_sku" label="SKU" width="150" />
+            <el-table-column label="中文申报" min-width="180" show-overflow-tooltip>
+              <template #default="scope">
+                {{ scope.row.declare_name_cn || scope.row.product_name || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="declare_name_en" label="英文申报" min-width="180" show-overflow-tooltip />
             <el-table-column prop="fulfillment_network_sku" label="FNSKU" width="150" />
             <el-table-column prop="quantity_shipped" label="发货数量" width="100" align="center" />
             <el-table-column prop="quantity_received" label="接收数量" width="100" align="center" />

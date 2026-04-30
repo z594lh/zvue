@@ -90,9 +90,18 @@ const navGroups = [
     ]
   },
   {
-    label: 'FBA货件',
+    label: '亚马逊',
     children: [
-      { label: 'FBA货件', path: '/amazon-shipments' }
+      { label: '货件管理', path: '/amazon-shipments' },
+      { label: '库存管理', path: '/amazon-inventory' }
+    ]
+  },
+  {
+    label: '供应商',
+    children: [
+      { label: '供应商管理', path: '/suppliers' },
+      { label: '进货单管理', path: '/purchase-orders' },
+      { label: '产品维护', path: '/products' }
     ]
   },
   {

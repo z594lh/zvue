@@ -273,6 +273,145 @@ export const getAmazonWarehouses = () => {
   return api.get('/amazon/warehouses');
 };
 
+// ==================== 亚马逊库存管理相关接口 ====================
+
+/**
+ * 获取亚马逊库存列表
+ * @param {Object} params {page, page_size, seller_sku, asin}
+ */
+export const getAmazonInventory = (params = {}) => {
+  return api.get('/amazon/inventory', { params });
+};
+
+/**
+ * 同步库存数据
+ * @param {Object} data {seller_skus, start_date_time}
+ */
+export const syncAmazonInventory = (data = {}) => {
+  return api.post('/amazon/sync/inventory', data);
+};
+
+// ==================== 供应商管理相关接口 ====================
+
+/**
+ * 获取供应商列表
+ * @param {Object} params {keyword, status, page, page_size}
+ */
+export const getSuppliers = (params = {}) => {
+  return api.get('/suppliers', { params });
+};
+
+/**
+ * 获取供应商详情
+ * @param {number} id 供应商ID
+ */
+export const getSupplier = (id) => {
+  return api.get(`/suppliers/${id}`);
+};
+
+/**
+ * 创建供应商
+ * @param {Object} data 供应商数据
+ */
+export const createSupplier = (data) => {
+  return api.post('/suppliers', data);
+};
+
+/**
+ * 更新供应商
+ * @param {number} id 供应商ID
+ * @param {Object} data 供应商数据
+ */
+export const updateSupplier = (id, data) => {
+  return api.put(`/suppliers/${id}`, data);
+};
+
+/**
+ * 删除供应商
+ * @param {number} id 供应商ID
+ */
+export const deleteSupplier = (id) => {
+  return api.delete(`/suppliers/${id}`);
+};
+
+// ==================== 进货单管理相关接口 ====================
+
+/**
+ * 获取进货单列表
+ * @param {Object} params {supplier_id, status, keyword, page, page_size}
+ */
+export const getPurchaseOrders = (params = {}) => {
+  return api.get('/purchase-orders', { params });
+};
+
+/**
+ * 获取进货单详情
+ * @param {number} id 进货单ID
+ */
+export const getPurchaseOrder = (id) => {
+  return api.get(`/purchase-orders/${id}`);
+};
+
+/**
+ * 创建进货单
+ * @param {Object} data 进货单数据
+ */
+export const createPurchaseOrder = (data) => {
+  return api.post('/purchase-orders', data);
+};
+
+/**
+ * 更新进货单
+ * @param {number} id 进货单ID
+ * @param {Object} data 进货单数据
+ */
+export const updatePurchaseOrder = (id, data) => {
+  return api.put(`/purchase-orders/${id}`, data);
+};
+
+/**
+ * 删除进货单
+ * @param {number} id 进货单ID
+ */
+export const deletePurchaseOrder = (id) => {
+  return api.delete(`/purchase-orders/${id}`);
+};
+
+// ==================== 产品管理相关接口 ====================
+
+/**
+ * 获取产品列表
+ * @param {Object} params {keyword, status, page, page_size}
+ */
+export const getProducts = (params = {}) => {
+  return api.get('/products', { params });
+};
+
+/**
+ * 创建产品
+ * @param {Object} data 产品数据
+ */
+export const createProduct = (data) => {
+  return api.post('/products', data);
+};
+
+/**
+ * 更新产品
+ * @param {number} id 产品ID
+ * @param {Object} data 产品数据
+ */
+export const updateProduct = (id, data) => {
+  return api.put(`/products/${id}`, data);
+};
+
+/**
+ * 删除产品
+ * @param {number} id 产品ID
+ */
+export const deleteProduct = (id) => {
+  return api.delete(`/products/${id}`);
+};
+
 // ==================== PDF 在线编辑与拆分接口 ====================
 
 /**
