@@ -228,7 +228,7 @@ export const generateFbaLabel = (data) => {
 
 /**
  * 获取亚马逊货件列表
- * @param {Object} params {days, status, shipment_id, last_update_after}
+ * @param {Object} params {page, page_size, status, destination_fc}
  */
 export const getAmazonShipments = (params = {}) => {
   return api.get('/amazon/shipments', { params });
@@ -237,9 +237,40 @@ export const getAmazonShipments = (params = {}) => {
 /**
  * 获取货件商品列表
  * @param {string} shipment_id 货件ID
+ * @param {Object} params {page, page_size}
  */
-export const getAmazonShipmentItems = (shipment_id) => {
-  return api.get(`/amazon/shipments/${shipment_id}/items`);
+export const getAmazonShipmentItems = (shipment_id, params = {}) => {
+  return api.get(`/amazon/shipments/${shipment_id}/items`, { params });
+};
+
+/**
+ * 一键同步所有数据
+ */
+export const syncAmazonAll = () => {
+  return api.post('/amazon/sync/all');
+};
+
+/**
+ * 同步货件数据
+ * @param {Object} data {status_list, last_update_after}
+ */
+export const syncAmazonShipments = (data = {}) => {
+  return api.post('/amazon/sync/shipments', data);
+};
+
+/**
+ * 同步指定货件的商品数据
+ * @param {string} shipment_id 货件ID
+ */
+export const syncAmazonShipmentItems = (shipment_id) => {
+  return api.post(`/amazon/sync/shipments/${shipment_id}/items`);
+};
+
+/**
+ * 获取仓库列表
+ */
+export const getAmazonWarehouses = () => {
+  return api.get('/amazon/warehouses');
 };
 
 // ==================== PDF 在线编辑与拆分接口 ====================
