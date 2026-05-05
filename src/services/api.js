@@ -244,6 +244,21 @@ export const getAmazonShipmentItems = (shipment_id, params = {}) => {
 };
 
 /**
+ * 获取亚马逊货件箱唛标签 PDF
+ * @param {string} shipment_id 货件ID
+ * @param {string} page_type 标签页面类型，默认 PackageLabel_Thermal_NonPCP
+ * @param {number} page_size 每页标签数量，默认 2
+ * @param {string} box_id 箱子ID（可选，传则打印单个箱子箱唛）
+ */
+export const getAmazonShipmentLabels = (shipment_id, page_type = 'PackageLabel_Thermal_NonPCP', page_size = 2, box_id = null) => {
+  const params = { page_type, page_size };
+  if (box_id) {
+    params.box_id = box_id;
+  }
+  return api.get(`/amazon/shipments/${shipment_id}/labels`, { params });
+};
+
+/**
  * 一键同步所有数据
  */
 export const syncAmazonAll = () => {
@@ -267,10 +282,29 @@ export const syncAmazonShipmentItems = (shipment_id) => {
 };
 
 /**
+ * 同步入库计划箱子数据
+ * @param {string} plan_id 入库计划ID
+ */
+export const syncAmazonInboundPlanBoxes = (plan_id) => {
+  return api.post(`/amazon/sync/inbound-plans/${plan_id}/boxes`);
+};
+
+/**
  * 获取仓库列表
  */
 export const getAmazonWarehouses = () => {
   return api.get('/amazon/warehouses');
+};
+
+/**
+ * 获取亚马逊入库计划箱子列表
+ * @param {string} shipment_id 货件编号（必填）
+ * @param {Object} params {page, page_size}
+ */
+export const getAmazonInboundPlanBoxes = (shipment_id, params = {}) => {
+  return api.get('/amazon/inbound-plan-boxes', {
+    params: { shipment_id, ...params }
+  });
 };
 
 // ==================== 亚马逊库存管理相关接口 ====================
