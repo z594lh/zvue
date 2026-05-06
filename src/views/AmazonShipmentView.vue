@@ -125,29 +125,28 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="scope">
-            <el-button type="primary" link size="small" @click="viewShipmentItems(scope.row)">
-              查看商品
-            </el-button>
-            <el-button type="info" link size="small" @click="viewShipmentBoxes(scope.row)">
-              查看箱子
-            </el-button>
-            <el-dropdown trigger="click">
-              <el-button type="primary" link size="small">
-                更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            <el-tooltip content="查看商品" placement="top">
+              <el-button type="primary" link @click="viewShipmentItems(scope.row)">
+                <el-icon><Goods /></el-icon>
               </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="printShipmentLabels(scope.row)">
-                    <el-icon><Printer /></el-icon> 打印箱唛
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="exportInvoice(scope.row)">
-                    <el-icon><Download /></el-icon> 导出发票
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            </el-tooltip>
+            <el-tooltip content="查看箱子" placement="top">
+              <el-button type="info" link @click="viewShipmentBoxes(scope.row)">
+                <el-icon><Box /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="打印箱唛" placement="top">
+              <el-button type="success" link :loading="labelsLoading" @click="printShipmentLabels(scope.row)">
+                <el-icon><Printer /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="导出发票" placement="top">
+              <el-button type="warning" link @click="exportInvoice(scope.row)">
+                <el-icon><Download /></el-icon>
+              </el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -379,7 +378,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, ArrowDown, Printer, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Box, Printer, Download } from '@element-plus/icons-vue'
 import {
   getAmazonShipments,
   getAmazonShipmentItems,
@@ -398,7 +397,8 @@ export default {
     Search,
     Refresh,
     RefreshRight,
-    ArrowDown,
+    Goods,
+    Box,
     Printer,
     Download
   },
