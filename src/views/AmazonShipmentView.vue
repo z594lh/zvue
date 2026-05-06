@@ -372,7 +372,7 @@ import {
   getAmazonShipments,
   getAmazonShipmentItems,
   getAmazonShipmentLabels,
-  syncAmazonShipments,
+  syncAmazonAll,
   syncAmazonShipmentItems,
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
@@ -512,7 +512,7 @@ export default {
     const syncAllData = async () => {
       syncLoading.value = true
       try {
-        const response = await syncAmazonShipments()
+        const response = await syncAmazonAll()
         if (response.data.status === 'success') {
           ElMessage.success(response.data.message || '同步完成')
           await fetchShipments()
