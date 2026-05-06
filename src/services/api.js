@@ -259,6 +259,16 @@ export const getAmazonShipmentLabels = (shipment_id, page_type = 'PackageLabel_T
 };
 
 /**
+ * 导出货件发票
+ * @param {string} shipment_id 货件ID
+ */
+export const exportAmazonShipmentInvoice = (shipment_id) => {
+  return api.get(`/amazon/shipments/${shipment_id}/invoice/export`, {
+    responseType: 'blob'
+  });
+};
+
+/**
  * 一键同步所有数据
  */
 export const syncAmazonAll = () => {
@@ -444,6 +454,27 @@ export const updateProduct = (id, data) => {
  */
 export const deleteProduct = (id) => {
   return api.delete(`/products/${id}`);
+};
+
+/**
+ * 创建产品（支持文件上传）
+ * @param {FormData} formData
+ */
+export const createProductWithFiles = (formData) => {
+  return api.post('/products', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+/**
+ * 更新产品（支持文件上传）
+ * @param {number} id 产品ID
+ * @param {FormData} formData
+ */
+export const updateProductWithFiles = (id, formData) => {
+  return api.put(`/products/${id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
 };
 
 // ==================== PDF 在线编辑与拆分接口 ====================

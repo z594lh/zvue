@@ -125,17 +125,29 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="scope">
-            <el-button type="primary" link @click="viewShipmentItems(scope.row)">
+            <el-button type="primary" link size="small" @click="viewShipmentItems(scope.row)">
               查看商品
             </el-button>
-            <el-button type="info" link @click="viewShipmentBoxes(scope.row)">
+            <el-button type="info" link size="small" @click="viewShipmentBoxes(scope.row)">
               查看箱子
             </el-button>
-            <el-button type="success" link :loading="labelsLoading" @click="printShipmentLabels(scope.row)">
-              打印箱唛
-            </el-button>
+            <el-dropdown trigger="click">
+              <el-button type="primary" link size="small">
+                更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="printShipmentLabels(scope.row)">
+                    <el-icon><Printer /></el-icon> 打印箱唛
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="exportInvoice(scope.row)">
+                    <el-icon><Download /></el-icon> 导出发票
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
@@ -367,7 +379,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, ArrowDown, Printer, Download } from '@element-plus/icons-vue'
 import {
   getAmazonShipments,
   getAmazonShipmentItems,
@@ -376,7 +388,8 @@ import {
   syncAmazonShipmentItems,
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
-  syncAmazonInboundPlanBoxes
+  syncAmazonInboundPlanBoxes,
+  exportAmazonShipmentInvoice
 } from '@/services/api.js'
 
 export default {
@@ -384,7 +397,10 @@ export default {
   components: {
     Search,
     Refresh,
-    RefreshRight
+    RefreshRight,
+    ArrowDown,
+    Printer,
+    Download
   },
   setup() {
     const loading = ref(false)
@@ -705,6 +721,28 @@ export default {
       }
     }
 
+    // 导出发票
+    const exportInvoice = async (shipment) => {
+      try {
+        const response = await exportAmazonShipmentInvoice(shipment.shipment_id)
+        const blob = new Blob([response.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${shipment.shipment_id}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        ElMessage.success('发票导出成功')
+      } catch (error) {
+        console.error('导出发票失败:', error)
+        ElMessage.error('导出发票失败')
+      }
+    }
+
     // 加载货件商品
     const loadShipmentItems = async () => {
       if (!selectedShipment.value) return
@@ -852,6 +890,7 @@ export default {
       showShipmentDetails,
       viewShipmentItems,
       printShipmentLabels,
+      exportInvoice,
       handleItemsPageChange,
       handleItemsSizeChange,
       parsePrepDetails,
