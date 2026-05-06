@@ -111,13 +111,14 @@
 
 <script>
 import { reactive, ref, getCurrentInstance } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { login, register, setAuthToken } from '@/services/api.js'
 
 export default {
   name: 'LoginView',
   setup() {
     const router = useRouter()
+    const route = useRoute()
     const { proxy } = getCurrentInstance()
     const activeTab = ref('login')
 
@@ -157,8 +158,9 @@ export default {
           proxy.$message.success({ message: '登录成功！', offset: window.innerHeight / 2 - 50 })
           // 触发登录成功事件，通知导航栏更新
           window.dispatchEvent(new CustomEvent('login-success'))
-          // 跳转到首页
-          router.push('/expense')
+          // 登录成功后返回之前所在页面，没有则默认跳转到 /expense
+          const redirect = route.query.redirect || '/expense'
+          router.push(redirect)
         } else {
           loginError.value = res.data.message || '登录失败'
         }

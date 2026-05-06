@@ -12,6 +12,7 @@ import AmazonInventoryView from '../views/AmazonInventoryView.vue'
 import SupplierView from '../views/SupplierView.vue'
 import PurchaseOrderView from '../views/PurchaseOrderView.vue'
 import ProductView from '../views/ProductView.vue'
+import { isAuthenticated } from '@/services/api.js'
 
 const routes = [
   {
@@ -84,6 +85,17 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes
+})
+
+// 全局前置守卫：未登录用户访问需要登录的页面时重定向到登录页
+const publicPaths = ['/', '/json', '/login']
+
+router.beforeEach((to, from, next) => {
+  if (!publicPaths.includes(to.path) && !isAuthenticated()) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+  } else {
+    next()
+  }
 })
 
 export default router
