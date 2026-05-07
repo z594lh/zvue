@@ -84,9 +84,10 @@ const navGroups = [
     ]
   },
   {
-    label: '记账',
+    label: '财务',
     children: [
-      { label: '记账', path: '/expense' }
+      { label: '支出记账', path: '/expense' },
+      { label: '计算售价', path: '/pricing' }
     ]
   },
   {
@@ -101,7 +102,15 @@ const navGroups = [
     children: [
       { label: '供应商管理', path: '/suppliers' },
       { label: '进货单管理', path: '/purchase-orders' },
-      { label: '产品维护', path: '/products' }
+      { label: '产品维护', path: '/products' },
+      { label: '类目维护', path: '/categories' }
+    ]
+  },
+  {
+    label: '货代',
+    children: [
+      { label: '货代管理', path: '/logistics-providers' },
+      { label: '货代运单管理', path: '/logistics-waybills' }
     ]
   },
   {

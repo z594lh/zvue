@@ -457,6 +457,56 @@ export const deleteProduct = (id) => {
 };
 
 /**
+ * 获取产品分类列表（下拉框用，不分页）
+ */
+export const getProductCategories = () => {
+  return api.get('/products/categories');
+};
+
+// ==================== 类目管理相关接口 ====================
+
+/**
+ * 获取类目列表（分页、搜索）
+ * @param {Object} params {keyword, page, page_size}
+ */
+export const getCategories = (params = {}) => {
+  return api.get('/products/categories', { params });
+};
+
+/**
+ * 获取类目详情
+ * @param {number} id 类目ID
+ */
+export const getCategory = (id) => {
+  return api.get(`/products/categories/${id}`);
+};
+
+/**
+ * 创建类目
+ * @param {Object} data {category, category_cn, commission_rate}
+ */
+export const createCategory = (data) => {
+  return api.post('/products/categories', data);
+};
+
+/**
+ * 更新类目
+ * @param {number} id 类目ID
+ * @param {Object} data 类目数据
+ */
+export const updateCategory = (id, data) => {
+  return api.put(`/products/categories/${id}`, data);
+};
+
+/**
+ * 删除类目
+ * @param {number} id 类目ID
+ */
+export const deleteCategory = (id) => {
+  return api.delete(`/products/categories/${id}`);
+};
+
+/**
  * 创建产品（支持文件上传）
  * @param {FormData} formData
  */
@@ -508,3 +558,109 @@ export const splitPdf = (file, pages) => {
     responseType: 'blob'
   });
 };
+
+// ==================== 售价计算接口 ====================
+
+/**
+ * SKU 售价反算
+ * @param {Object} data {seller_sku, target_profit_rate, fba_fee, commission_rate, ad_rate, refund_rate, exchange_rate, purchase_cost, purchase_cost_currency}
+ */
+export const calculatePricing = (data) => {
+  return api.post('/pricing/calculate', data);
+};
+
+// ==================== 货代管理相关接口 ====================
+
+/**
+ * 获取货代列表
+ * @param {Object} params {keyword, status, page, page_size}
+ */
+export const getLogisticsProviders = (params = {}) => {
+  return api.get('/logistics-providers', { params });
+};
+
+/**
+ * 获取货代详情
+ * @param {number} id 货代ID
+ */
+export const getLogisticsProvider = (id) => {
+  return api.get(`/logistics-providers/${id}`);
+};
+
+/**
+ * 创建货代
+ * @param {Object} data 货代数据
+ */
+export const createLogisticsProvider = (data) => {
+  return api.post('/logistics-providers', data);
+};
+
+/**
+ * 更新货代
+ * @param {number} id 货代ID
+ * @param {Object} data 货代数据
+ */
+export const updateLogisticsProvider = (id, data) => {
+  return api.put(`/logistics-providers/${id}`, data);
+};
+
+/**
+ * 删除货代
+ * @param {number} id 货代ID
+ */
+export const deleteLogisticsProvider = (id) => {
+  return api.delete(`/logistics-providers/${id}`);
+};
+
+// ==================== 货代运单管理相关接口 ====================
+
+/**
+ * 获取运单列表
+ * @param {Object} params {waybill_no, provider_id, status, transport_type, page, page_size}
+ */
+export const getLogisticsWaybills = (params = {}) => {
+  return api.get('/logistics-waybills', { params });
+};
+
+/**
+ * 获取运单详情
+ * @param {number} id 运单ID
+ */
+export const getLogisticsWaybill = (id) => {
+  return api.get(`/logistics-waybills/${id}`);
+};
+
+/**
+ * 创建运单
+ * @param {Object} data 运单数据
+ */
+export const createLogisticsWaybill = (data) => {
+  return api.post('/logistics-waybills', data);
+};
+
+/**
+ * 更新运单
+ * @param {number} id 运单ID
+ * @param {Object} data 运单数据
+ */
+export const updateLogisticsWaybill = (id, data) => {
+  return api.put(`/logistics-waybills/${id}`, data);
+};
+
+/**
+ * 删除运单
+ * @param {number} id 运单ID
+ */
+export const deleteLogisticsWaybill = (id) => {
+  return api.delete(`/logistics-waybills/${id}`);
+};
+
+/**
+ * 获取可供绑定的 FBA 货件列表
+ * @param {Object} params {status_list, keyword, exclude_waybill_id}
+ */
+export const getAvailableShipments = (params = {}) => {
+  return api.get('/logistics-waybills/available-shipments', { params });
+};
+
+

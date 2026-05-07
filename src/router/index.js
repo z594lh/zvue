@@ -5,6 +5,7 @@ import AiImageView from '../views/AiImageView.vue'
 import ImageGallery from '../views/ImageGallery.vue'
 import LoginView from '../views/LoginView.vue'
 import ExpenseView from '../views/ExpenseView.vue'
+import PricingView from '../views/PricingView.vue'
 import FbaLabelView from '../views/FbaLabelView.vue'
 import PdfToolsView from '../views/PdfToolsView.vue'
 import AmazonShipmentView from '../views/AmazonShipmentView.vue'
@@ -12,6 +13,9 @@ import AmazonInventoryView from '../views/AmazonInventoryView.vue'
 import SupplierView from '../views/SupplierView.vue'
 import PurchaseOrderView from '../views/PurchaseOrderView.vue'
 import ProductView from '../views/ProductView.vue'
+import CategoryView from '../views/CategoryView.vue'
+import LogisticsProviderView from '../views/LogisticsProviderView.vue'
+import LogisticsWaybillView from '../views/LogisticsWaybillView.vue'
 import { isAuthenticated } from '@/services/api.js'
 
 const routes = [
@@ -44,6 +48,11 @@ const routes = [
     path: '/expense',
     name: 'Expense',
     component: ExpenseView
+  },
+  {
+    path: '/pricing',
+    name: 'Pricing',
+    component: PricingView
   },
   {
     path: '/fba-label',
@@ -79,6 +88,21 @@ const routes = [
     path: '/products',
     name: 'Products',
     component: ProductView
+  },
+  {
+    path: '/categories',
+    name: 'Categories',
+    component: CategoryView
+  },
+  {
+    path: '/logistics-providers',
+    name: 'LogisticsProviders',
+    component: LogisticsProviderView
+  },
+  {
+    path: '/logistics-waybills',
+    name: 'LogisticsWaybills',
+    component: LogisticsWaybillView
   }
 ]
 

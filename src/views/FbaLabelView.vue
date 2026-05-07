@@ -9,34 +9,37 @@
       <div class="form-card">
         <h3 class="section-title">标签信息</h3>
         <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
-          <el-form-item label="FNSKU" prop="fnsku">
-            <el-input
-              v-model="form.fnsku"
-              placeholder="请输入亚马逊 FNSKU"
+          <el-form-item label="选择 SKU" prop="selected_sku">
+            <el-select
+              v-model="form.selected_sku"
+              placeholder="请选择产品 SKU"
               clearable
-            />
+              filterable
+              style="width: 100%"
+              @change="handleSkuChange"
+            >
+              <el-option
+                v-for="item in productList"
+                :key="item.seller_sku"
+                :label="item.seller_sku + (item.product_name ? ' - ' + item.product_name : '')"
+                :value="item.seller_sku"
+              />
+            </el-select>
           </el-form-item>
-          <el-form-item label="SKU 编码" prop="sku">
-            <el-input
-              v-model="form.sku"
-              placeholder="请输入 SKU 编码"
-              clearable
-            />
+
+          <el-form-item label="FNSKU">
+            <el-input v-model="form.fnsku" disabled />
           </el-form-item>
-          <el-form-item label="产品名称" prop="product_name">
-            <el-input
-              v-model="form.product_name"
-              placeholder="请输入产品名称"
-              clearable
-            />
+          <el-form-item label="SKU 编码">
+            <el-input v-model="form.sku" disabled />
+          </el-form-item>
+          <el-form-item label="产品名称">
+            <el-input v-model="form.product_name" disabled />
           </el-form-item>
           <el-form-item label="额外信息">
-            <el-input
-              v-model="form.extra_info"
-              placeholder="如颜色、尺寸等（可选）"
-              clearable
-            />
+            <el-input v-model="form.extra_info" disabled />
           </el-form-item>
+
           <el-form-item label="标签尺寸">
             <div class="size-inputs">
               <el-input-number
@@ -45,20 +48,21 @@
                 :max="100"
                 :step="5"
                 controls-position="right"
-                style="width: 140px"
+                style="width: 120px"
               />
-              <span class="size-separator">mm ×</span>
+              <span class="size-separator">mm</span>
+              <span class="size-separator">×</span>
               <el-input-number
                 v-model="form.height_mm"
                 :min="15"
                 :max="80"
                 :step="5"
                 controls-position="right"
-                style="width: 140px"
+                style="width: 120px"
               />
               <span class="size-separator">mm</span>
             </div>
-            <div class="size-hint">默认 60mm × 40mm</div>
+            <div class="size-hint">默认 70mm × 40mm</div>
           </el-form-item>
           <el-form-item label="打印数量" prop="quantity">
             <el-input-number
@@ -145,7 +149,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Printer, View, DocumentCopy } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { generateFbaLabel } from '@/services/api.js'
+import { generateFbaLabel, getProducts } from '@/services/api.js'
 
 export default {
   name: 'FbaLabelView',
@@ -155,21 +159,49 @@ export default {
     const generating = ref(false)
     const generatedLabel = ref(null)
     const history = ref([])
+    const productList = ref([])
 
     const form = reactive({
+      selected_sku: '',
       fnsku: '',
       product_name: '',
       sku: '',
       extra_info: '',
-      width_mm: 60,
+      width_mm: 70,
       height_mm: 40,
       quantity: 1
     })
 
     const rules = {
-      fnsku: [{ required: true, message: '请输入 FNSKU', trigger: 'blur' }],
-      product_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
-      sku: [{ required: true, message: '请输入 SKU 编码', trigger: 'blur' }]
+      selected_sku: [{ required: true, message: '请选择 SKU', trigger: 'change' }]
+    }
+
+    const handleSkuChange = (sku) => {
+      if (!sku) {
+        form.fnsku = ''
+        form.sku = ''
+        form.product_name = ''
+        form.extra_info = ''
+        return
+      }
+      const product = productList.value.find(item => item.seller_sku === sku)
+      if (product) {
+        form.fnsku = product.fnsku || ''
+        form.sku = product.seller_sku || ''
+        form.product_name = product.declare_name_en || product.product_name || ''
+        form.extra_info = product.model || ''
+      }
+    }
+
+    const fetchProducts = async () => {
+      try {
+        const response = await getProducts({ status: 1, page_size: 9999 })
+        if (response.data.status === 'success') {
+          productList.value = response.data.data?.list || []
+        }
+      } catch (error) {
+        console.error('获取产品列表失败:', error)
+      }
     }
 
     // 统一错误处理
@@ -248,8 +280,13 @@ export default {
     // 重置表单
     const resetForm = () => {
       formRef.value?.resetFields()
-      form.width_mm = 50
-      form.height_mm = 30
+      form.selected_sku = ''
+      form.fnsku = ''
+      form.sku = ''
+      form.product_name = ''
+      form.extra_info = ''
+      form.width_mm = 70
+      form.height_mm = 40
       form.quantity = 1
       generatedLabel.value = null
     }
@@ -296,6 +333,7 @@ export default {
           history.value = []
         }
       }
+      fetchProducts()
     })
 
     return {
@@ -305,11 +343,13 @@ export default {
       generating,
       generatedLabel,
       history,
+      productList,
       submitForm,
       resetForm,
       openPdf,
       copyUrl,
       reopenHistory,
+      handleSkuChange,
       Printer,
       View,
       DocumentCopy
@@ -370,12 +410,14 @@ export default {
 .size-inputs {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .size-separator {
   color: #666;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .size-hint {

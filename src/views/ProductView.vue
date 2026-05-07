@@ -30,6 +30,22 @@
           </el-select>
         </el-form-item>
 
+        <el-form-item label="分类">
+          <el-select
+            v-model="searchForm.category_id"
+            placeholder="选择分类"
+            clearable
+            style="width: 160px"
+          >
+            <el-option
+              v-for="item in categoryList"
+              :key="item.id"
+              :label="item.category_cn || item.category"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" @click="handleSearch" :loading="loading">
             <el-icon><Search /></el-icon>
@@ -64,6 +80,7 @@
         <el-table-column prop="asin" label="ASIN" min-width="120" show-overflow-tooltip />
         <el-table-column prop="fnsku" label="FNSKU" min-width="120" show-overflow-tooltip />
         <el-table-column prop="weight_kg" label="重量(kg)" width="100" align="center" />
+        <el-table-column prop="category_name" label="分类" width="120" align="center" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="80" align="center">
           <template #default="scope">
             <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
@@ -152,6 +169,23 @@
           <el-col :span="12">
             <el-form-item label="英文材质">
               <el-input v-model="formData.material_en" placeholder="输入英文材质" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="分类">
+              <el-select
+                v-model="formData.category_id"
+                placeholder="选择分类"
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="item in categoryList"
+                  :key="item.id"
+                  :label="item.category_cn || item.category"
+                  :value="item.id"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -330,7 +364,8 @@ import {
   getProducts,
   createProductWithFiles,
   updateProductWithFiles,
-  deleteProduct
+  deleteProduct,
+  getProductCategories
 } from '@/services/api.js'
 
 export default {
@@ -356,7 +391,8 @@ export default {
 
     const searchForm = reactive({
       keyword: '',
-      status: ''
+      status: '',
+      category_id: ''
     })
 
     const pagination = reactive({
@@ -373,6 +409,7 @@ export default {
       declare_name_en: '',
       remark: '',
       status: 1,
+      category_id: '',
 
       // 材质信息
       material_cn: '',
@@ -426,6 +463,7 @@ export default {
         }
         if (searchForm.keyword) params.keyword = searchForm.keyword
         if (searchForm.status !== '') params.status = searchForm.status
+        if (searchForm.category_id !== '') params.category_id = searchForm.category_id
 
         const response = await getProducts(params)
         if (response.data.status === 'success') {
@@ -457,6 +495,7 @@ export default {
     const resetSearch = () => {
       searchForm.keyword = ''
       searchForm.status = ''
+      searchForm.category_id = ''
       pagination.page = 1
       fetchList()
     }
@@ -469,6 +508,7 @@ export default {
       formData.declare_name_en = ''
       formData.remark = ''
       formData.status = 1
+      formData.category_id = ''
 
       formData.material_cn = ''
       formData.material_en = ''
@@ -508,6 +548,7 @@ export default {
       formData.declare_name_en = row.declare_name_en || ''
       formData.remark = row.remark || ''
       formData.status = row.status ?? 1
+      formData.category_id = row.category_id ?? ''
 
       formData.material_cn = row.material_cn || ''
       formData.material_en = row.material_en || ''
@@ -577,6 +618,7 @@ export default {
         fd.append('declare_name_en', formData.declare_name_en || '')
         fd.append('remark', formData.remark || '')
         fd.append('status', formData.status)
+        fd.append('category_id', formData.category_id != null ? formData.category_id : '')
         fd.append('material_cn', formData.material_cn || '')
         fd.append('material_en', formData.material_en || '')
         fd.append('purpose', formData.purpose || '')
@@ -659,8 +701,22 @@ export default {
       fetchList()
     }
 
+    const categoryList = ref([])
+
+    const fetchCategories = async () => {
+      try {
+        const response = await getProductCategories()
+        if (response.data.status === 'success') {
+          categoryList.value = response.data.data?.list || []
+        }
+      } catch (error) {
+        console.error('获取产品分类失败:', error)
+      }
+    }
+
     onMounted(() => {
       fetchList()
+      fetchCategories()
     })
 
     return {
@@ -678,6 +734,7 @@ export default {
       imageFilesList,
       previewVisible,
       previewImageUrl,
+      categoryList,
       handleSearch,
       resetSearch,
       handleCreate,
