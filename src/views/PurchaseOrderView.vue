@@ -42,9 +42,9 @@
             style="width: 130px"
           >
             <el-option label="全部" value="" />
-            <el-option label="待审核" :value="0" />
-            <el-option label="已完成" :value="1" />
-            <el-option label="已取消" :value="2" />
+            <el-option label="待下单" :value="0" />
+            <el-option label="已下单" :value="1" />
+            <el-option label="已完成" :value="2" />
           </el-select>
         </el-form-item>
 
@@ -178,9 +178,9 @@
             <el-col :span="8">
               <el-form-item label="状态" prop="status">
                 <el-select v-model="formData.status" placeholder="选择状态" style="width: 100%">
-                  <el-option label="待审核" :value="0" />
-                  <el-option label="已完成" :value="1" />
-                  <el-option label="已取消" :value="2" />
+                  <el-option label="待下单" :value="0" />
+                  <el-option label="已下单" :value="1" />
+                  <el-option label="已完成" :value="2" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -608,12 +608,12 @@ export default {
     }
 
     const getStatusType = (status) => {
-      const map = { 0: 'warning', 1: 'success', 2: 'danger' }
+      const map = { 0: 'warning', 1: 'primary', 2: 'success' }
       return map[status] || 'info'
     }
 
     const getStatusText = (status) => {
-      const map = { 0: '待审核', 1: '已完成', 2: '已取消' }
+      const map = { 0: '待下单', 1: '已下单', 2: '已完成' }
       return map[status] || status
     }
 
