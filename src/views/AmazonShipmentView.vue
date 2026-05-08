@@ -1,8 +1,8 @@
 <template>
   <div class="amazon-shipment-page">
     <div class="page-header">
-      <h1 class="page-title">亚马逊货件管理</h1>
-      <p class="page-subtitle">管理您的亚马逊FBA货件，查看货件状态和详情</p>
+      <h1 class="page-title">亚马逊货件列表</h1>
+      <p class="page-subtitle">查看您的亚马逊FBA货件，查看货件状态和详情</p>
     </div>
 
     <!-- 搜索和筛选区域 -->

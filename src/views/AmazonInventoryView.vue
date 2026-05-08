@@ -1,7 +1,7 @@
 <template>
   <div class="amazon-inventory-page">
     <div class="page-header">
-      <h1 class="page-title">亚马逊库存管理</h1>
+      <h1 class="page-title">亚马逊库存列表</h1>
       <p class="page-subtitle">查看亚马逊FBA库存汇总，掌握商品库存状态</p>
     </div>
 

@@ -342,6 +342,48 @@ export const getInboundShipmentDetail = (shipment_id) => {
   return api.get(`/amazon/inbound-shipments/${shipment_id}/detail`);
 };
 
+// ==================== 亚马逊订单管理相关接口 ====================
+
+/**
+ * 获取亚马逊订单列表
+ * @param {Object} params {order_status, amazon_order_id, buyer_name, purchase_date_from, purchase_date_to, page, page_size}
+ */
+export const getAmazonOrders = (params = {}) => {
+  return api.get('/amazon/orders', { params });
+};
+
+/**
+ * 获取亚马逊订单详情（含商品列表）
+ * @param {string} order_id 亚马逊订单号
+ */
+export const getAmazonOrder = (order_id) => {
+  return api.get(`/amazon/orders/${order_id}`);
+};
+
+/**
+ * 手动同步订单列表
+ * @param {Object} data {created_after, created_before, order_statuses, marketplace_ids}
+ */
+export const syncAmazonOrders = (data = {}) => {
+  return api.post('/amazon/sync/orders', data);
+};
+
+/**
+ * 手动同步指定订单的商品数据
+ * @param {string} order_id 亚马逊订单号
+ */
+export const syncAmazonOrderItems = (order_id) => {
+  return api.post(`/amazon/sync/orders/${order_id}/items`);
+};
+
+/**
+ * 一键全量同步订单（订单列表 + 商品明细）
+ * @param {Object} data {created_after, created_before, order_statuses, marketplace_ids}
+ */
+export const syncAmazonOrdersAll = (data = {}) => {
+  return api.post('/amazon/sync/orders-all', data);
+};
+
 // ==================== 亚马逊库存管理相关接口 ====================
 
 /**

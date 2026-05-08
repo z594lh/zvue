@@ -93,8 +93,9 @@ const navGroups = [
   {
     label: '亚马逊',
     children: [
-      { label: '货件管理', path: '/amazon-shipments' },
-      { label: '库存管理', path: '/amazon-inventory' }
+      { label: '订单列表', path: '/amazon-orders' },
+      { label: '货件列表', path: '/amazon-shipments' },
+      { label: '库存列表', path: '/amazon-inventory' }
     ]
   },
   {
