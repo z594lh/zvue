@@ -8,12 +8,47 @@
     <!-- 搜索和筛选区域 -->
     <div class="search-card">
       <el-form :model="searchForm" :inline="true" class="search-form">
+        <el-form-item label="货件编号">
+          <el-input
+            v-model="searchForm.shipment_confirmation_id"
+            placeholder="如 FBA19CDP5H0W"
+            clearable
+            style="width: 180px"
+          />
+        </el-form-item>
+
+        <el-form-item label="亚马逊参考号">
+          <el-input
+            v-model="searchForm.amazon_reference_id"
+            placeholder="如 8AAFYNCI"
+            clearable
+            style="width: 160px"
+          />
+        </el-form-item>
+
+        <el-form-item label="目标仓库">
+          <el-select
+            v-model="searchForm.destination_warehouse_id"
+            placeholder="选择仓库"
+            clearable
+            filterable
+            style="width: 140px"
+          >
+            <el-option
+              v-for="wh in warehouses"
+              :key="wh.warehouse_id"
+              :label="wh.warehouse_id"
+              :value="wh.warehouse_id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="状态筛选">
           <el-select
             v-model="searchForm.status"
             placeholder="选择状态"
             clearable
-            style="width: 160px"
+            style="width: 140px"
           >
             <el-option label="全部" value="" />
             <el-option label="处理中" value="WORKING" />
@@ -22,23 +57,6 @@
             <el-option label="已关闭" value="CLOSED" />
             <el-option label="已删除" value="DELETED" />
             <el-option label="已取消" value="CANCELLED" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="目标仓库">
-          <el-select
-            v-model="searchForm.destination_fc"
-            placeholder="选择仓库"
-            clearable
-            filterable
-            style="width: 160px"
-          >
-            <el-option
-              v-for="wh in warehouses"
-              :key="wh.warehouse_id"
-              :label="wh.warehouse_id"
-              :value="wh.warehouse_id"
-            />
           </el-select>
         </el-form-item>
 
@@ -83,11 +101,11 @@
         v-loading="loading"
         stripe
         style="width: 100%"
-        :default-sort="{ prop: 'sync_time', order: 'descending' }"
+        :default-sort="{ prop: 'shipment_sync_time', order: 'descending' }"
       >
-        <el-table-column prop="shipment_id" label="货件ID" width="140" fixed="left">
+        <el-table-column prop="shipment_id" label="货件ID" width="220" fixed="left">
           <template #default="scope">
-            <el-button type="primary" link @click="showShipmentDetails(scope.row)">
+            <el-button type="primary" link @click="viewShipmentDetail(scope.row)">
               {{ scope.row.shipment_id }}
             </el-button>
           </template>
@@ -95,18 +113,12 @@
 
         <el-table-column prop="shipment_name" label="货件名称" min-width="220" show-overflow-tooltip />
 
-        <el-table-column label="发货地址" min-width="240" show-overflow-tooltip>
-          <template #default="scope">
-            <div v-if="scope.row.ship_from_name">
-              <div class="address-name">{{ scope.row.ship_from_name }}</div>
-              <div class="address-detail">{{ formatFullAddress(scope.row) }}</div>
-            </div>
-            <div v-else>-</div>
-          </template>
-        </el-table-column>
+        <el-table-column prop="shipment_confirmation_id" label="货件编号" width="140" />
 
-        <el-table-column prop="destination_fulfillment_center_id" label="目标仓库" width="100" align="center" />
+        <el-table-column prop="amazon_reference_id" label="亚马逊参考号" width="130" />
 
+        <el-table-column prop="destination_warehouse_id" label="目标仓库" width="100" align="center" />
+        
         <el-table-column prop="shipment_status" label="状态" width="100" align="center">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.shipment_status)">
@@ -115,21 +127,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="box_contents_source" label="装箱来源" width="110" align="center" />
-
-        <el-table-column prop="label_prep_type" label="标签类型" width="120" align="center" />
-
-        <el-table-column prop="sync_time" label="同步时间" width="160" align="center">
+        <el-table-column prop="shipment_sync_time" label="同步时间" width="170" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.sync_time) }}
+            {{ formatDate(scope.row.shipment_sync_time) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="140" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="scope">
-            <el-tooltip content="查看商品" placement="top">
-              <el-button type="primary" link @click="viewShipmentItems(scope.row)">
-                <el-icon><Goods /></el-icon>
+            <el-tooltip content="货件详情" placement="top">
+              <el-button type="primary" link @click="viewShipmentDetail(scope.row)">
+                <el-icon><InfoFilled /></el-icon>
               </el-button>
             </el-tooltip>
             <el-tooltip content="查看箱子" placement="top">
@@ -173,112 +181,110 @@
       width="70%"
       :destroy-on-close="true"
     >
-      <div v-if="currentShipment" class="shipment-detail">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="货件ID">{{ currentShipment.shipment_id }}</el-descriptions-item>
-          <el-descriptions-item label="货件名称">{{ currentShipment.shipment_name }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="getStatusType(currentShipment.shipment_status)">
-              {{ getStatusText(currentShipment.shipment_status) }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="目标仓库">{{ currentShipment.destination_fulfillment_center_id }}</el-descriptions-item>
-          <el-descriptions-item label="标签类型">{{ currentShipment.label_prep_type }}</el-descriptions-item>
-          <el-descriptions-item label="装箱来源">{{ currentShipment.box_contents_source }}</el-descriptions-item>
-          <el-descriptions-item label="市场ID">{{ currentShipment.marketplace_id }}</el-descriptions-item>
-          <el-descriptions-item label="同步时间">{{ formatDate(currentShipment.sync_time) }}</el-descriptions-item>
-        </el-descriptions>
+      <div v-loading="detailLoading">
+        <div v-if="shipmentDetailData" class="shipment-detail">
+          <!-- 基础信息 -->
+          <div class="detail-section">
+            <h4>基础信息</h4>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="货件ID">{{ shipmentDetailData.shipment_id }}</el-descriptions-item>
+              <el-descriptions-item label="入库计划ID">{{ shipmentDetailData.inbound_plan_id }}</el-descriptions-item>
+              <el-descriptions-item label="货件名称">{{ shipmentDetailData.name }}</el-descriptions-item>
+              <el-descriptions-item label="货件编号">{{ shipmentDetailData.shipment_confirmation_id || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="亚马逊参考号">{{ shipmentDetailData.amazon_reference_id || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="状态">
+                <el-tag :type="getStatusType(shipmentDetailData.status)">
+                  {{ getStatusText(shipmentDetailData.status) }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="目标仓库">{{ shipmentDetailData.destination_warehouse_id || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="目标类型">{{ shipmentDetailData.destination_type || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="来源类型">{{ shipmentDetailData.source_type || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="同步时间">{{ formatDate(shipmentDetailData.sync_time) }}</el-descriptions-item>
+              <el-descriptions-item label="Placement Option ID">{{ shipmentDetailData.placement_option_id || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="Transportation Option ID">{{ shipmentDetailData.selected_transportation_option_id || '-' }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
 
-        <div class="detail-section" v-if="currentShipment.ship_from_name">
-          <h4>发货地址</h4>
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="名称">{{ currentShipment.ship_from_name }}</el-descriptions-item>
-            <el-descriptions-item label="详细地址">{{ formatAddress(currentShipment) }}</el-descriptions-item>
-            <el-descriptions-item label="城市">{{ currentShipment.ship_from_city }}, {{ currentShipment.ship_from_state }}</el-descriptions-item>
-            <el-descriptions-item label="邮编">{{ currentShipment.ship_from_postal_code }}</el-descriptions-item>
-            <el-descriptions-item label="国家">{{ currentShipment.ship_from_country }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
-      </div>
-    </el-dialog>
+          <!-- 目的地址 -->
+          <div class="detail-section" v-if="parsedDestinationAddress">
+            <h4>目的地址</h4>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="名称">{{ parsedDestinationAddress.name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="公司">{{ parsedDestinationAddress.companyName || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="地址行1">{{ parsedDestinationAddress.addressLine1 || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="地址行2">{{ parsedDestinationAddress.addressLine2 || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="城市">{{ parsedDestinationAddress.city || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="州/省">{{ parsedDestinationAddress.stateOrProvinceCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="邮编">{{ parsedDestinationAddress.postalCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="国家">{{ parsedDestinationAddress.countryCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="电话">{{ parsedDestinationAddress.phoneNumber || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="区县">{{ parsedDestinationAddress.districtOrCounty || '-' }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
 
-    <!-- 商品列表对话框 -->
-    <el-dialog
-      v-model="itemsDialogVisible"
-      :title="`商品列表 - ${selectedShipment?.shipment_id}`"
-      width="75%"
-      :destroy-on-close="true"
-    >
-      <div class="items-dialog-header">
-        <el-tooltip
-          effect="dark"
-          placement="top"
-          content="从亚马逊卖家后台手动同步该货件的商品明细。页面数据每小时自动更新一次，如需查看最新商品信息可点击此按钮。"
-        >
-          <el-button type="warning" @click="syncCurrentShipmentItems" :loading="itemsLoading" size="small">
-            <el-icon><RefreshRight /></el-icon>
-            同步该货件商品
-          </el-button>
-        </el-tooltip>
-      </div>
-      <div v-loading="itemsLoading">
-        <div v-if="shipmentItems && shipmentItems.length > 0">
-          <el-table :data="shipmentItems" stripe style="width: 100%">
-            <el-table-column prop="seller_sku" label="SKU" width="150" />
-            <el-table-column label="中文申报" min-width="180" show-overflow-tooltip>
-              <template #default="scope">
-                {{ scope.row.declare_name_cn || scope.row.product_name || '-' }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="declare_name_en" label="英文申报" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="fulfillment_network_sku" label="FNSKU" width="150" />
-            <el-table-column prop="quantity_shipped" label="发货数量" width="100" align="center" />
-            <el-table-column prop="quantity_received" label="接收数量" width="100" align="center" />
-            <el-table-column prop="quantity_in_case" label="每箱数量" width="100" align="center" />
-            <el-table-column label="预处理详情" min-width="200">
-              <template #default="scope">
-                <div v-if="parsePrepDetails(scope.row.prep_details).length > 0">
-                  <el-tag
-                    v-for="(prep, idx) in parsePrepDetails(scope.row.prep_details)"
-                    :key="idx"
-                    size="small"
-                    class="prep-tag"
-                  >
-                    {{ prep.PrepInstruction }} ({{ prep.PrepOwner }})
-                  </el-tag>
-                </div>
+          <!-- 发货地址 -->
+          <div class="detail-section" v-if="parsedSourceAddress">
+            <h4>发货地址</h4>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="名称">{{ parsedSourceAddress.name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="公司">{{ parsedSourceAddress.companyName || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="地址行1">{{ parsedSourceAddress.addressLine1 || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="地址行2">{{ parsedSourceAddress.addressLine2 || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="城市">{{ parsedSourceAddress.city || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="州/省">{{ parsedSourceAddress.stateOrProvinceCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="邮编">{{ parsedSourceAddress.postalCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="国家">{{ parsedSourceAddress.countryCode || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="电话">{{ parsedSourceAddress.phoneNumber || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="区县">{{ parsedSourceAddress.districtOrCounty || '-' }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <!-- 配送窗口 -->
+          <div class="detail-section" v-if="parsedDeliveryWindow">
+            <h4>配送窗口</h4>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="窗口ID">{{ parsedDeliveryWindow.deliveryWindowOptionId || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="可用性">{{ parsedDeliveryWindow.availabilityType || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="开始时间">{{ formatDate(parsedDeliveryWindow.startDate) }}</el-descriptions-item>
+              <el-descriptions-item label="结束时间">{{ formatDate(parsedDeliveryWindow.endDate) }}</el-descriptions-item>
+              <el-descriptions-item label="可编辑截止">{{ formatDate(parsedDeliveryWindow.editableUntil) }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <!-- 追踪详情 -->
+          <div class="detail-section" v-if="parsedTrackingDetails">
+            <h4>追踪详情</h4>
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="LTL 追踪">
+                <pre v-if="hasLtlTracking" class="json-pre">{{ JSON.stringify(parsedTrackingDetails.ltlTrackingDetail, null, 2) }}</pre>
                 <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="sync_time" label="同步时间" width="160" align="center">
-              <template #default="scope">
-                {{ formatDate(scope.row.sync_time) }}
-              </template>
-            </el-table-column>
-          </el-table>
+              </el-descriptions-item>
+              <el-descriptions-item label="SPD 追踪">
+                <pre v-if="hasSpdTracking" class="json-pre">{{ JSON.stringify(parsedTrackingDetails.spdTrackingDetail, null, 2) }}</pre>
+                <span v-else>-</span>
+              </el-descriptions-item>
+            </el-descriptions>
+          </div>
 
-          <!-- 商品分页 -->
-          <div class="pagination-container">
-            <el-pagination
-              v-model:current-page="itemsPagination.page"
-              v-model:page-size="itemsPagination.page_size"
-              :page-sizes="[20, 50, 100]"
-              :total="itemsPagination.total"
-              layout="total, sizes, prev, pager, next, jumper"
-              :hide-on-single-page="false"
-              @current-change="handleItemsPageChange"
-              @size-change="handleItemsSizeChange"
-            />
+          <!-- 日期信息 -->
+          <div class="detail-section" v-if="parsedDates && Object.keys(parsedDates).length > 0">
+            <h4>日期信息</h4>
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="Dates JSON">
+                <pre class="json-pre">{{ JSON.stringify(parsedDates, null, 2) }}</pre>
+              </el-descriptions-item>
+            </el-descriptions>
           </div>
         </div>
-        <el-empty v-else description="暂无商品数据" />
+        <el-empty v-else description="暂无详情数据" />
       </div>
     </el-dialog>
 
     <!-- 箱子列表对话框 -->
     <el-dialog
       v-model="boxesDialogVisible"
-      :title="`箱子列表 - ${selectedBoxesShipment?.shipment_id}`"
+      :title="`箱子列表 - ${selectedBoxesShipment?.shipment_confirmation_id || selectedBoxesShipment?.shipment_id}`"
       width="85%"
       :destroy-on-close="true"
       @closed="allBoxesExpanded = false"
@@ -376,15 +382,14 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Box, Printer, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, InfoFilled, Box, Printer, Download } from '@element-plus/icons-vue'
 import {
-  getAmazonShipments,
-  getAmazonShipmentItems,
+  getInboundShipments,
+  getInboundShipmentDetail,
+  syncInboundShipments,
   getAmazonShipmentLabels,
-  syncAmazonAll,
-  syncAmazonShipmentItems,
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
   syncAmazonInboundPlanBoxes,
@@ -397,14 +402,13 @@ export default {
     Search,
     Refresh,
     RefreshRight,
-    Goods,
+    InfoFilled,
     Box,
     Printer,
     Download
   },
   setup() {
     const loading = ref(false)
-    const itemsLoading = ref(false)
     const syncLoading = ref(false)
     const labelsLoading = ref(false)
     const shipments = ref([])
@@ -412,8 +416,11 @@ export default {
 
     // 搜索表单
     const searchForm = reactive({
-      status: 'WORKING',
-      destination_fc: ''
+      inbound_plan_id: '',
+      shipment_confirmation_id: '',
+      amazon_reference_id: '',
+      destination_warehouse_id: '',
+      status: 'WORKING'
     })
 
     // 分页状态
@@ -425,19 +432,9 @@ export default {
 
     // 详情对话框
     const detailDialogVisible = ref(false)
+    const detailLoading = ref(false)
     const currentShipment = ref(null)
-
-    // 商品列表对话框
-    const itemsDialogVisible = ref(false)
-    const selectedShipment = ref(null)
-    const shipmentItems = ref([])
-
-    // 商品分页
-    const itemsPagination = reactive({
-      page: 1,
-      page_size: 20,
-      total: 0
-    })
+    const shipmentDetailData = ref(null)
 
     // 箱子列表对话框
     const boxesDialogVisible = ref(false)
@@ -473,15 +470,20 @@ export default {
           page_size: pagination.page_size
         }
 
+        if (searchForm.shipment_confirmation_id) {
+          params.shipment_confirmation_id = searchForm.shipment_confirmation_id
+        }
+        if (searchForm.amazon_reference_id) {
+          params.amazon_reference_id = searchForm.amazon_reference_id
+        }
+        if (searchForm.destination_warehouse_id) {
+          params.destination_warehouse_id = searchForm.destination_warehouse_id
+        }
         if (searchForm.status) {
           params.status = searchForm.status
         }
 
-        if (searchForm.destination_fc) {
-          params.destination_fc = searchForm.destination_fc
-        }
-
-        const response = await getAmazonShipments(params)
+        const response = await getInboundShipments(params)
 
         if (response.data.status === 'success') {
           const data = response.data.data || {}
@@ -512,8 +514,10 @@ export default {
 
     // 重置搜索
     const resetSearch = () => {
+      searchForm.shipment_confirmation_id = ''
+      searchForm.amazon_reference_id = ''
+      searchForm.destination_warehouse_id = ''
       searchForm.status = ''
-      searchForm.destination_fc = ''
       pagination.page = 1
       pagination.page_size = 20
       fetchShipments()
@@ -528,7 +532,7 @@ export default {
     const syncAllData = async () => {
       syncLoading.value = true
       try {
-        const response = await syncAmazonAll()
+        const response = await syncInboundShipments()
         if (response.data.status === 'success') {
           ElMessage.success(response.data.message || '同步完成')
           await fetchShipments()
@@ -540,26 +544,6 @@ export default {
         ElMessage.error('同步数据失败: ' + (error.response?.data?.message || error.message))
       } finally {
         syncLoading.value = false
-      }
-    }
-
-    // 同步当前货件商品
-    const syncCurrentShipmentItems = async () => {
-      if (!selectedShipment.value) return
-      itemsLoading.value = true
-      try {
-        const response = await syncAmazonShipmentItems(selectedShipment.value.shipment_id)
-        if (response.data.status === 'success') {
-          ElMessage.success(response.data.message || '货件商品同步完成')
-          await loadShipmentItems()
-        } else {
-          ElMessage.error(response.data.message || '货件商品同步失败')
-        }
-      } catch (error) {
-        console.error('同步货件商品失败:', error)
-        ElMessage.error('同步货件商品失败: ' + (error.response?.data?.message || error.message))
-      } finally {
-        itemsLoading.value = false
       }
     }
 
@@ -576,21 +560,26 @@ export default {
       fetchShipments()
     }
 
-    // 显示货件详情
-    const showShipmentDetails = (shipment) => {
+    // 查看货件详情
+    const viewShipmentDetail = async (shipment) => {
       currentShipment.value = shipment
       detailDialogVisible.value = true
-    }
+      detailLoading.value = true
+      shipmentDetailData.value = null
 
-    // 查看商品列表
-    const viewShipmentItems = async (shipment) => {
-      selectedShipment.value = shipment
-      itemsDialogVisible.value = true
-      itemsLoading.value = true
-      itemsPagination.page = 1
-      itemsPagination.page_size = 20
-
-      await loadShipmentItems()
+      try {
+        const response = await getInboundShipmentDetail(shipment.shipment_id)
+        if (response.data.status === 'success') {
+          shipmentDetailData.value = response.data.data || null
+        } else {
+          ElMessage.error(response.data.message || '获取货件详情失败')
+        }
+      } catch (error) {
+        console.error('获取货件详情失败:', error)
+        ElMessage.error('获取货件详情失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        detailLoading.value = false
+      }
     }
 
     // 查看箱子列表
@@ -611,7 +600,7 @@ export default {
       boxesLoading.value = true
       try {
         const response = await getAmazonInboundPlanBoxes(
-          selectedBoxesShipment.value.shipment_id,
+          selectedBoxesShipment.value.shipment_confirmation_id,
           {
             page: boxesPagination.page,
             page_size: boxesPagination.page_size
@@ -703,14 +692,12 @@ export default {
     const printShipmentLabels = async (shipment, boxId = null) => {
       labelsLoading.value = true
       try {
-        const response = await getAmazonShipmentLabels(shipment.shipment_id, 'PackageLabel_Thermal_NonPCP', 2, boxId)
+        const response = await getAmazonShipmentLabels(shipment.shipment_confirmation_id, 'PackageLabel_Thermal_NonPCP', 2, boxId)
         const downloadUrl = response.data?.data?.payload?.DownloadURL
         if (!downloadUrl) {
           ElMessage.error('未获取到箱唛下载链接')
           return
         }
-        // S3 预签名 URL 有跨域限制，不能在前端 fetch 获取 blob
-        // 直接用 window.open 让浏览器自行下载，避免 CORS 问题
         window.open(downloadUrl, '_blank')
         ElMessage.success('箱唛已打开，请在浏览器新标签页中查看或下载')
       } catch (error) {
@@ -724,7 +711,7 @@ export default {
     // 导出发票
     const exportInvoice = async (shipment) => {
       try {
-        const response = await exportAmazonShipmentInvoice(shipment.shipment_id)
+        const response = await exportAmazonShipmentInvoice(shipment.shipment_confirmation_id)
         const blob = new Blob([response.data], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         })
@@ -743,95 +730,55 @@ export default {
       }
     }
 
-    // 加载货件商品
-    const loadShipmentItems = async () => {
-      if (!selectedShipment.value) return
-
-      itemsLoading.value = true
+    // 解析 JSON
+    const safeParseJson = (str) => {
       try {
-        const response = await getAmazonShipmentItems(
-          selectedShipment.value.shipment_id,
-          {
-            page: itemsPagination.page,
-            page_size: itemsPagination.page_size
-          }
-        )
-
-        if (response.data.status === 'success') {
-          const data = response.data.data || {}
-          shipmentItems.value = data.list || []
-          itemsPagination.total = data.total || 0
-          itemsPagination.page = data.page || 1
-          itemsPagination.page_size = data.page_size || 20
-        } else {
-          shipmentItems.value = []
-          itemsPagination.total = 0
-          ElMessage.error(response.data.message || '获取商品列表失败')
-        }
-      } catch (error) {
-        console.error('获取商品列表失败:', error)
-        ElMessage.error('获取商品列表失败: ' + (error.response?.data?.message || error.message))
-        shipmentItems.value = []
-        itemsPagination.total = 0
-      } finally {
-        itemsLoading.value = false
-      }
-    }
-
-    // 商品分页变化
-    const handleItemsPageChange = (page) => {
-      itemsPagination.page = page
-      loadShipmentItems()
-    }
-
-    // 商品每页数量变化
-    const handleItemsSizeChange = (size) => {
-      itemsPagination.page_size = size
-      itemsPagination.page = 1
-      loadShipmentItems()
-    }
-
-    // 解析预处理详情
-    const parsePrepDetails = (str) => {
-      try {
-        return JSON.parse(str || '[]')
+        return JSON.parse(str || '{}')
       } catch {
-        return []
+        return {}
       }
     }
+
+    // 计算属性：解析详情中的 JSON 字段
+    const parsedDestinationAddress = computed(() => {
+      if (!shipmentDetailData.value?.destination_address_json) return null
+      return safeParseJson(shipmentDetailData.value.destination_address_json)
+    })
+
+    const parsedSourceAddress = computed(() => {
+      if (!shipmentDetailData.value?.source_address_json) return null
+      return safeParseJson(shipmentDetailData.value.source_address_json)
+    })
+
+    const parsedDeliveryWindow = computed(() => {
+      if (!shipmentDetailData.value?.selected_delivery_window_json) return null
+      return safeParseJson(shipmentDetailData.value.selected_delivery_window_json)
+    })
+
+    const parsedTrackingDetails = computed(() => {
+      if (!shipmentDetailData.value?.tracking_details_json) return null
+      return safeParseJson(shipmentDetailData.value.tracking_details_json)
+    })
+
+    const hasLtlTracking = computed(() => {
+      const td = parsedTrackingDetails.value
+      return td && td.ltlTrackingDetail && Object.keys(td.ltlTrackingDetail).length > 0
+    })
+
+    const hasSpdTracking = computed(() => {
+      const td = parsedTrackingDetails.value
+      return td && td.spdTrackingDetail && Object.keys(td.spdTrackingDetail).length > 0
+    })
+
+    const parsedDates = computed(() => {
+      if (!shipmentDetailData.value?.dates_json) return null
+      return safeParseJson(shipmentDetailData.value.dates_json)
+    })
 
     // 格式化日期
     const formatDate = (dateString) => {
       if (!dateString) return '-'
-      // 直接替换 T 为空格展示，避免 new Date() 时区解析导致时间偏移
       return dateString.replace('T', ' ')
-    }
-
-    // 格式化详细地址（用于表格展示）
-    const formatFullAddress = (row) => {
-      const parts = [
-        row.ship_from_address_line1,
-        row.ship_from_address_line2,
-        row.ship_from_district,
-        row.ship_from_city,
-        row.ship_from_state,
-        row.ship_from_postal_code,
-        row.ship_from_country
-      ].filter(Boolean)
-      return parts.join(', ')
-    }
-
-    // 格式化地址（用于详情页面）
-    const formatAddress = (row) => {
-      const parts = [
-        row.ship_from_address_line1,
-        row.ship_from_address_line2,
-        row.ship_from_city,
-        row.ship_from_state,
-        row.ship_from_postal_code,
-        row.ship_from_country
-      ].filter(Boolean)
-      return parts.join(', ')
     }
 
     // 状态样式
@@ -866,17 +813,14 @@ export default {
 
     return {
       loading,
-      itemsLoading,
       shipments,
       warehouses,
       searchForm,
       pagination,
       detailDialogVisible,
+      detailLoading,
       currentShipment,
-      itemsDialogVisible,
-      selectedShipment,
-      shipmentItems,
-      itemsPagination,
+      shipmentDetailData,
       syncLoading,
       labelsLoading,
       fetchShipments,
@@ -884,28 +828,28 @@ export default {
       resetSearch,
       refreshData,
       syncAllData,
-      syncCurrentShipmentItems,
       handlePageChange,
       handleSizeChange,
-      showShipmentDetails,
-      viewShipmentItems,
+      viewShipmentDetail,
+      viewShipmentBoxes,
       printShipmentLabels,
       exportInvoice,
-      handleItemsPageChange,
-      handleItemsSizeChange,
-      parsePrepDetails,
       formatDate,
-      formatAddress,
-      formatFullAddress,
       getStatusType,
       getStatusText,
+      parsedDestinationAddress,
+      parsedSourceAddress,
+      parsedDeliveryWindow,
+      parsedTrackingDetails,
+      hasLtlTracking,
+      hasSpdTracking,
+      parsedDates,
       // 箱子列表
       boxesDialogVisible,
       boxesLoading,
       selectedBoxesShipment,
       shipmentBoxes,
       boxesPagination,
-      viewShipmentBoxes,
       loadShipmentBoxes,
       handleBoxesPageChange,
       handleBoxesSizeChange,
@@ -980,18 +924,6 @@ export default {
   gap: 10px;
 }
 
-.address-name {
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.address-detail {
-  font-size: 13px;
-  color: #666;
-  line-height: 1.4;
-}
-
 .shipment-detail .detail-section {
   margin-top: 20px;
 }
@@ -1003,15 +935,17 @@ export default {
   font-weight: 600;
 }
 
-.prep-tag {
-  margin-right: 6px;
-  margin-bottom: 4px;
-}
-
-.items-dialog-header {
-  margin-bottom: 16px;
-  display: flex;
-  justify-content: flex-end;
+.json-pre {
+  margin: 0;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .pagination-container {

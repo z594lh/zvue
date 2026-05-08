@@ -317,6 +317,31 @@ export const getAmazonInboundPlanBoxes = (shipment_id, params = {}) => {
   });
 };
 
+// ==================== 亚马逊入库计划货件相关接口（新接口）====================
+
+/**
+ * 查询入库计划货件列表（连表详情）
+ * @param {Object} params {inbound_plan_id, shipment_confirmation_id, amazon_reference_id, destination_warehouse_id, status, page, page_size}
+ */
+export const getInboundShipments = (params = {}) => {
+  return api.get('/amazon/inbound-shipments', { params });
+};
+
+/**
+ * 一键同步最新货件数据
+ */
+export const syncInboundShipments = () => {
+  return api.post('/amazon/sync/inbound-shipments', {});
+};
+
+/**
+ * 查询货件详情
+ * @param {string} shipment_id 新版 shipmentId
+ */
+export const getInboundShipmentDetail = (shipment_id) => {
+  return api.get(`/amazon/inbound-shipments/${shipment_id}/detail`);
+};
+
 // ==================== 亚马逊库存管理相关接口 ====================
 
 /**
