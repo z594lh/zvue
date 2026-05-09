@@ -4,6 +4,13 @@
       <router-link to="/" class="brand-link">ZywTools</router-link>
     </div>
 
+    <!-- 移动端汉堡菜单按钮 -->
+    <button class="hamburger" @click="toggleMobileMenu" :class="{ active: mobileMenuOpen }" aria-label="菜单">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
     <div class="nav-links">
       <template v-for="group in navGroups" :key="group.label">
         <!-- 只有一个子项：直接跳转 -->
@@ -38,6 +45,41 @@
                 {{ item.label }}
               </router-link>
             </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 移动端菜单 -->
+    <div v-show="mobileMenuOpen" class="mobile-menu">
+      <template v-for="group in navGroups" :key="group.label">
+        <!-- 单个子项直接显示 -->
+        <router-link
+          v-if="group.children.length === 1"
+          :to="group.children[0].path"
+          class="mobile-sub-link"
+          style="padding: 14px 8px; font-size: 15px; color: #333; font-weight: 500;"
+          @click="closeMobileMenu"
+        >
+          {{ group.label }}
+        </router-link>
+
+        <!-- 多个子项可展开 -->
+        <div v-else class="mobile-menu-item">
+          <div class="mobile-menu-header" @click="openGroup = openGroup === group.label ? null : group.label">
+            <span>{{ group.label }}</span>
+            <span class="mobile-menu-arrow" :class="{ open: openGroup === group.label }">▼</span>
+          </div>
+          <div v-show="openGroup === group.label" class="mobile-sub-menu">
+            <router-link
+              v-for="item in group.children"
+              :key="item.path"
+              :to="item.path"
+              class="mobile-sub-link"
+              @click="closeMobileMenu"
+            >
+              {{ item.label }}
+            </router-link>
           </div>
         </div>
       </template>
@@ -135,6 +177,15 @@ export default {
     const showMenu = ref(false)
     const menuRef = ref(null)
     const openGroup = ref(null)
+    const mobileMenuOpen = ref(false)
+
+    const toggleMobileMenu = () => {
+      mobileMenuOpen.value = !mobileMenuOpen.value
+    }
+
+    const closeMobileMenu = () => {
+      mobileMenuOpen.value = false
+    }
 
     const isGroupActive = (group) => {
       return group.children.some(item => item.path === route.path)
@@ -213,6 +264,9 @@ export default {
       showMenu,
       menuRef,
       openGroup,
+      mobileMenuOpen,
+      toggleMobileMenu,
+      closeMobileMenu,
       toggleMenu,
       goToProfile,
       handleLogout,
@@ -462,6 +516,100 @@ export default {
   margin: 8px 0;
 }
 
+/* 移动端菜单 */
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  z-index: 99;
+  overflow-y: auto;
+  padding: 16px;
+  animation: slideDown 0.2s ease;
+}
+
+.mobile-menu-item {
+  border-bottom: 1px solid #eee;
+}
+
+.mobile-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 8px;
+  font-size: 15px;
+  color: #333;
+  font-weight: 500;
+}
+
+.mobile-menu-arrow {
+  font-size: 12px;
+  color: #999;
+  transition: transform 0.3s;
+}
+
+.mobile-menu-arrow.open {
+  transform: rotate(180deg);
+}
+
+.mobile-sub-menu {
+  padding: 0 8px 8px;
+}
+
+.mobile-sub-link {
+  display: block;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #666;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.mobile-sub-link.router-link-active,
+.mobile-sub-link.router-link-exact-active {
+  color: #667eea;
+  background: #f0f3ff;
+  font-weight: 500;
+}
+
+/* 汉堡菜单按钮 */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+}
+
+.hamburger span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: #333;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+
+.hamburger.active span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger.active span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .navbar {
@@ -474,6 +622,14 @@ export default {
 
   .username {
     display: none;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: block;
   }
 }
 </style>
