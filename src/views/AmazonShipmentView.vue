@@ -982,6 +982,19 @@ export default {
   .pagination-container {
     text-align: center;
   }
+
+  .shipment-detail .detail-section h4 {
+    font-size: 14px;
+  }
+
+  .json-pre {
+    font-size: 11px;
+    max-height: 200px;
+  }
+
+  .box-expand-content {
+    padding: 10px 12px;
+  }
 }
 
 .boxes-dialog-header {

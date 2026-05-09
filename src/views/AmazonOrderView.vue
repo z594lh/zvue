@@ -780,5 +780,15 @@ export default {
   .pagination-container {
     text-align: center;
   }
+
+  .order-detail .detail-section h4 {
+    font-size: 14px;
+  }
+
+  .items-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>

@@ -776,5 +776,18 @@ export default {
   .pagination-container {
     text-align: center;
   }
+
+  .image-list {
+    gap: 8px;
+  }
+
+  .description-box {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .listing-detail .detail-section h4 {
+    font-size: 14px;
+  }
 }
 </style>

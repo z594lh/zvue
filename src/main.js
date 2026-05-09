@@ -4,6 +4,7 @@ import App from './App.vue'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/dist/index.css'
+import '@/styles/mobile.css'
 import router from './router' // ✅ 正确引入 router 实例
 import { restoreAuthToken } from '@/services/api.js'
 

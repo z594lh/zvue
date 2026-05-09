@@ -1,0 +1,192 @@
+/**
+ * 全局移动端适配样式
+ * 所有规则仅在屏幕宽度 <= 768px 时生效，PC 端完全不受影响
+ */
+
+@media (max-width: 768px) {
+  /* ========== 页面基础 ========== */
+  html, body {
+    font-size: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ========== Dialog 弹窗 ========== */
+  .el-dialog {
+    width: 92vw !important;
+    max-width: none !important;
+    margin: 10px auto !important;
+  }
+
+  .el-dialog__header {
+    padding: 12px 16px !important;
+  }
+
+  .el-dialog__header .el-dialog__title {
+    font-size: 15px !important;
+    line-height: 1.4;
+  }
+
+  .el-dialog__body {
+    padding: 12px 16px !important;
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+  }
+
+  .el-dialog__footer {
+    padding: 10px 16px !important;
+  }
+
+  /* ========== Descriptions 详情（两列强制变单列） ========== */
+  .el-descriptions .el-descriptions__body .el-descriptions__table,
+  .el-descriptions .el-descriptions__body .el-descriptions__table tbody,
+  .el-descriptions .el-descriptions__body .el-descriptions__table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .el-descriptions .el-descriptions__body .el-descriptions__table td.el-descriptions__cell {
+    display: flex !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    padding: 8px 10px !important;
+  }
+
+  .el-descriptions .el-descriptions__cell .el-descriptions__label {
+    flex-shrink: 0;
+    min-width: 80px;
+    max-width: 40%;
+  }
+
+  .el-descriptions .el-descriptions__cell .el-descriptions__content {
+    flex: 1;
+    min-width: 0;
+    word-break: break-all;
+  }
+
+  /* 有边框模式额外微调 */
+  .el-descriptions.is-bordered .el-descriptions__body .el-descriptions__table td.el-descriptions__cell {
+    border-bottom: 1px solid var(--el-descriptions-table-border);
+  }
+
+  .el-descriptions.is-bordered .el-descriptions__body .el-descriptions__table tr:last-child td.el-descriptions__cell:last-child {
+    border-bottom: none;
+  }
+
+  /* ========== Form 表单 ========== */
+  .el-form-item {
+    display: block;
+    margin-bottom: 14px;
+  }
+
+  .el-form-item__label {
+    float: none !important;
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0 0 4px 0 !important;
+    line-height: 1.4;
+    font-size: 13px;
+  }
+
+  .el-form-item__content {
+    margin-left: 0 !important;
+    line-height: 1.4;
+  }
+
+  /* 行内表单也恢复为块级 */
+  .el-form--inline .el-form-item {
+    display: block;
+    margin-right: 0;
+  }
+
+  /* ========== Table 表格 ========== */
+  .el-table {
+    font-size: 12px;
+  }
+
+  .el-table .cell {
+    padding: 0 6px;
+    line-height: 1.4;
+  }
+
+  .el-table th.el-table__cell,
+  .el-table td.el-table__cell {
+    padding: 6px 0;
+  }
+
+  /* 表格上方操作按钮区 */
+  .el-table__header-wrapper .el-table__header th.el-table__cell {
+    font-size: 12px;
+  }
+
+  /* ========== Pagination 分页 ========== */
+  .el-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .el-pagination .el-pagination__total,
+  .el-pagination .el-pagination__sizes,
+  .el-pagination .el-pagination__jump {
+    display: none;
+  }
+
+  .el-pagination .btn-prev,
+  .el-pagination .btn-next,
+  .el-pagination .el-pager li {
+    min-width: 28px;
+    height: 28px;
+    line-height: 28px;
+    font-size: 12px;
+  }
+
+  /* ========== Card 卡片 ========== */
+  .el-card__body {
+    padding: 12px !important;
+  }
+
+  /* ========== Input / Select 输入框 ========== */
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: 14px; /* 防止 iOS 缩放 */
+  }
+
+  /* ========== DatePicker / TimePicker 弹窗 ========== */
+  .el-picker-panel {
+    max-width: 92vw;
+  }
+
+  /* ========== MessageBox 消息弹窗 ========== */
+  .el-message-box {
+    width: 84vw !important;
+    max-width: none !important;
+  }
+
+  /* ========== Image / Preview 图片预览 ========== */
+  .el-image-viewer__canvas img {
+    max-width: 100vw;
+    max-height: 100vh;
+  }
+
+  /* ========== Upload 上传 ========== */
+  .el-upload-list--picture-card .el-upload-list__item,
+  .el-upload--picture-card {
+    width: 80px;
+    height: 80px;
+  }
+
+  /* ========== Timeline 时间线 ========== */
+  .el-timeline-item__node {
+    left: 0;
+  }
+
+  .el-timeline-item__wrapper {
+    padding-left: 20px;
+  }
+
+  /* ========== 通用工具类 ========== */
+  .mobile-hide {
+    display: none !important;
+  }
+}

@@ -1357,11 +1357,17 @@ export default {
   }
 
   :deep(.el-form-item__label) {
-    width: 80px !important;
+    float: none !important;
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0 0 4px 0 !important;
+    line-height: 1.4;
   }
 
   :deep(.el-form-item__content) {
-    margin-left: 80px !important;
+    margin-left: 0 !important;
+    line-height: 1.4;
   }
 
   .edit-meta {

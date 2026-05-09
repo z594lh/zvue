@@ -546,5 +546,14 @@ export default {
   .pagination-container {
     text-align: center;
   }
+
+  .inventory-detail .detail-section h4 {
+    font-size: 14px;
+  }
+
+  .detail-tag {
+    margin-right: 4px;
+    margin-bottom: 4px;
+  }
 }
 </style>
