@@ -94,8 +94,10 @@ const navGroups = [
     label: '亚马逊',
     children: [
       { label: '订单列表', path: '/amazon-orders' },
+      { label: 'Listing列表', path: '/amazon-listings' },
       { label: '货件列表', path: '/amazon-shipments' },
       { label: '库存列表', path: '/amazon-inventory' }
+      
     ]
   },
   {

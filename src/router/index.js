@@ -11,6 +11,7 @@ import PdfToolsView from '../views/PdfToolsView.vue'
 import AmazonShipmentView from '../views/AmazonShipmentView.vue'
 import AmazonInventoryView from '../views/AmazonInventoryView.vue'
 import AmazonOrderView from '../views/AmazonOrderView.vue'
+import AmazonListingView from '../views/AmazonListingView.vue'
 import SupplierView from '../views/SupplierView.vue'
 import PurchaseOrderView from '../views/PurchaseOrderView.vue'
 import ProductView from '../views/ProductView.vue'
@@ -79,6 +80,11 @@ const routes = [
     path: '/amazon-orders',
     name: 'AmazonOrders',
     component: AmazonOrderView
+  },
+  {
+    path: '/amazon-listings',
+    name: 'AmazonListings',
+    component: AmazonListingView
   },
   {
     path: '/suppliers',

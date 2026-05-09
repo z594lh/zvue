@@ -679,6 +679,103 @@ export const deleteLogisticsProvider = (id) => {
   return api.delete(`/logistics-providers/${id}`);
 };
 
+// ==================== Amazon Listing 管理相关接口 ====================
+
+/**
+ * 获取 Amazon Listing 列表
+ * @param {Object} params {page, page_size, sku, asin, product_type, status, parent_sku, keyword}
+ */
+export const getAmazonListings = (params = {}) => {
+  return api.get('/amazon/listings', { params });
+};
+
+/**
+ * 获取 Amazon Listing 详情
+ * @param {string} sku 卖家 SKU
+ */
+export const getAmazonListing = (sku) => {
+  return api.get(`/amazon/listings/${sku}`);
+};
+
+/**
+ * 手动触发 Listing 同步
+ * @param {Object} data {included_data, page_size}
+ */
+export const syncAmazonListings = (data = {}) => {
+  return api.post('/amazon/sync/listings', data);
+};
+
+/**
+ * 实时获取 Listing 详情（直连 SP-API）
+ * @param {string} sku 卖家 SKU
+ * @param {string} included_data 逗号分隔，如 summaries,attributes,issues,offers
+ */
+export const getAmazonListingSpApi = (sku, included_data = 'summaries,attributes,issues') => {
+  return api.get(`/amazon/listings/spapi/${sku}`, { params: { included_data } });
+};
+
+/**
+ * 上传 Listing 图片到 OSS
+ * @param {FormData} formData 包含 image 文件
+ */
+export const uploadAmazonListingImage = (formData) => {
+  return api.post('/amazon/listings/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+/**
+ * 上架新 Listing
+ * @param {Object} data {sku, product_type, attributes, requirements, condition_type}
+ */
+export const createAmazonListing = (data) => {
+  return api.post('/amazon/listings', data);
+};
+
+/**
+ * 修改 Listing（完全覆盖式更新）
+ * @param {string} sku 卖家 SKU
+ * @param {Object} data 更新数据
+ */
+export const updateAmazonListing = (sku, data) => {
+  return api.put(`/amazon/listings/${sku}`, data);
+};
+
+/**
+ * 部分更新 Listing（JSON Patch）
+ * @param {string} sku 卖家 SKU
+ * @param {Object} data {patches, product_type}
+ */
+export const patchAmazonListing = (sku, data) => {
+  return api.patch(`/amazon/listings/${sku}`, data);
+};
+
+/**
+ * 删除 Listing
+ * @param {string} sku 卖家 SKU
+ * @param {string} marketplace_ids 逗号分隔的市场ID
+ */
+export const deleteAmazonListing = (sku, marketplace_ids = '') => {
+  const params = marketplace_ids ? { marketplace_ids } : {};
+  return api.delete(`/amazon/listings/${sku}`, { params });
+};
+
+/**
+ * 删除 OSS 图片
+ * @param {Object} data {oss_key} 或 {url}
+ */
+export const deleteAmazonListingImage = (data) => {
+  return api.delete('/amazon/listings/delete-image', { data });
+};
+
+/**
+ * 清理孤儿图片
+ * @param {Object} data {dry_run}
+ */
+export const cleanupAmazonListingImages = (data = { dry_run: true }) => {
+  return api.post('/amazon/listings/cleanup-images', data);
+};
+
 // ==================== 货代运单管理相关接口 ====================
 
 /**
