@@ -8,6 +8,22 @@
     <!-- 搜索和筛选区域 -->
     <div class="search-card">
       <el-form :model="searchForm" :inline="true" class="search-form">
+        <el-form-item label="店铺">
+          <el-select
+            v-model="selectedShopId"
+            placeholder="选择店铺"
+            style="width: 180px"
+            @change="handleShopChange"
+          >
+            <el-option
+              v-for="shop in shopList"
+              :key="shop.id"
+              :label="shop.shop_name"
+              :value="shop.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="货件编号">
           <el-input
             v-model="searchForm.shipment_confirmation_id"
@@ -103,6 +119,12 @@
         style="width: 100%"
         :default-sort="{ prop: 'shipment_sync_time', order: 'descending' }"
       >
+        <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
+          <template #default>
+            {{ getShopName(selectedShopId) || '-' }}
+          </template>
+        </el-table-column>
+
         <el-table-column prop="shipment_id" label="货件ID" width="220" fixed="left">
           <template #default="scope">
             <el-button type="primary" link @click="viewShipmentDetail(scope.row)">
@@ -393,7 +415,8 @@ import {
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
   syncAmazonInboundPlanBoxes,
-  exportAmazonShipmentInvoice
+  exportAmazonShipmentInvoice,
+  getShops
 } from '@/services/api.js'
 
 export default {
@@ -413,6 +436,10 @@ export default {
     const labelsLoading = ref(false)
     const shipments = ref([])
     const warehouses = ref([])
+
+    // 店铺列表（从接口获取，禁止硬编码）
+    const shopList = ref([])
+    const selectedShopId = ref(null)
 
     // 搜索表单
     const searchForm = reactive({
@@ -449,10 +476,46 @@ export default {
       total: 0
     })
 
+    // 获取店铺列表
+    const fetchShopList = async () => {
+      try {
+        const response = await getShops()
+        if (response.data.status === 'success') {
+          const list = response.data.data || []
+          if (list.length === 0) {
+            shopList.value = []
+            selectedShopId.value = null
+            ElMessage.warning('暂无店铺数据，请先配置店铺')
+            return
+          }
+          shopList.value = list
+          const defaultShop = list.find(s => s.is_default === 1)
+          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
+        } else {
+          shopList.value = []
+          selectedShopId.value = null
+          ElMessage.error(response.data.message || '获取店铺列表失败')
+        }
+      } catch (error) {
+        console.error('获取店铺列表失败:', error)
+        shopList.value = []
+        selectedShopId.value = null
+        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 根据 shop_id 获取店铺名称
+    const getShopName = (shopId) => {
+      if (!shopId) return '-'
+      const shop = shopList.value.find(s => s.id === shopId)
+      return shop ? shop.shop_name : '-'
+    }
+
     // 获取仓库列表
     const fetchWarehouses = async () => {
+      if (!selectedShopId.value) return
       try {
-        const response = await getAmazonWarehouses()
+        const response = await getAmazonWarehouses(selectedShopId.value)
         if (response.data.status === 'success') {
           warehouses.value = response.data.data || []
         }
@@ -463,9 +526,15 @@ export default {
 
     // 获取货件列表
     const fetchShipments = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       loading.value = true
       try {
         const params = {
+          shop_id: selectedShopId.value,
           page: pagination.page,
           page_size: pagination.page_size
         }
@@ -528,11 +597,23 @@ export default {
       fetchShipments()
     }
 
+    // 切换店铺
+    const handleShopChange = () => {
+      pagination.page = 1
+      fetchWarehouses()
+      fetchShipments()
+    }
+
     // 同步最新货件
     const syncAllData = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       syncLoading.value = true
       try {
-        const response = await syncInboundShipments()
+        const response = await syncInboundShipments({ shop_id: selectedShopId.value })
         if (response.data.status === 'success') {
           ElMessage.success(response.data.message || '同步完成')
           await fetchShipments()
@@ -562,13 +643,18 @@ export default {
 
     // 查看货件详情
     const viewShipmentDetail = async (shipment) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       currentShipment.value = shipment
       detailDialogVisible.value = true
       detailLoading.value = true
       shipmentDetailData.value = null
 
       try {
-        const response = await getInboundShipmentDetail(shipment.shipment_id)
+        const response = await getInboundShipmentDetail(shipment.shipment_id, selectedShopId.value)
         if (response.data.status === 'success') {
           shipmentDetailData.value = response.data.data || null
         } else {
@@ -596,11 +682,16 @@ export default {
     // 加载货件箱子
     const loadShipmentBoxes = async () => {
       if (!selectedBoxesShipment.value) return
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
 
       boxesLoading.value = true
       try {
         const response = await getAmazonInboundPlanBoxes(
           selectedBoxesShipment.value.shipment_confirmation_id,
+          selectedShopId.value,
           {
             page: boxesPagination.page,
             page_size: boxesPagination.page_size
@@ -644,6 +735,10 @@ export default {
     // 同步入库计划箱子数据
     const boxesSyncLoading = ref(false)
     const syncInboundPlanBoxes = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
       const planId = shipmentBoxes.value[0]?.inbound_plan_id
       if (!planId) {
         ElMessage.error('未获取到入库计划ID，无法同步')
@@ -651,7 +746,7 @@ export default {
       }
       boxesSyncLoading.value = true
       try {
-        const response = await syncAmazonInboundPlanBoxes(planId)
+        const response = await syncAmazonInboundPlanBoxes(planId, { shop_id: selectedShopId.value })
         if (response.data.status === 'success') {
           ElMessage.success(response.data.message || '箱子数据同步完成')
           await loadShipmentBoxes()
@@ -690,9 +785,13 @@ export default {
 
     // 打印箱唛标签
     const printShipmentLabels = async (shipment, boxId = null) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
       labelsLoading.value = true
       try {
-        const response = await getAmazonShipmentLabels(shipment.shipment_confirmation_id, 'PackageLabel_Thermal_NonPCP', 2, boxId)
+        const response = await getAmazonShipmentLabels(shipment.shipment_confirmation_id, selectedShopId.value, 'PackageLabel_Thermal_NonPCP', 2, boxId)
         const downloadUrl = response.data?.data?.payload?.DownloadURL
         if (!downloadUrl) {
           ElMessage.error('未获取到箱唛下载链接')
@@ -710,8 +809,12 @@ export default {
 
     // 导出发票
     const exportInvoice = async (shipment) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
       try {
-        const response = await exportAmazonShipmentInvoice(shipment.shipment_confirmation_id)
+        const response = await exportAmazonShipmentInvoice(shipment.shipment_confirmation_id, selectedShopId.value)
         const blob = new Blob([response.data], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         })
@@ -806,7 +909,8 @@ export default {
       return textMap[status] || status
     }
 
-    onMounted(() => {
+    onMounted(async () => {
+      await fetchShopList()
       fetchWarehouses()
       fetchShipments()
     })
@@ -823,6 +927,8 @@ export default {
       shipmentDetailData,
       syncLoading,
       labelsLoading,
+      shopList,
+      selectedShopId,
       fetchShipments,
       handleSearch,
       resetSearch,
@@ -830,6 +936,7 @@ export default {
       syncAllData,
       handlePageChange,
       handleSizeChange,
+      handleShopChange,
       viewShipmentDetail,
       viewShipmentBoxes,
       printShipmentLabels,
@@ -837,6 +944,7 @@ export default {
       formatDate,
       getStatusType,
       getStatusText,
+      getShopName,
       parsedDestinationAddress,
       parsedSourceAddress,
       parsedDeliveryWindow,

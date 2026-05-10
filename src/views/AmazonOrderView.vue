@@ -8,6 +8,22 @@
     <!-- 搜索和筛选区域 -->
     <div class="search-card">
       <el-form :model="searchForm" :inline="true" class="search-form">
+        <el-form-item label="店铺">
+          <el-select
+            v-model="selectedShopId"
+            placeholder="选择店铺"
+            style="width: 180px"
+            @change="handleShopChange"
+          >
+            <el-option
+              v-for="shop in shopList"
+              :key="shop.id"
+              :label="shop.shop_name"
+              :value="shop.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="订单状态">
           <el-select
             v-model="searchForm.order_status"
@@ -99,6 +115,12 @@
         style="width: 100%"
         :default-sort="{ prop: 'purchase_date', order: 'descending' }"
       >
+        <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
+          <template #default>
+            {{ getShopName(selectedShopId) || '-' }}
+          </template>
+        </el-table-column>
+
         <el-table-column prop="amazon_order_id" label="订单号" width="170" fixed="left">
           <template #default="scope">
             <el-button type="primary" link @click="viewOrderDetail(scope.row)">
@@ -363,7 +385,8 @@ import {
   getAmazonOrders,
   getAmazonOrder,
   syncAmazonOrdersAll,
-  syncAmazonOrderItems
+  syncAmazonOrderItems,
+  getShops
 } from '@/services/api.js'
 
 export default {
@@ -379,6 +402,10 @@ export default {
     const syncLoading = ref(false)
     const syncItemLoading = ref(null)
     const orders = ref([])
+
+    // 店铺列表（从接口获取，禁止硬编码）
+    const shopList = ref([])
+    const selectedShopId = ref(null)
 
     // 搜索表单
     const searchForm = reactive({
@@ -402,11 +429,52 @@ export default {
     const currentOrder = ref(null)
     const orderDetail = ref(null)
 
+    // 获取店铺列表
+    const fetchShopList = async () => {
+      try {
+        const response = await getShops()
+        if (response.data.status === 'success') {
+          const list = response.data.data || []
+          if (list.length === 0) {
+            shopList.value = []
+            selectedShopId.value = null
+            ElMessage.warning('暂无店铺数据，请先配置店铺')
+            return
+          }
+          shopList.value = list
+          const defaultShop = list.find(s => s.is_default === 1)
+          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
+        } else {
+          shopList.value = []
+          selectedShopId.value = null
+          ElMessage.error(response.data.message || '获取店铺列表失败')
+        }
+      } catch (error) {
+        console.error('获取店铺列表失败:', error)
+        shopList.value = []
+        selectedShopId.value = null
+        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 根据 shop_id 获取店铺名称
+    const getShopName = (shopId) => {
+      if (!shopId) return '-'
+      const shop = shopList.value.find(s => s.id === shopId)
+      return shop ? shop.shop_name : '-'
+    }
+
     // 获取订单列表
     const fetchOrders = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       loading.value = true
       try {
         const params = {
+          shop_id: selectedShopId.value,
           page: pagination.page,
           page_size: pagination.page_size
         }
@@ -478,11 +546,23 @@ export default {
       return d.toISOString().replace(/\.\d{3}Z$/, 'Z')
     }
 
+    // 切换店铺
+    const handleShopChange = () => {
+      pagination.page = 1
+      fetchOrders()
+    }
+
     // 一键全量同步
     const syncAllData = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       syncLoading.value = true
       try {
         const response = await syncAmazonOrdersAll({
+          shop_id: selectedShopId.value,
           created_after: getSevenDaysAgoISO()
         })
         if (response.data.status === 'success') {
@@ -502,9 +582,13 @@ export default {
     // 同步指定订单商品
     const syncOrderItems = async (order) => {
       if (!order) return
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
       syncItemLoading.value = order.amazon_order_id
       try {
-        const response = await syncAmazonOrderItems(order.amazon_order_id)
+        const response = await syncAmazonOrderItems(order.amazon_order_id, { shop_id: selectedShopId.value })
         if (response.data.status === 'success') {
           ElMessage.success(response.data.message || '订单商品同步完成')
           // 如果在详情弹窗中，刷新详情
@@ -546,8 +630,12 @@ export default {
     }
 
     const loadOrderDetail = async (orderId) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
       try {
-        const response = await getAmazonOrder(orderId)
+        const response = await getAmazonOrder(orderId, selectedShopId.value)
         if (response.data.status === 'success') {
           orderDetail.value = response.data.data || null
         } else {
@@ -617,7 +705,8 @@ export default {
       )
     }
 
-    onMounted(() => {
+    onMounted(async () => {
+      await fetchShopList()
       fetchOrders()
     })
 
@@ -633,6 +722,8 @@ export default {
       detailLoading,
       currentOrder,
       orderDetail,
+      shopList,
+      selectedShopId,
       fetchOrders,
       handleSearch,
       resetSearch,
@@ -641,10 +732,12 @@ export default {
       syncOrderItems,
       handlePageChange,
       handleSizeChange,
+      handleShopChange,
       viewOrderDetail,
       loadOrderDetail,
       getStatusType,
       getStatusText,
+      getShopName,
       formatDate,
       formatJsonArray,
       hasAnyFlag

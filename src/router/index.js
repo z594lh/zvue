@@ -18,6 +18,7 @@ import ProductView from '../views/ProductView.vue'
 import CategoryView from '../views/CategoryView.vue'
 import LogisticsProviderView from '../views/LogisticsProviderView.vue'
 import LogisticsWaybillView from '../views/LogisticsWaybillView.vue'
+import ShopView from '../views/ShopView.vue'
 import { isAuthenticated } from '@/services/api.js'
 
 const routes = [
@@ -115,6 +116,11 @@ const routes = [
     path: '/logistics-waybills',
     name: 'LogisticsWaybills',
     component: LogisticsWaybillView
+  },
+  {
+    path: '/shops',
+    name: 'Shops',
+    component: ShopView
   }
 ]
 

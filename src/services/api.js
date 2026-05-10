@@ -246,12 +246,13 @@ export const getAmazonShipmentItems = (shipment_id, params = {}) => {
 /**
  * 获取亚马逊货件箱唛标签 PDF
  * @param {string} shipment_id 货件ID
+ * @param {number} shop_id 店铺ID（必填）
  * @param {string} page_type 标签页面类型，默认 PackageLabel_Thermal_NonPCP
  * @param {number} page_size 每页标签数量，默认 2
  * @param {string} box_id 箱子ID（可选，传则打印单个箱子箱唛）
  */
-export const getAmazonShipmentLabels = (shipment_id, page_type = 'PackageLabel_Thermal_NonPCP', page_size = 2, box_id = null) => {
-  const params = { page_type, page_size };
+export const getAmazonShipmentLabels = (shipment_id, shop_id, page_type = 'PackageLabel_Thermal_NonPCP', page_size = 2, box_id = null) => {
+  const params = { shop_id, page_type, page_size };
   if (box_id) {
     params.box_id = box_id;
   }
@@ -261,9 +262,11 @@ export const getAmazonShipmentLabels = (shipment_id, page_type = 'PackageLabel_T
 /**
  * 导出货件发票
  * @param {string} shipment_id 货件ID
+ * @param {number} shop_id 店铺ID（必填）
  */
-export const exportAmazonShipmentInvoice = (shipment_id) => {
+export const exportAmazonShipmentInvoice = (shipment_id, shop_id) => {
   return api.get(`/amazon/shipments/${shipment_id}/invoice/export`, {
+    params: { shop_id },
     responseType: 'blob'
   });
 };
@@ -294,26 +297,29 @@ export const syncAmazonShipmentItems = (shipment_id) => {
 /**
  * 同步入库计划箱子数据
  * @param {string} plan_id 入库计划ID
+ * @param {Object} data {shop_id}
  */
-export const syncAmazonInboundPlanBoxes = (plan_id) => {
-  return api.post(`/amazon/sync/inbound-plans/${plan_id}/boxes`);
+export const syncAmazonInboundPlanBoxes = (plan_id, data = {}) => {
+  return api.post(`/amazon/sync/inbound-plans/${plan_id}/boxes`, data);
 };
 
 /**
  * 获取仓库列表
+ * @param {number} shop_id 店铺ID（必填）
  */
-export const getAmazonWarehouses = () => {
-  return api.get('/amazon/warehouses');
+export const getAmazonWarehouses = (shop_id) => {
+  return api.get('/amazon/warehouses', { params: { shop_id } });
 };
 
 /**
  * 获取亚马逊入库计划箱子列表
  * @param {string} shipment_id 货件编号（必填）
+ * @param {number} shop_id 店铺ID（必填）
  * @param {Object} params {page, page_size}
  */
-export const getAmazonInboundPlanBoxes = (shipment_id, params = {}) => {
+export const getAmazonInboundPlanBoxes = (shipment_id, shop_id, params = {}) => {
   return api.get('/amazon/inbound-plan-boxes', {
-    params: { shipment_id, ...params }
+    params: { shipment_id, shop_id, ...params }
   });
 };
 
@@ -321,7 +327,7 @@ export const getAmazonInboundPlanBoxes = (shipment_id, params = {}) => {
 
 /**
  * 查询入库计划货件列表（连表详情）
- * @param {Object} params {inbound_plan_id, shipment_confirmation_id, amazon_reference_id, destination_warehouse_id, status, page, page_size}
+ * @param {Object} params {shop_id, inbound_plan_id, shipment_confirmation_id, amazon_reference_id, destination_warehouse_id, status, page, page_size}
  */
 export const getInboundShipments = (params = {}) => {
   return api.get('/amazon/inbound-shipments', { params });
@@ -329,24 +335,26 @@ export const getInboundShipments = (params = {}) => {
 
 /**
  * 一键同步最新货件数据
+ * @param {Object} data {shop_id}
  */
-export const syncInboundShipments = () => {
-  return api.post('/amazon/sync/inbound-shipments', {});
+export const syncInboundShipments = (data = {}) => {
+  return api.post('/amazon/sync/inbound-shipments', data);
 };
 
 /**
  * 查询货件详情
  * @param {string} shipment_id 新版 shipmentId
+ * @param {number} shop_id 店铺ID（必填）
  */
-export const getInboundShipmentDetail = (shipment_id) => {
-  return api.get(`/amazon/inbound-shipments/${shipment_id}/detail`);
+export const getInboundShipmentDetail = (shipment_id, shop_id) => {
+  return api.get(`/amazon/inbound-shipments/${shipment_id}/detail`, { params: { shop_id } });
 };
 
 // ==================== 亚马逊订单管理相关接口 ====================
 
 /**
  * 获取亚马逊订单列表
- * @param {Object} params {order_status, amazon_order_id, buyer_name, purchase_date_from, purchase_date_to, page, page_size}
+ * @param {Object} params {shop_id, order_status, amazon_order_id, buyer_name, purchase_date_from, purchase_date_to, page, page_size}
  */
 export const getAmazonOrders = (params = {}) => {
   return api.get('/amazon/orders', { params });
@@ -355,14 +363,15 @@ export const getAmazonOrders = (params = {}) => {
 /**
  * 获取亚马逊订单详情（含商品列表）
  * @param {string} order_id 亚马逊订单号
+ * @param {number} shop_id 店铺ID（必填）
  */
-export const getAmazonOrder = (order_id) => {
-  return api.get(`/amazon/orders/${order_id}`);
+export const getAmazonOrder = (order_id, shop_id) => {
+  return api.get(`/amazon/orders/${order_id}`, { params: { shop_id } });
 };
 
 /**
  * 手动同步订单列表
- * @param {Object} data {created_after, created_before, order_statuses, marketplace_ids}
+ * @param {Object} data {shop_id, created_after, created_before, order_statuses, marketplace_ids}
  */
 export const syncAmazonOrders = (data = {}) => {
   return api.post('/amazon/sync/orders', data);
@@ -371,14 +380,15 @@ export const syncAmazonOrders = (data = {}) => {
 /**
  * 手动同步指定订单的商品数据
  * @param {string} order_id 亚马逊订单号
+ * @param {Object} data {shop_id}
  */
-export const syncAmazonOrderItems = (order_id) => {
-  return api.post(`/amazon/sync/orders/${order_id}/items`);
+export const syncAmazonOrderItems = (order_id, data = {}) => {
+  return api.post(`/amazon/sync/orders/${order_id}/items`, data);
 };
 
 /**
  * 一键全量同步订单（订单列表 + 商品明细）
- * @param {Object} data {created_after, created_before, order_statuses, marketplace_ids}
+ * @param {Object} data {shop_id, created_after, created_before, order_statuses, marketplace_ids}
  */
 export const syncAmazonOrdersAll = (data = {}) => {
   return api.post('/amazon/sync/orders-all', data);
@@ -387,8 +397,63 @@ export const syncAmazonOrdersAll = (data = {}) => {
 // ==================== 亚马逊库存管理相关接口 ====================
 
 /**
+ * 获取店铺列表（用于店铺选择器，仅启用状态）
+ */
+export const getShops = () => {
+  return api.get('/shops');
+};
+
+/**
+ * 获取所有店铺列表（含禁用，管理后台用）
+ */
+export const getAllShops = () => {
+  return api.get('/shops/all');
+};
+
+/**
+ * 获取单个店铺详情
+ * @param {number} id 店铺ID
+ */
+export const getShop = (id) => {
+  return api.get(`/shops/${id}`);
+};
+
+/**
+ * 创建店铺
+ * @param {Object} data {shop_name, seller_id, refresh_token, marketplace_id, region, is_default}
+ */
+export const createShop = (data) => {
+  return api.post('/shops', data);
+};
+
+/**
+ * 更新店铺
+ * @param {number} id 店铺ID
+ * @param {Object} data 更新数据
+ */
+export const updateShop = (id, data) => {
+  return api.put(`/shops/${id}`, data);
+};
+
+/**
+ * 删除店铺（软删除）
+ * @param {number} id 店铺ID
+ */
+export const deleteShop = (id) => {
+  return api.delete(`/shops/${id}`);
+};
+
+/**
+ * 设为默认店铺
+ * @param {number} id 店铺ID
+ */
+export const setDefaultShop = (id) => {
+  return api.post(`/shops/${id}/set-default`);
+};
+
+/**
  * 获取亚马逊库存列表
- * @param {Object} params {page, page_size, seller_sku, asin}
+ * @param {Object} params {page, page_size, seller_sku, asin, shop_id}
  */
 export const getAmazonInventory = (params = {}) => {
   return api.get('/amazon/inventory', { params });
@@ -396,7 +461,7 @@ export const getAmazonInventory = (params = {}) => {
 
 /**
  * 同步库存数据
- * @param {Object} data {seller_skus, start_date_time}
+ * @param {Object} data {seller_skus, start_date_time, shop_id}
  */
 export const syncAmazonInventory = (data = {}) => {
   return api.post('/amazon/sync/inventory', data);
@@ -683,7 +748,7 @@ export const deleteLogisticsProvider = (id) => {
 
 /**
  * 获取 Amazon Listing 列表
- * @param {Object} params {page, page_size, sku, asin, product_type, status, parent_sku, keyword}
+ * @param {Object} params {shop_id, page, page_size, sku, asin, product_type, status, parent_sku, keyword}
  */
 export const getAmazonListings = (params = {}) => {
   return api.get('/amazon/listings', { params });
@@ -692,14 +757,15 @@ export const getAmazonListings = (params = {}) => {
 /**
  * 获取 Amazon Listing 详情
  * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID（必填）
  */
-export const getAmazonListing = (sku) => {
-  return api.get(`/amazon/listings/${sku}`);
+export const getAmazonListing = (sku, shop_id) => {
+  return api.get(`/amazon/listings/${sku}`, { params: { shop_id } });
 };
 
 /**
  * 手动触发 Listing 同步
- * @param {Object} data {included_data, page_size}
+ * @param {Object} data {shop_id, included_data, page_size}
  */
 export const syncAmazonListings = (data = {}) => {
   return api.post('/amazon/sync/listings', data);
@@ -708,10 +774,11 @@ export const syncAmazonListings = (data = {}) => {
 /**
  * 实时获取 Listing 详情（直连 SP-API）
  * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID（必填）
  * @param {string} included_data 逗号分隔，如 summaries,attributes,issues,offers
  */
-export const getAmazonListingSpApi = (sku, included_data = 'summaries,attributes,issues') => {
-  return api.get(`/amazon/listings/spapi/${sku}`, { params: { included_data } });
+export const getAmazonListingSpApi = (sku, shop_id, included_data = 'summaries,attributes,issues') => {
+  return api.get(`/amazon/listings/spapi/${sku}`, { params: { shop_id, included_data } });
 };
 
 /**
@@ -726,7 +793,7 @@ export const uploadAmazonListingImage = (formData) => {
 
 /**
  * 上架新 Listing
- * @param {Object} data {sku, product_type, attributes, requirements, condition_type}
+ * @param {Object} data {shop_id, sku, product_type, attributes, requirements, condition_type}
  */
 export const createAmazonListing = (data) => {
   return api.post('/amazon/listings', data);
@@ -735,7 +802,7 @@ export const createAmazonListing = (data) => {
 /**
  * 修改 Listing（完全覆盖式更新）
  * @param {string} sku 卖家 SKU
- * @param {Object} data 更新数据
+ * @param {Object} data {shop_id, ...更新数据}
  */
 export const updateAmazonListing = (sku, data) => {
   return api.put(`/amazon/listings/${sku}`, data);
@@ -744,7 +811,7 @@ export const updateAmazonListing = (sku, data) => {
 /**
  * 部分更新 Listing（JSON Patch）
  * @param {string} sku 卖家 SKU
- * @param {Object} data {patches, product_type}
+ * @param {Object} data {shop_id, patches, product_type}
  */
 export const patchAmazonListing = (sku, data) => {
   return api.patch(`/amazon/listings/${sku}`, data);
@@ -753,10 +820,11 @@ export const patchAmazonListing = (sku, data) => {
 /**
  * 删除 Listing
  * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID（必填）
  * @param {string} marketplace_ids 逗号分隔的市场ID
  */
-export const deleteAmazonListing = (sku, marketplace_ids = '') => {
-  const params = marketplace_ids ? { marketplace_ids } : {};
+export const deleteAmazonListing = (sku, shop_id, marketplace_ids = '') => {
+  const params = marketplace_ids ? { shop_id, marketplace_ids } : { shop_id };
   return api.delete(`/amazon/listings/${sku}`, { params });
 };
 

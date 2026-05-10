@@ -8,6 +8,22 @@
     <!-- 搜索和筛选区域 -->
     <div class="search-card">
       <el-form :model="searchForm" :inline="true" class="search-form">
+        <el-form-item label="店铺">
+          <el-select
+            v-model="selectedShopId"
+            placeholder="选择店铺"
+            style="width: 180px"
+            @change="handleShopChange"
+          >
+            <el-option
+              v-for="shop in shopList"
+              :key="shop.id"
+              :label="shop.shop_name"
+              :value="shop.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="SKU">
           <el-input
             v-model="searchForm.sku"
@@ -109,6 +125,12 @@
         stripe
         style="width: 100%"
       >
+        <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
+          <template #default>
+            {{ getShopName(selectedShopId) || '-' }}
+          </template>
+        </el-table-column>
+
         <el-table-column label="主图" width="80" align="center">
           <template #default="scope">
             <el-image
@@ -360,7 +382,8 @@ import { Search, Refresh, RefreshRight, View } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
-  syncAmazonListings
+  syncAmazonListings,
+  getShops
 } from '@/services/api.js'
 
 export default {
@@ -375,6 +398,10 @@ export default {
     const loading = ref(false)
     const syncLoading = ref(false)
     const listings = ref([])
+
+    // 店铺列表（从接口获取，禁止硬编码）
+    const shopList = ref([])
+    const selectedShopId = ref(null)
 
     // 搜索表单
     const searchForm = reactive({
@@ -399,11 +426,52 @@ export default {
     const currentListing = ref(null)
     const listingDetail = ref(null)
 
+    // 获取店铺列表
+    const fetchShopList = async () => {
+      try {
+        const response = await getShops()
+        if (response.data.status === 'success') {
+          const list = response.data.data || []
+          if (list.length === 0) {
+            shopList.value = []
+            selectedShopId.value = null
+            ElMessage.warning('暂无店铺数据，请先配置店铺')
+            return
+          }
+          shopList.value = list
+          const defaultShop = list.find(s => s.is_default === 1)
+          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
+        } else {
+          shopList.value = []
+          selectedShopId.value = null
+          ElMessage.error(response.data.message || '获取店铺列表失败')
+        }
+      } catch (error) {
+        console.error('获取店铺列表失败:', error)
+        shopList.value = []
+        selectedShopId.value = null
+        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
+    // 根据 shop_id 获取店铺名称
+    const getShopName = (shopId) => {
+      if (!shopId) return '-'
+      const shop = shopList.value.find(s => s.id === shopId)
+      return shop ? shop.shop_name : '-'
+    }
+
     // 获取 Listing 列表
     const fetchListings = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       loading.value = true
       try {
         const params = {
+          shop_id: selectedShopId.value,
           page: pagination.page,
           page_size: pagination.page_size
         }
@@ -462,11 +530,23 @@ export default {
       fetchListings()
     }
 
+    // 切换店铺
+    const handleShopChange = () => {
+      pagination.page = 1
+      fetchListings()
+    }
+
     // 同步 Listing
     const syncListings = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       syncLoading.value = true
       try {
         const response = await syncAmazonListings({
+          shop_id: selectedShopId.value,
           included_data: ['summaries', 'attributes', 'issues'],
           page_size: 20
         })
@@ -499,13 +579,18 @@ export default {
 
     // 查看详情
     const viewDetail = async (row) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       currentListing.value = row
       detailDialogVisible.value = true
       detailLoading.value = true
       listingDetail.value = null
 
       try {
-        const response = await getAmazonListing(row.sku)
+        const response = await getAmazonListing(row.sku, selectedShopId.value)
         if (response.data.status === 'success') {
           listingDetail.value = response.data.data || null
         } else {
@@ -589,7 +674,8 @@ export default {
       }
     }
 
-    onMounted(() => {
+    onMounted(async () => {
+      await fetchShopList()
       fetchListings()
     })
 
@@ -603,6 +689,8 @@ export default {
       detailLoading,
       currentListing,
       listingDetail,
+      shopList,
+      selectedShopId,
       fetchListings,
       handleSearch,
       resetSearch,
@@ -610,9 +698,11 @@ export default {
       syncListings,
       handlePageChange,
       handleSizeChange,
+      handleShopChange,
       viewDetail,
       getStatusType,
       getStatusText,
+      getShopName,
       formatDate,
       formatJson,
       getStatusList,

@@ -8,6 +8,22 @@
     <!-- 搜索和筛选区域 -->
     <div class="search-card">
       <el-form :model="searchForm" :inline="true" class="search-form">
+        <el-form-item label="店铺">
+          <el-select
+            v-model="selectedShopId"
+            placeholder="选择店铺"
+            style="width: 180px"
+            @change="handleShopChange"
+          >
+            <el-option
+              v-for="shop in shopList"
+              :key="shop.id"
+              :label="shop.shop_name"
+              :value="shop.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="卖家SKU">
           <el-input
             v-model="searchForm.seller_sku"
@@ -69,6 +85,12 @@
         style="width: 100%"
         :default-sort="{ prop: 'sync_time', order: 'descending' }"
       >
+        <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
+          <template #default>
+            {{ getShopName(selectedShopId) || '-' }}
+          </template>
+        </el-table-column>
+
         <el-table-column prop="seller_sku" label="卖家SKU" width="150" fixed="left" />
 
         <el-table-column prop="asin" label="ASIN" width="130" />
@@ -250,7 +272,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, RefreshRight } from '@element-plus/icons-vue'
-import { getAmazonInventory, syncAmazonInventory } from '@/services/api.js'
+import { getAmazonInventory, syncAmazonInventory, getShops } from '@/services/api.js'
 
 export default {
   name: 'AmazonInventoryView',
@@ -263,6 +285,10 @@ export default {
     const loading = ref(false)
     const syncLoading = ref(false)
     const inventoryList = ref([])
+
+    // 店铺列表（从接口获取，禁止硬编码）
+    const shopList = ref([])
+    const selectedShopId = ref(null)
 
     // 搜索表单
     const searchForm = reactive({
@@ -281,13 +307,48 @@ export default {
     const detailDialogVisible = ref(false)
     const currentItem = ref(null)
 
+    // 获取店铺列表
+    const fetchShopList = async () => {
+      try {
+        const response = await getShops()
+        if (response.data.status === 'success') {
+          const list = response.data.data || []
+          if (list.length === 0) {
+            shopList.value = []
+            selectedShopId.value = null
+            ElMessage.warning('暂无店铺数据，请先配置店铺')
+            return
+          }
+          shopList.value = list
+          // 优先选中 is_default=1 的店铺，否则选中第一个
+          const defaultShop = list.find(s => s.is_default === 1)
+          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
+        } else {
+          shopList.value = []
+          selectedShopId.value = null
+          ElMessage.error(response.data.message || '获取店铺列表失败')
+        }
+      } catch (error) {
+        console.error('获取店铺列表失败:', error)
+        shopList.value = []
+        selectedShopId.value = null
+        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
+      }
+    }
+
     // 获取库存列表
     const fetchInventory = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       loading.value = true
       try {
         const params = {
           page: pagination.page,
-          page_size: pagination.page_size
+          page_size: pagination.page_size,
+          shop_id: selectedShopId.value
         }
 
         if (searchForm.seller_sku) {
@@ -341,11 +402,25 @@ export default {
       fetchInventory()
     }
 
+    // 切换店铺
+    const handleShopChange = () => {
+      pagination.page = 1
+      fetchInventory()
+    }
+
     // 同步库存数据
     const syncInventoryData = async () => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
       syncLoading.value = true
       try {
-        const response = await syncAmazonInventory()
+        const body = {
+          shop_id: selectedShopId.value
+        }
+        const response = await syncAmazonInventory(body)
         if (response.data.status === 'success') {
           ElMessage.success(response.data.message || '库存同步完成')
           await fetchInventory()
@@ -398,13 +473,21 @@ export default {
       return nameMap[name] || name
     }
 
+    // 根据 shop_id 获取店铺名称
+    const getShopName = (shopId) => {
+      if (!shopId) return '-'
+      const shop = shopList.value.find(s => s.id === shopId)
+      return shop ? shop.shop_name : '-'
+    }
+
     // 格式化日期
     const formatDate = (dateString) => {
       if (!dateString) return '-'
       return dateString.replace('T', ' ')
     }
 
-    onMounted(() => {
+    onMounted(async () => {
+      await fetchShopList()
       fetchInventory()
     })
 
@@ -416,6 +499,8 @@ export default {
       pagination,
       detailDialogVisible,
       currentItem,
+      shopList,
+      selectedShopId,
       fetchInventory,
       handleSearch,
       resetSearch,
@@ -423,9 +508,11 @@ export default {
       syncInventoryData,
       handlePageChange,
       handleSizeChange,
+      handleShopChange,
       showInventoryDetails,
       parseResearchingBreakdown,
       formatResearchingName,
+      getShopName,
       formatDate
     }
   }
