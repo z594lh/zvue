@@ -128,8 +128,12 @@
             v-model="formData.refresh_token"
             type="textarea"
             :rows="3"
-            placeholder="亚马逊 SP-API Refresh Token（很长的字符串）"
+            :placeholder="isEdit ? '如需更换 Token 请在此处填写，留空则保持原值不变' : '亚马逊 SP-API Refresh Token（很长的字符串）'"
           />
+          <div class="form-tip" v-if="isEdit">
+            <el-icon><InfoFilled /></el-icon>
+            出于安全考虑，系统不会回显已有的 Refresh Token。如需更新请手动填写，留空则保留原值。
+          </div>
         </el-form-item>
 
         <el-form-item label="Marketplace ID" prop="marketplace_id">
@@ -201,7 +205,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, QuestionFilled } from '@element-plus/icons-vue'
+import { Plus, QuestionFilled, InfoFilled } from '@element-plus/icons-vue'
 import {
   getAllShops,
   createShop,
@@ -214,7 +218,8 @@ export default {
   name: 'ShopView',
   components: {
     Plus,
-    QuestionFilled
+    QuestionFilled,
+    InfoFilled
   },
   setup() {
     const loading = ref(false)
@@ -345,10 +350,14 @@ export default {
           const payload = {
             shop_name: formData.shop_name,
             seller_id: formData.seller_id,
-            refresh_token: formData.refresh_token,
             marketplace_id: formData.marketplace_id,
             region: formData.region,
             is_default: formData.is_default
+          }
+
+          // 编辑模式下，refresh_token 留空则不传给后端，避免覆盖原值
+          if (!isEdit.value || formData.refresh_token) {
+            payload.refresh_token = formData.refresh_token
           }
 
           let response
