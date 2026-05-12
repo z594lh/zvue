@@ -313,16 +313,21 @@
       @closed="allBoxesExpanded = false"
     >
       <div v-loading="boxesLoading">
+        <div class="boxes-dialog-header">
+          <el-button type="warning" size="small" :loading="boxesSyncLoading" @click="syncInboundPlanBoxes">
+            <el-icon><RefreshRight /></el-icon>
+            同步最新数据
+          </el-button>
+          <el-button
+            v-if="shipmentBoxes && shipmentBoxes.length > 0"
+            type="primary"
+            size="small"
+            @click="toggleAllBoxesExpansion"
+          >
+            {{ allBoxesExpanded ? '全部收缩' : '全部展开' }}
+          </el-button>
+        </div>
         <div v-if="shipmentBoxes && shipmentBoxes.length > 0">
-          <div class="boxes-dialog-header">
-            <el-button type="warning" size="small" :loading="boxesSyncLoading" @click="syncInboundPlanBoxes">
-              <el-icon><RefreshRight /></el-icon>
-              同步最新数据
-            </el-button>
-            <el-button type="primary" size="small" @click="toggleAllBoxesExpansion">
-              {{ allBoxesExpanded ? '全部收缩' : '全部展开' }}
-            </el-button>
-          </div>
           <el-table ref="boxesTable" :data="shipmentBoxes" stripe style="width: 100%" border>
             <el-table-column type="expand" width="45">
               <template #default="scope">
@@ -713,6 +718,7 @@ export default {
         return
       }
       const planId = shipmentBoxes.value[0]?.inbound_plan_id
+        || selectedBoxesShipment.value?.inbound_plan_id
       if (!planId) {
         ElMessage.error('未获取到入库计划ID，无法同步')
         return
