@@ -498,7 +498,8 @@ export default {
       try {
         ElMessage.info('正在裁剪PDF...')
         const res = await editPdf(originalPdfFile.value, operations)
-        downloadBlob(new Blob([res.data], { type: 'application/pdf' }), '裁剪后.pdf')
+        const filename = res.headers['content-disposition']?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)?.[1]?.replace(/['"]/g, '') || '裁剪后.pdf'
+        downloadBlob(new Blob([res.data], { type: 'application/pdf' }), filename)
         ElMessage.success('裁剪导出成功')
       } catch (e) {
         console.error(e)
