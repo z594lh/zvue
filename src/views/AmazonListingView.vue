@@ -21,6 +21,7 @@
               :label="shop.shop_name"
               :value="shop.id"
             />
+            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
           </el-select>
         </el-form-item>
 
@@ -208,11 +209,21 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="170" fixed="right" align="center">
           <template #default="scope">
             <el-tooltip content="查看详情" placement="top">
               <el-button type="primary" link @click="viewDetail(scope.row)">
                 <el-icon><View /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="同步到产品" placement="top">
+              <el-button
+                type="warning"
+                link
+                :loading="syncToProductLoading === scope.row.sku"
+                @click="syncToProduct(scope.row.sku)"
+              >
+                <el-icon><RefreshRight /></el-icon>
               </el-button>
             </el-tooltip>
           </template>
@@ -383,8 +394,9 @@ import {
   getAmazonListings,
   getAmazonListing,
   syncAmazonListings,
-  getShops
+  syncListingToProduct
 } from '@/services/api.js'
+import { useShopCache } from '@/composables/useShopCache'
 
 export default {
   name: 'AmazonListingView',
@@ -399,8 +411,7 @@ export default {
     const syncLoading = ref(false)
     const listings = ref([])
 
-    // 店铺列表（从接口获取，禁止硬编码）
-    const shopList = ref([])
+    const { shopList, fetchShopList, refreshShopList, getShopName, defaultShopId } = useShopCache()
     const selectedShopId = ref(null)
 
     // 搜索表单
@@ -423,43 +434,9 @@ export default {
     // 详情对话框
     const detailDialogVisible = ref(false)
     const detailLoading = ref(false)
+    const syncToProductLoading = ref(null)
     const currentListing = ref(null)
     const listingDetail = ref(null)
-
-    // 获取店铺列表
-    const fetchShopList = async () => {
-      try {
-        const response = await getShops()
-        if (response.data.status === 'success') {
-          const list = response.data.data || []
-          if (list.length === 0) {
-            shopList.value = []
-            selectedShopId.value = null
-            ElMessage.warning('暂无店铺数据，请先配置店铺')
-            return
-          }
-          shopList.value = list
-          const defaultShop = list.find(s => s.is_default === 1)
-          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
-        } else {
-          shopList.value = []
-          selectedShopId.value = null
-          ElMessage.error(response.data.message || '获取店铺列表失败')
-        }
-      } catch (error) {
-        console.error('获取店铺列表失败:', error)
-        shopList.value = []
-        selectedShopId.value = null
-        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
-      }
-    }
-
-    // 根据 shop_id 获取店铺名称
-    const getShopName = (shopId) => {
-      if (!shopId) return '-'
-      const shop = shopList.value.find(s => s.id === shopId)
-      return shop ? shop.shop_name : '-'
-    }
 
     // 获取 Listing 列表
     const fetchListings = async () => {
@@ -531,7 +508,14 @@ export default {
     }
 
     // 切换店铺
-    const handleShopChange = () => {
+    const handleShopChange = async (val) => {
+      if (val === '__refresh__') {
+        await refreshShopList()
+        selectedShopId.value = defaultShopId()
+        pagination.page = 1
+        fetchListings()
+        return
+      }
       pagination.page = 1
       fetchListings()
     }
@@ -601,6 +585,29 @@ export default {
         ElMessage.error('获取 Listing 详情失败: ' + (error.response?.data?.message || error.message))
       } finally {
         detailLoading.value = false
+      }
+    }
+
+    // 同步 Listing 到产品
+    const syncToProduct = async (sku) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
+      syncToProductLoading.value = sku
+      try {
+        const response = await syncListingToProduct(sku, selectedShopId.value)
+        if (response.data.status === 'success') {
+          ElMessage.success(response.data.message || `产品 ${sku} 已同步`)
+        } else {
+          ElMessage.error(response.data.message || '同步到产品失败')
+        }
+      } catch (error) {
+        console.error('同步到产品失败:', error)
+        ElMessage.error('同步到产品失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        syncToProductLoading.value = null
       }
     }
 
@@ -676,6 +683,9 @@ export default {
 
     onMounted(async () => {
       await fetchShopList()
+      if (shopList.value.length > 0) {
+        selectedShopId.value = defaultShopId()
+      }
       fetchListings()
     })
 
@@ -687,6 +697,8 @@ export default {
       pagination,
       detailDialogVisible,
       detailLoading,
+      syncToProductLoading,
+      syncToProduct,
       currentListing,
       listingDetail,
       shopList,

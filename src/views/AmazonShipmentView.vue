@@ -21,6 +21,7 @@
               :label="shop.shop_name"
               :value="shop.id"
             />
+            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
           </el-select>
         </el-form-item>
 
@@ -415,9 +416,9 @@ import {
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
   syncAmazonInboundPlanBoxes,
-  exportAmazonShipmentInvoice,
-  getShops
+  exportAmazonShipmentInvoice
 } from '@/services/api.js'
+import { useShopCache } from '@/composables/useShopCache'
 
 export default {
   name: 'AmazonShipmentView',
@@ -437,8 +438,7 @@ export default {
     const shipments = ref([])
     const warehouses = ref([])
 
-    // 店铺列表（从接口获取，禁止硬编码）
-    const shopList = ref([])
+    const { shopList, fetchShopList, refreshShopList, getShopName, defaultShopId } = useShopCache()
     const selectedShopId = ref(null)
 
     // 搜索表单
@@ -475,41 +475,6 @@ export default {
       page_size: 20,
       total: 0
     })
-
-    // 获取店铺列表
-    const fetchShopList = async () => {
-      try {
-        const response = await getShops()
-        if (response.data.status === 'success') {
-          const list = response.data.data || []
-          if (list.length === 0) {
-            shopList.value = []
-            selectedShopId.value = null
-            ElMessage.warning('暂无店铺数据，请先配置店铺')
-            return
-          }
-          shopList.value = list
-          const defaultShop = list.find(s => s.is_default === 1)
-          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
-        } else {
-          shopList.value = []
-          selectedShopId.value = null
-          ElMessage.error(response.data.message || '获取店铺列表失败')
-        }
-      } catch (error) {
-        console.error('获取店铺列表失败:', error)
-        shopList.value = []
-        selectedShopId.value = null
-        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
-      }
-    }
-
-    // 根据 shop_id 获取店铺名称
-    const getShopName = (shopId) => {
-      if (!shopId) return '-'
-      const shop = shopList.value.find(s => s.id === shopId)
-      return shop ? shop.shop_name : '-'
-    }
 
     // 获取仓库列表
     const fetchWarehouses = async () => {
@@ -598,7 +563,15 @@ export default {
     }
 
     // 切换店铺
-    const handleShopChange = () => {
+    const handleShopChange = async (val) => {
+      if (val === '__refresh__') {
+        await refreshShopList()
+        selectedShopId.value = defaultShopId()
+        pagination.page = 1
+        fetchWarehouses()
+        fetchShipments()
+        return
+      }
       pagination.page = 1
       fetchWarehouses()
       fetchShipments()
@@ -911,6 +884,9 @@ export default {
 
     onMounted(async () => {
       await fetchShopList()
+      if (shopList.value.length > 0) {
+        selectedShopId.value = defaultShopId()
+      }
       fetchWarehouses()
       fetchShipments()
     })

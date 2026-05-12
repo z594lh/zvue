@@ -29,4 +29,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: #f5f7fa;
 }
+
+/* ElMessage 居中显示，避免遮挡导航栏及下拉子菜单 */
+.el-message {
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
 </style>

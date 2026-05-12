@@ -21,6 +21,7 @@
               :label="shop.shop_name"
               :value="shop.id"
             />
+            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
           </el-select>
         </el-form-item>
 
@@ -272,7 +273,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, RefreshRight } from '@element-plus/icons-vue'
-import { getAmazonInventory, syncAmazonInventory, getShops } from '@/services/api.js'
+import { getAmazonInventory, syncAmazonInventory } from '@/services/api.js'
+import { useShopCache } from '@/composables/useShopCache'
 
 export default {
   name: 'AmazonInventoryView',
@@ -287,7 +289,7 @@ export default {
     const inventoryList = ref([])
 
     // 店铺列表（从接口获取，禁止硬编码）
-    const shopList = ref([])
+    const { shopList, fetchShopList, refreshShopList, getShopName, defaultShopId } = useShopCache()
     const selectedShopId = ref(null)
 
     // 搜索表单
@@ -306,35 +308,6 @@ export default {
     // 详情对话框
     const detailDialogVisible = ref(false)
     const currentItem = ref(null)
-
-    // 获取店铺列表
-    const fetchShopList = async () => {
-      try {
-        const response = await getShops()
-        if (response.data.status === 'success') {
-          const list = response.data.data || []
-          if (list.length === 0) {
-            shopList.value = []
-            selectedShopId.value = null
-            ElMessage.warning('暂无店铺数据，请先配置店铺')
-            return
-          }
-          shopList.value = list
-          // 优先选中 is_default=1 的店铺，否则选中第一个
-          const defaultShop = list.find(s => s.is_default === 1)
-          selectedShopId.value = defaultShop ? defaultShop.id : list[0].id
-        } else {
-          shopList.value = []
-          selectedShopId.value = null
-          ElMessage.error(response.data.message || '获取店铺列表失败')
-        }
-      } catch (error) {
-        console.error('获取店铺列表失败:', error)
-        shopList.value = []
-        selectedShopId.value = null
-        ElMessage.error('获取店铺列表失败: ' + (error.response?.data?.message || error.message))
-      }
-    }
 
     // 获取库存列表
     const fetchInventory = async () => {
@@ -403,7 +376,14 @@ export default {
     }
 
     // 切换店铺
-    const handleShopChange = () => {
+    const handleShopChange = async (val) => {
+      if (val === '__refresh__') {
+        await refreshShopList()
+        selectedShopId.value = defaultShopId()
+        pagination.page = 1
+        fetchInventory()
+        return
+      }
       pagination.page = 1
       fetchInventory()
     }
@@ -474,12 +454,6 @@ export default {
     }
 
     // 根据 shop_id 获取店铺名称
-    const getShopName = (shopId) => {
-      if (!shopId) return '-'
-      const shop = shopList.value.find(s => s.id === shopId)
-      return shop ? shop.shop_name : '-'
-    }
-
     // 格式化日期
     const formatDate = (dateString) => {
       if (!dateString) return '-'
@@ -488,6 +462,9 @@ export default {
 
     onMounted(async () => {
       await fetchShopList()
+      if (shopList.value.length > 0) {
+        selectedShopId.value = defaultShopId()
+      }
       fetchInventory()
     })
 

@@ -213,6 +213,7 @@ import {
   deleteShop,
   setDefaultShop
 } from '@/services/api.js'
+import { useShopCache } from '@/composables/useShopCache'
 
 export default {
   name: 'ShopView',
@@ -229,6 +230,7 @@ export default {
     const isEdit = ref(false)
     const currentId = ref(null)
     const formRef = ref(null)
+    const { notifyShopChanged } = useShopCache()
 
     const formData = reactive({
       shop_name: '',
@@ -369,6 +371,7 @@ export default {
 
           if (response.data.status === 'success') {
             ElMessage.success(isEdit.value ? '店铺更新成功' : '店铺创建成功')
+            notifyShopChanged()
             dialogVisible.value = false
             await fetchShopList()
           } else {
@@ -394,6 +397,7 @@ export default {
         const response = await setDefaultShop(row.id)
         if (response.data.status === 'success') {
           ElMessage.success('默认店铺设置成功')
+          notifyShopChanged()
           await fetchShopList()
         } else {
           ElMessage.error(response.data.message || '设置失败')
@@ -416,6 +420,7 @@ export default {
         const response = await deleteShop(row.id)
         if (response.data.status === 'success') {
           ElMessage.success('店铺删除成功')
+          notifyShopChanged()
           await fetchShopList()
         } else {
           ElMessage.error(response.data.message || '删除失败')

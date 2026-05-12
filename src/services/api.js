@@ -844,6 +844,15 @@ export const cleanupAmazonListingImages = (data = { dry_run: true }) => {
   return api.post('/amazon/listings/cleanup-images', data);
 };
 
+/**
+ * 同步 Listing 到产品表
+ * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID
+ */
+export const syncListingToProduct = (sku, shop_id) => {
+  return api.post(`/amazon/listings/${sku}/sync-to-product`, { shop_id });
+};
+
 // ==================== 货代运单管理相关接口 ====================
 
 /**
