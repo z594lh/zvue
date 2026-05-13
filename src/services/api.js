@@ -930,6 +930,15 @@ export const exportProductBoard = (params = {}) => {
   });
 };
 
+/**
+ * 切换产品上架状态
+ * @param {string} asin ASIN
+ * @param {boolean} is_listed 是否已上架
+ */
+export const toggleProductBoardListed = (asin, is_listed) => {
+  return api.post('/product-board/toggle-listed', { asin, is_listed });
+};
+
 // ==================== 货代运单管理相关接口 ====================
 
 /**
