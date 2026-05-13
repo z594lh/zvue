@@ -119,13 +119,6 @@ import { isAuthenticated, getUserProfile, logout, setAuthToken } from '@/service
 
 const navGroups = [
   {
-    label: 'AI创作',
-    children: [
-      { label: 'AI生图', path: '/ai-image' },
-      { label: '图库', path: '/gallery' }
-    ]
-  },
-  {
     label: '财务',
     children: [
       { label: '支出记账', path: '/expense' },
@@ -143,8 +136,9 @@ const navGroups = [
     ]
   },
   {
-    label: '供应商',
+    label: '供应链',
     children: [
+      { label: '备货看板', path: '/product-board' },
       { label: '供应商管理', path: '/suppliers' },
       { label: '进货单管理', path: '/purchase-orders' },
       { label: '产品维护', path: '/products' },
