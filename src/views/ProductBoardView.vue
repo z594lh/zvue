@@ -15,52 +15,6 @@
       </div>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="stats-row">
-      <div class="stat-card stat-blue">
-        <div class="stat-icon"><el-icon size="24"><Goods /></el-icon></div>
-        <div class="stat-body">
-          <div class="stat-value">{{ stats.total_products || 0 }}</div>
-          <div class="stat-label">产品总数</div>
-        </div>
-      </div>
-      <div class="stat-card stat-purple">
-        <div class="stat-icon"><el-icon size="24"><PriceTag /></el-icon></div>
-        <div class="stat-body">
-          <div class="stat-value">${{ formatNumber(stats.avg_price) }}</div>
-          <div class="stat-label">平均售价</div>
-        </div>
-      </div>
-      <div class="stat-card stat-green">
-        <div class="stat-icon"><el-icon size="24"><Sell /></el-icon></div>
-        <div class="stat-body">
-          <div class="stat-value">{{ formatNumber(stats.total_sales_30d) }}</div>
-          <div class="stat-label">30天总销量</div>
-        </div>
-      </div>
-      <div class="stat-card stat-orange">
-        <div class="stat-icon"><el-icon size="24"><Coin /></el-icon></div>
-        <div class="stat-body">
-          <div class="stat-value">{{ formatPercent(stats.avg_profit_margin) }}</div>
-          <div class="stat-label">平均毛利率</div>
-        </div>
-      </div>
-      <div class="stat-card stat-red">
-        <div class="stat-icon"><el-icon size="24"><Warning /></el-icon></div>
-        <div class="stat-body">
-          <div class="stat-value">{{ formatPercent(stats.avg_refund_rate) }}</div>
-          <div class="stat-label">平均退款率</div>
-        </div>
-      </div>
-      <div class="stat-card stat-cyan">
-        <div class="stat-icon"><el-icon size="24"><Promotion /></el-icon></div>
-        <div class="stat-body">
-          <div class="stat-value">${{ formatNumber(stats.total_ad_spend_30d) }}</div>
-          <div class="stat-label">总广告费(30天)</div>
-        </div>
-      </div>
-    </div>
-
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="filter-group">
@@ -70,19 +24,29 @@
         <el-select v-model="searchForm.amazon_status" placeholder="AMZ状态" clearable style="width:130px" @change="handleSearch">
           <el-option v-for="status in amazonStatusList" :key="status" :label="status" :value="status" />
         </el-select>
+        <el-select v-model="searchForm.is_listed" placeholder="上架状态" clearable style="width:120px" @change="handleSearch">
+          <el-option label="已上架" :value="true" />
+          <el-option label="未上架" :value="false" />
+        </el-select>
         <el-input v-model="searchForm.keyword" placeholder="搜索 ASIN / 名称" clearable style="width:200px" @keyup.enter="handleSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-input-number v-model="searchForm.min_sales" :min="0" :controls="false" placeholder="最小30天销量" style="width:140px" @change="handleSearch" />
+        <el-input-number v-model="searchForm.min_sales" :min="0" :controls="false" placeholder="最小30天销量" style="width:140px" @keyup.enter="handleSearch" />
+        <el-button type="primary" @click="handleSearch"><el-icon><Search /></el-icon> 搜索</el-button>
+        <el-button plain @click="resetSearch"><el-icon><Refresh /></el-icon> 重置</el-button>
       </div>
       <div class="filter-group">
-        <el-select v-model="searchForm.sort_by" style="width:140px" @change="handleSearch">
+        <el-select v-model="searchForm.sort_by" style="width:150px" @change="handleSearch">
           <el-option label="30天销量" value="sales_30d" />
           <el-option label="7天销量" value="sales_7d" />
+          <el-option label="3天销量" value="sales_3d" />
+          <el-option label="1天销量" value="sales_1d" />
           <el-option label="30天毛利" value="gross_profit_30d_usd" />
           <el-option label="7天毛利" value="gross_profit_7d_usd" />
-          <el-option label="毛利率" value="profit_margin_30d" />
-          <el-option label="退款率" value="refund_rate_30d" />
+          <el-option label="30天毛利率" value="profit_margin_30d" />
+          <el-option label="7天毛利率" value="profit_margin_7d" />
+          <el-option label="30天退款率" value="refund_rate_30d" />
+          <el-option label="60天退款率" value="refund_rate_60d" />
           <el-option label="售价" value="selling_price_usd" />
           <el-option label="昨日广告费" value="ad_spend_yesterday" />
           <el-option label="当月广告费" value="ad_spend_current_month" />
@@ -97,7 +61,6 @@
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>
-        <el-button circle @click="resetSearch" title="重置"><el-icon><Refresh /></el-icon></el-button>
       </div>
     </div>
 
@@ -107,14 +70,16 @@
         :data="productList"
         v-loading="loading"
         style="width:100%"
-        height="calc(100vh - 360px)"
-        @selection-change="handleSelectionChange"
+        height="calc(100vh - 260px)"
+        @select="handleSelect"
+        @select-all="handleSelectAll"
         ref="tableRef"
+        :row-key="(row) => row.id"
         row-class-name="product-row"
-        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600,height:'44px'}"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
       >
-        <el-table-column type="selection" width="48" align="center" fixed="left" />
+        <el-table-column type="selection" width="48" align="center" fixed="left" :reserve-selection="true" />
         <el-table-column label="产品" min-width="280" fixed="left">
           <template #default="scope">
             <div class="product-cell">
@@ -130,11 +95,24 @@
               <div class="product-meta">
                 <div class="product-name" :title="scope.row.product_name_cn">{{ scope.row.product_name_cn || '-' }}</div>
                 <div class="product-asin">
-                  {{ scope.row.asin }}
-                  <el-link v-if="scope.row.sales_url" :href="scope.row.sales_url" target="_blank" :underline="false" type="primary" style="font-size:12px;margin-left:4px;"><el-icon size="12"><Link /></el-icon></el-link>
+                  <el-link v-if="scope.row.sales_url" :href="scope.row.sales_url" target="_blank" :underline="false" type="primary" style="font-family:monospace;font-size:12px;">
+                    {{ scope.row.asin }}
+                  </el-link>
+                  <span v-else style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
                 </div>
                 <div class="product-tags">
                   <el-tag v-if="scope.row.amazon_status" size="small" effect="plain" type="info">{{ scope.row.amazon_status }}</el-tag>
+                  <el-switch
+                    v-model="scope.row.is_listed"
+                    :active-value="true"
+                    :inactive-value="false"
+                    active-text="已上架"
+                    inactive-text="未上架"
+                    inline-prompt
+                    size="small"
+                    style="--el-switch-on-color: #10b981;"
+                    @change="(val) => handleToggleListed(scope.row, val)"
+                  />
                   <span class="rating-badge" v-if="scope.row.rating">
                     <el-icon size="12" color="#ff9900"><Star-Filled /></el-icon>
                     {{ Number(scope.row.rating).toFixed(1) }}
@@ -173,52 +151,90 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="7天销量" width="90" align="center">
+        <el-table-column width="90" align="center">
+          <template #header>
+            <el-tooltip content="30天/14天/7天/3天/1天" placement="top">
+              <span>销量</span>
+            </el-tooltip>
+          </template>
           <template #default="scope">
-            <span style="font-size:14px;color:#888;">{{ scope.row.sales_7d || 0 }}</span>
+            <div style="line-height:1.5;text-align:center;font-size:13px;">
+              <div style="font-weight:700;color:#667eea;">{{ scope.row.sales_30d || 0 }}</div>
+              <div style="color:#888;">{{ scope.row.sales_14d || 0 }}</div>
+              <div style="color:#888;">{{ scope.row.sales_7d || 0 }}</div>
+              <div style="color:#888;">{{ scope.row.sales_3d || 0 }}</div>
+              <div style="color:#aaa;">{{ scope.row.sales_1d || 0 }}</div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="30天销量" width="100" align="center">
+        <el-table-column width="110" align="right">
+          <template #header>
+            <el-tooltip content="30天 / 7天" placement="top">
+              <span>毛利(USD)</span>
+            </el-tooltip>
+          </template>
           <template #default="scope">
-            <span style="font-size:15px;font-weight:700;color:#667eea;">{{ scope.row.sales_30d || 0 }}</span>
+            <div style="line-height:1.5;text-align:right;font-size:13px;">
+              <div :class="getProfitClass(scope.row.gross_profit_30d_usd)" style="font-weight:700;">${{ formatNumber(scope.row.gross_profit_30d_usd) }}</div>
+              <div :class="getProfitClass(scope.row.gross_profit_7d_usd)" style="color:#888;">${{ formatNumber(scope.row.gross_profit_7d_usd) }}</div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="7天毛利" width="100" align="right">
+        <el-table-column width="95" align="center">
+          <template #header>
+            <el-tooltip content="30天 / 7天" placement="top">
+              <span>毛利率</span>
+            </el-tooltip>
+          </template>
           <template #default="scope">
-            <span :class="['profit-sub', getProfitClass(scope.row.gross_profit_7d_usd)]">
-              ${{ formatNumber(scope.row.gross_profit_7d_usd) }}
-            </span>
+            <div style="line-height:1.5;text-align:center;font-size:13px;">
+              <div><el-tag :type="getMarginTagType(scope.row.profit_margin_30d)" size="small" effect="dark" round>{{ formatPercent(scope.row.profit_margin_30d) }}</el-tag></div>
+              <div v-if="scope.row.profit_margin_7d != null" style="margin-top:2px;"><el-tag :type="getMarginTagType(scope.row.profit_margin_7d)" size="small" effect="plain" round>{{ formatPercent(scope.row.profit_margin_7d) }}</el-tag></div>
+              <div v-else style="color:#ccc;font-size:12px;">-</div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="30天毛利" width="110" align="right">
-          <template #default="scope">
-            <span :class="['profit-main', getProfitClass(scope.row.gross_profit_30d_usd)]">
-              ${{ formatNumber(scope.row.gross_profit_30d_usd) }}
-            </span>
+        <el-table-column width="90" align="center">
+          <template #header>
+            <el-tooltip content="60天 / 30天" placement="top">
+              <span>退款率</span>
+            </el-tooltip>
           </template>
-        </el-table-column>
-        <el-table-column label="毛利率" width="100" align="center">
           <template #default="scope">
-            <el-tag :type="getMarginTagType(scope.row.profit_margin_30d)" size="small" effect="dark" round>
-              {{ formatPercent(scope.row.profit_margin_30d) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="退款率" width="90" align="center">
-          <template #default="scope">
-            <span :class="getRefundClass(scope.row.refund_rate_30d)">{{ formatPercent(scope.row.refund_rate_30d) }}</span>
+            <div style="line-height:1.5;text-align:center;font-size:13px;">
+              <div :class="getRefundClass(scope.row.refund_rate_60d)">{{ formatPercent(scope.row.refund_rate_60d) }}</div>
+              <div :class="getRefundClass(scope.row.refund_rate_30d)" style="color:#888;">{{ formatPercent(scope.row.refund_rate_30d) }}</div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="广告" width="130" align="center">
           <template #default="scope">
             <div class="ad-block">
               <div v-if="scope.row.acos_current_month != null">
-                <el-tooltip content="Advertising Cost of Sales，广告销售成本比" placement="top">
+                <el-tooltip :raw-content="true" placement="top">
+                  <template #content>
+                    <div style="max-width:360px;line-height:1.6;font-size:13px;">
+                      <div style="font-weight:600;margin-bottom:4px;">ACoS（Advertising Cost of Sales）广告成本销售比</div>
+                      <div style="color:#ddd;margin-bottom:4px;">公式：ACoS = 广告花费 ÷ 广告带来的销售额 × 100%</div>
+                      <div style="color:#ddd;margin-bottom:4px;">只看广告直接带来的订单</div>
+                      <div style="color:#ddd;margin-bottom:4px;">例如：广告花了 3000 美元，广告销售额 3 万美元，ACoS = 10%</div>
+                      <div style="color:#ccc;">用途：衡量单次广告投放效率，用来调竞价、优化关键词</div>
+                    </div>
+                  </template>
                   <span>ACoS {{ formatPercentDecimal(scope.row.acos_current_month) }}</span>
                 </el-tooltip>
               </div>
               <div v-if="scope.row.tacos_current_month != null" class="ad-sub">
-                <el-tooltip content="Total Advertising Cost of Sales，总广告销售成本比" placement="top">
+                <el-tooltip :raw-content="true" placement="top">
+                  <template #content>
+                    <div style="max-width:360px;line-height:1.6;font-size:13px;">
+                      <div style="font-weight:600;margin-bottom:4px;">TACoS（Total Advertising Cost of Sales）总广告成本销售比</div>
+                      <div style="color:#ddd;margin-bottom:4px;">公式：TACoS = 广告花费 ÷ 店铺总销售额 × 100%</div>
+                      <div style="color:#ddd;margin-bottom:4px;">看整个店铺，包括自然流量订单 + 广告订单</div>
+                      <div style="color:#ddd;margin-bottom:4px;">例如：广告花 3000 美元，但店铺总销售额 10 万美元（广告 3 万 + 自然 7 万），TACoS = 3%</div>
+                      <div style="color:#ccc;">用途：衡量广告对整体生意的占比，判断你是否过度依赖广告</div>
+                    </div>
+                  </template>
                   <span>TACoS {{ formatPercentDecimal(scope.row.tacos_current_month) }}</span>
                 </el-tooltip>
               </div>
@@ -226,7 +242,12 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="广告费(USD)" width="130" align="right">
+        <el-table-column width="130" align="right">
+          <template #header>
+            <el-tooltip content="昨日 / 当月 / 30天" placement="top">
+              <span>广告费(USD)</span>
+            </el-tooltip>
+          </template>
           <template #default="scope">
             <div class="adfee-block">
               <div v-if="scope.row.ad_spend_yesterday != null" class="adfee-row">
@@ -245,7 +266,12 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="时间节点" width="170" align="center">
+        <el-table-column width="170" align="center">
+          <template #header>
+            <el-tooltip content="开发 / 首到 / 最早 / FBA" placement="top">
+              <span>时间节点</span>
+            </el-tooltip>
+          </template>
           <template #default="scope">
             <div class="timeline-block">
               <div v-if="scope.row.dev_time" class="timeline-row">
@@ -273,6 +299,7 @@
             <span style="color:#888;font-size:13px;">¥{{ formatNumber(scope.row.purchase_cost_rmb) }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="操作" width="100" align="center" fixed="right">
           <template #default="scope">
             <el-button type="primary" text size="small" @click="viewSingleTrend(scope.row)">趋势</el-button>
@@ -302,7 +329,23 @@
           <el-checkbox v-model="selectAll" @change="handleSelectAllChange" style="margin-right:12px;" />
           <span class="batch-text">已选 <b>{{ selectedRows.length }}</b> 项</span>
           <el-divider direction="vertical" />
-          <span class="batch-asins">{{ selectedRows.map(r=>r.asin).join(', ') }}</span>
+          <div class="batch-tags">
+            <el-tooltip v-for="row in selectedRows.slice(0,20)" :key="row.id" placement="top" :show-arrow="false">
+              <template #content>
+                <div style="display:flex;align-items:center;gap:8px;padding:4px;">
+                  <el-image :src="row.image_url || defaultImage" fit="cover" style="width:48px;height:48px;border-radius:4px;flex-shrink:0;" />
+                  <div style="max-width:200px;">
+                    <div style="font-weight:600;font-size:13px;color:#fff;margin-bottom:2px;">{{ row.product_name_cn || row.product_name || '无标题' }}</div>
+                    <div style="font-size:11px;color:#ccc;font-family:monospace;">{{ row.asin }}</div>
+                  </div>
+                </div>
+              </template>
+              <el-tag closable size="small" type="info" effect="plain" @close="removeSelectedRow(row)" style="cursor:pointer;">
+                {{ row.asin }}
+              </el-tag>
+            </el-tooltip>
+            <el-tag v-if="selectedRows.length > 20" size="small" type="warning" effect="plain">+{{ selectedRows.length - 20 }}</el-tag>
+          </div>
         </div>
         <div class="batch-right">
           <el-button type="primary" @click="handleViewTrend"><el-icon><TrendCharts /></el-icon> 查看趋势</el-button>
@@ -329,17 +372,44 @@
       <div class="trend-toolbar" v-if="trendProducts.length">
         <div class="trend-metric-select">
           <span class="trend-label">指标</span>
-          <el-select v-model="trendMetric" style="width:160px" @change="renderTrendChart">
-            <el-option label="30天销量" value="sales_30d" />
-            <el-option label="7天销量" value="sales_7d" />
-            <el-option label="售价" value="selling_price_usd" />
-            <el-option label="促销价" value="promo_price_usd" />
-            <el-option label="30天毛利" value="gross_profit_30d_usd" />
-            <el-option label="7天毛利" value="gross_profit_7d_usd" />
-            <el-option label="毛利率" value="profit_margin_30d" />
-            <el-option label="退款率" value="refund_rate_30d" />
-            <el-option label="ACoS" value="acos_current_month" />
-            <el-option label="TACoS" value="tacos_current_month" />
+          <el-select v-model="trendMetric" style="width:180px" @change="renderTrendChart">
+            <el-option-group label="销量">
+              <el-option label="30天销量" value="sales_30d" />
+              <el-option label="14天销量" value="sales_14d" />
+              <el-option label="7天销量" value="sales_7d" />
+              <el-option label="3天销量" value="sales_3d" />
+              <el-option label="1天销量" value="sales_1d" />
+            </el-option-group>
+            <el-option-group label="价格">
+              <el-option label="售价" value="selling_price_usd" />
+              <el-option label="促销价" value="promo_price_usd" />
+              <el-option label="原价" value="original_price_usd" />
+              <el-option label="建议售价" value="suggested_price_usd" />
+            </el-option-group>
+            <el-option-group label="毛利">
+              <el-option label="30天毛利" value="gross_profit_30d_usd" />
+              <el-option label="7天毛利" value="gross_profit_7d_usd" />
+            </el-option-group>
+            <el-option-group label="利润率">
+              <el-option label="30天毛利率" value="profit_margin_30d" />
+              <el-option label="7天毛利率" value="profit_margin_7d" />
+            </el-option-group>
+            <el-option-group label="退款率">
+              <el-option label="30天退款率" value="refund_rate_30d" />
+              <el-option label="60天退款率" value="refund_rate_60d" />
+            </el-option-group>
+            <el-option-group label="广告">
+              <el-option label="ACoS" value="acos_current_month" />
+              <el-option label="TACoS" value="tacos_current_month" />
+              <el-option label="昨日广告费" value="ad_spend_yesterday" />
+              <el-option label="当月广告费" value="ad_spend_current_month" />
+              <el-option label="30天广告费" value="ad_spend_30d" />
+            </el-option-group>
+            <el-option-group label="其他">
+              <el-option label="采购成本" value="purchase_cost_rmb" />
+              <el-option label="评分" value="rating" />
+              <el-option label="评论数" value="review_count" />
+            </el-option-group>
           </el-select>
         </div>
         <div class="trend-selected-products">
@@ -362,14 +432,14 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Picture, TrendCharts, UploadFilled, StarFilled,
-  Goods, PriceTag, Sell, Coin, Warning, Promotion
+  Search, Picture, TrendCharts, UploadFilled, StarFilled
 } from '@element-plus/icons-vue'
 import { Chart } from 'chart.js/auto'
 import {
-  getProductBoardBatches, getProductBoardList, getProductBoardStats,
+  getProductBoardBatches, getProductBoardList,
   getProductBoardFilters, getProductBoardTrend, deleteProductBoardItem,
-  batchDeleteProductBoardItems, importProductBoard, exportProductBoard
+  batchDeleteProductBoardItems, importProductBoard, exportProductBoard,
+  toggleProductBoardListed
 } from '@/services/api.js'
 
 const COLOR_PALETTE = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899','#84cc16','#6366f1']
@@ -377,8 +447,7 @@ const COLOR_PALETTE = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d
 export default {
   name: 'ProductBoardView',
   components: {
-    Search, Picture, TrendCharts, UploadFilled, StarFilled,
-    Goods, PriceTag, Sell, Coin, Warning, Promotion
+    Search, Picture, TrendCharts, UploadFilled, StarFilled
   },
   setup() {
     const loading = ref(false)
@@ -393,6 +462,7 @@ export default {
     const batchList = ref([])
     const amazonStatusList = ref([])
     const selectedRows = ref([])
+    const selectedRowMap = ref(new Map())
     const selectAll = ref(false)
     const currentBatch = ref('')
     const importFile = ref(null)
@@ -403,8 +473,7 @@ export default {
 
     const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHZpZXdCb3g9IjAgMCA1NiA1NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIgZmlsbD0iI2Y1ZjdmYSIvPgo8cGF0aCBkPSJNMjggMjBDMjQuMTM0IDIwIDIxIDIzLjEzNCAyMSAyN0MyMSAzMC44NjYgMjQuMTM0IDM0IDI4IDM0QzMxLjg2NiAzNCAzNSAzMC44NjYgMzUgMjdDMzUgMjMuMTM0IDMxLjg2NiAyMCAyOCAyMFoiIGZpbGw9IiNkZGUiLz4KPC9zdmc+'
 
-    const stats = reactive({ total_products: 0, avg_price: 0, total_sales_30d: 0, avg_profit_margin: 0, avg_refund_rate: 0, total_ad_spend_30d: 0 })
-    const searchForm = reactive({ batch: '', keyword: '', amazon_status: '', min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
+    const searchForm = reactive({ batch: '', keyword: '', amazon_status: '', is_listed: null, min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
     const pagination = reactive({ page: 1, page_size: 20, total: 0 })
 
     const formatNumber = (val) => {
@@ -483,46 +552,6 @@ export default {
       } catch (e) { console.error(e) }
     }
 
-    const computeStatsFromList = () => {
-      const list = productList.value
-      if (!list.length) return
-      stats.total_products = pagination.total || list.length
-      let totalPrice = 0, totalSales = 0, totalMargin = 0, totalRefund = 0, totalAd = 0, priceCount = 0
-      list.forEach(p => {
-        if (p.selling_price_usd) { totalPrice += Number(p.selling_price_usd); priceCount++ }
-        if (p.sales_30d != null) totalSales += Number(p.sales_30d)
-        if (p.profit_margin_30d != null) totalMargin += Number(p.profit_margin_30d)
-        if (p.refund_rate_30d != null) totalRefund += Number(p.refund_rate_30d)
-        if (p.ad_spend_30d != null) totalAd += Number(p.ad_spend_30d)
-      })
-      stats.avg_price = priceCount ? totalPrice / priceCount : 0
-      stats.total_sales_30d = totalSales
-      stats.avg_profit_margin = list.length ? totalMargin / list.length : 0
-      stats.avg_refund_rate = list.length ? totalRefund / list.length : 0
-      stats.total_ad_spend_30d = totalAd
-    }
-
-    const fetchStats = async () => {
-      try {
-        const params = {}
-        if (searchForm.batch) params.batch = searchForm.batch
-        const res = await getProductBoardStats(params)
-        if (res.data.status === 'success') {
-          const d = res.data.data || {}
-          stats.total_products = d.total_products ?? d.total ?? d.product_count ?? d.count ?? 0
-          stats.avg_price = d.avg_price ?? d.average_price ?? d.avg_selling_price ?? 0
-          stats.total_sales_30d = d.total_sales_30d ?? d.total_sales ?? d.sales_30d_total ?? 0
-          stats.avg_profit_margin = d.avg_profit_margin ?? d.average_profit_margin ?? d.avg_margin ?? 0
-          stats.avg_refund_rate = d.avg_refund_rate ?? d.average_refund_rate ?? d.refund_rate_avg ?? 0
-          stats.total_ad_spend_30d = d.total_ad_spend_30d ?? d.total_ad_spend ?? d.ad_spend_total ?? 0
-        }
-      } catch (e) { console.error('stats error:', e) }
-      // 兜底：如果接口没返回有效数据，从当前列表计算
-      if (!stats.total_products && productList.value.length) {
-        computeStatsFromList()
-      }
-    }
-
     const fetchList = async () => {
       loading.value = true
       try {
@@ -531,6 +560,7 @@ export default {
         if (searchForm.keyword) params.keyword = searchForm.keyword
         if (searchForm.amazon_status) params.amazon_status = searchForm.amazon_status
         if (searchForm.min_sales != null && searchForm.min_sales !== '') params.min_sales = searchForm.min_sales
+        if (searchForm.is_listed !== null && searchForm.is_listed !== '') params.is_listed = searchForm.is_listed
         const res = await getProductBoardList(params)
         if (res.data.status === 'success') {
           const d = res.data.data || {}
@@ -545,36 +575,106 @@ export default {
       } catch (error) {
         ElMessage.error('获取失败: ' + (error.response?.data?.message || error.message))
         productList.value = []; pagination.total = 0
-      } finally { loading.value = false }
+      } finally {
+        loading.value = false
+        nextTick(() => { updateSelectAllState() })
+      }
     }
 
     const refreshAll = async () => { 
       await fetchBatches(); 
-      await fetchList(); 
-      await fetchStats()
-      // 再兜底一次
-      if (!stats.total_products && productList.value.length) {
-        computeStatsFromList()
-      }
+      await fetchList()
     }
 
-    const handleSearch = () => { pagination.page = 1; fetchList(); fetchStats() }
-    const resetSearch = () => {
-      searchForm.keyword = ''; searchForm.amazon_status = ''; searchForm.min_sales = null
-      searchForm.sort_by = 'sales_30d'; searchForm.sort_dir = 'desc'
-      pagination.page = 1; fetchList(); fetchStats()
+    const clearSelection = () => {
+      selectedRowMap.value.clear()
+      selectedRows.value = []
+      selectAll.value = false
+      tableRef.value?.clearSelection()
     }
-    const handleBatchChange = (val) => { currentBatch.value = val; pagination.page = 1; fetchList(); fetchStats() }
+
+    const updateSelectAllState = () => {
+      if (productList.value.length === 0) { selectAll.value = false; return }
+      const currentPageSelected = productList.value.filter(r => selectedRowMap.value.has(r.id))
+      selectAll.value = currentPageSelected.length === productList.value.length
+    }
+
+    const handleSearch = () => { clearSelection(); pagination.page = 1; fetchList() }
+    const resetSearch = () => {
+      searchForm.keyword = ''; searchForm.amazon_status = ''; searchForm.is_listed = null; searchForm.min_sales = null
+      searchForm.sort_by = 'sales_30d'; searchForm.sort_dir = 'desc'
+      clearSelection(); pagination.page = 1; fetchList()
+    }
+    const handleBatchChange = (val) => { currentBatch.value = val; clearSelection(); pagination.page = 1; fetchList() }
     const handlePageChange = (page) => { pagination.page = page; fetchList() }
-    const handleSizeChange = (size) => { pagination.page_size = size; pagination.page = 1; fetchList() }
-    const handleSelectionChange = (rows) => { selectedRows.value = rows; selectAll.value = rows.length > 0 && rows.length === productList.value.length }
-    const handleSelectAllChange = (val) => { val ? tableRef.value?.toggleAllSelection() : tableRef.value?.clearSelection() }
+    const handleSizeChange = (size) => { pagination.page_size = size; clearSelection(); pagination.page = 1; fetchList() }
+
+    const handleSelect = (selection, row) => {
+      const isSelected = selection.some(r => r.id === row.id)
+      if (isSelected) { selectedRowMap.value.set(row.id, row) }
+      else { selectedRowMap.value.delete(row.id) }
+      selectedRows.value = Array.from(selectedRowMap.value.values())
+      updateSelectAllState()
+    }
+    const handleSelectAll = (selection) => {
+      if (selection.length > 0) {
+        for (const row of selection) { selectedRowMap.value.set(row.id, row) }
+      } else {
+        for (const row of productList.value) { selectedRowMap.value.delete(row.id) }
+      }
+      selectedRows.value = Array.from(selectedRowMap.value.values())
+      updateSelectAllState()
+    }
+    const removeSelectedRow = (row) => {
+      selectedRowMap.value.delete(row.id)
+      selectedRows.value = Array.from(selectedRowMap.value.values())
+      tableRef.value?.toggleRowSelection(row, false)
+      updateSelectAllState()
+    }
+
+    const handleSelectAllChange = (val) => {
+      if (val) {
+        for (const row of productList.value) {
+          selectedRowMap.value.set(row.id, row)
+          tableRef.value?.toggleRowSelection(row, true)
+        }
+      } else {
+        for (const row of productList.value) {
+          selectedRowMap.value.delete(row.id)
+          tableRef.value?.toggleRowSelection(row, false)
+        }
+      }
+      selectedRows.value = Array.from(selectedRowMap.value.values())
+      updateSelectAllState()
+    }
+
+    const handleToggleListed = async (row, val) => {
+      try {
+        const res = await toggleProductBoardListed(row.asin, val)
+        if (res.data.status === 'success') {
+          row.is_listed = val
+          ElMessage.success(val ? '已标记为已上架' : '已标记为未上架')
+        } else {
+          row.is_listed = !val
+          ElMessage.error(res.data.message || '操作失败')
+        }
+      } catch (e) {
+        row.is_listed = !val
+        ElMessage.error('操作失败')
+      }
+    }
 
     const handleDelete = (row) => {
       ElMessageBox.confirm(`确定删除 ASIN "${row.asin}" 吗？`, '提示', { type: 'warning' }).then(async () => {
         try {
           const res = await deleteProductBoardItem(row.id)
-          if (res.data.status === 'success') { ElMessage.success('删除成功'); await fetchList(); await fetchStats() }
+          if (res.data.status === 'success') {
+            ElMessage.success('删除成功')
+            selectedRowMap.value.delete(row.id)
+            selectedRows.value = Array.from(selectedRowMap.value.values())
+            updateSelectAllState()
+            await fetchList()
+          }
           else ElMessage.error(res.data.message || '删除失败')
         } catch (e) { ElMessage.error('删除失败') }
       }).catch(()=>{})
@@ -585,7 +685,7 @@ export default {
       ElMessageBox.confirm(`确定删除选中的 ${ids.length} 条记录吗？`, '提示', { type: 'warning' }).then(async () => {
         try {
           const res = await batchDeleteProductBoardItems(ids)
-          if (res.data.status === 'success') { ElMessage.success('批量删除成功'); selectedRows.value = []; await fetchList(); await fetchStats() }
+          if (res.data.status === 'success') { ElMessage.success('批量删除成功'); clearSelection(); await fetchList() }
           else ElMessage.error(res.data.message || '删除失败')
         } catch (e) { ElMessage.error('删除失败') }
       }).catch(()=>{})
@@ -612,6 +712,7 @@ export default {
         const params = {}
         if (searchForm.batch) params.batch = searchForm.batch
         if (searchForm.keyword) params.keyword = searchForm.keyword
+        if (searchForm.is_listed !== null && searchForm.is_listed !== '') params.is_listed = searchForm.is_listed
         const res = await exportProductBoard(params)
         const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
         const link = document.createElement('a')
@@ -629,16 +730,36 @@ export default {
 
     // ============ 趋势图（Chart.js 单图+下拉筛选） ============
     const METRIC_CONFIG = {
+      // 销量
       sales_30d: { label: '30天销量', isMoney: false, isPercent: false, isDecimalPercent: false },
+      sales_14d: { label: '14天销量', isMoney: false, isPercent: false, isDecimalPercent: false },
       sales_7d: { label: '7天销量', isMoney: false, isPercent: false, isDecimalPercent: false },
+      sales_3d: { label: '3天销量', isMoney: false, isPercent: false, isDecimalPercent: false },
+      sales_1d: { label: '1天销量', isMoney: false, isPercent: false, isDecimalPercent: false },
+      // 价格
       selling_price_usd: { label: '售价', isMoney: true, isPercent: false, isDecimalPercent: false },
       promo_price_usd: { label: '促销价', isMoney: true, isPercent: false, isDecimalPercent: false },
+      original_price_usd: { label: '原价', isMoney: true, isPercent: false, isDecimalPercent: false },
+      suggested_price_usd: { label: '建议售价', isMoney: true, isPercent: false, isDecimalPercent: false },
+      // 毛利
       gross_profit_30d_usd: { label: '30天毛利', isMoney: true, isPercent: false, isDecimalPercent: false },
       gross_profit_7d_usd: { label: '7天毛利', isMoney: true, isPercent: false, isDecimalPercent: false },
-      profit_margin_30d: { label: '毛利率', isMoney: false, isPercent: true, isDecimalPercent: false },
-      refund_rate_30d: { label: '退款率', isMoney: false, isPercent: true, isDecimalPercent: false },
+      // 利润率
+      profit_margin_30d: { label: '30天毛利率', isMoney: false, isPercent: true, isDecimalPercent: false },
+      profit_margin_7d: { label: '7天毛利率', isMoney: false, isPercent: true, isDecimalPercent: false },
+      // 退款率
+      refund_rate_30d: { label: '30天退款率', isMoney: false, isPercent: true, isDecimalPercent: false },
+      refund_rate_60d: { label: '60天退款率', isMoney: false, isPercent: true, isDecimalPercent: false },
+      // 广告
       acos_current_month: { label: 'ACoS', isMoney: false, isPercent: false, isDecimalPercent: true },
-      tacos_current_month: { label: 'TACoS', isMoney: false, isPercent: false, isDecimalPercent: true }
+      tacos_current_month: { label: 'TACoS', isMoney: false, isPercent: false, isDecimalPercent: true },
+      ad_spend_yesterday: { label: '昨日广告费', isMoney: true, isPercent: false, isDecimalPercent: false },
+      ad_spend_current_month: { label: '当月广告费', isMoney: true, isPercent: false, isDecimalPercent: false },
+      ad_spend_30d: { label: '30天广告费', isMoney: true, isPercent: false, isDecimalPercent: false },
+      // 其他
+      purchase_cost_rmb: { label: '采购成本', isMoney: false, isPercent: false, isDecimalPercent: false, isRmb: true },
+      rating: { label: '评分', isMoney: false, isPercent: false, isDecimalPercent: false },
+      review_count: { label: '评论数', isMoney: false, isPercent: false, isDecimalPercent: false }
     }
 
     const formatTrendValue = (val, config) => {
@@ -646,6 +767,7 @@ export default {
       if (config.isDecimalPercent) return (Number(val) * 100).toFixed(1) + '%'
       if (config.isPercent) return Number(val).toFixed(1) + '%'
       if (config.isMoney) return '$' + Number(val).toFixed(2)
+      if (config.isRmb) return '¥' + Number(val).toFixed(2)
       return Number(val).toLocaleString()
     }
 
@@ -807,12 +929,13 @@ export default {
       loading, exportLoading, importLoading, trendLoading,
       importDialogVisible, trendDialogVisible, tableRef, uploadRef,
       productList, batchList, amazonStatusList, selectedRows, selectAll,
-      currentBatch, stats, searchForm, pagination, defaultImage,
+      currentBatch, searchForm, pagination, defaultImage,
       trendChartRef, trendProducts, trendMetric,
       formatNumber, formatPercent, formatPercentDecimal, formatBatchLabel,
       getProfitClass, getMarginTagType, getRefundClass,
       handleSearch, resetSearch, handleBatchChange, handlePageChange, handleSizeChange,
-      handleSelectionChange, handleSelectAllChange, handleDelete, handleBatchDelete,
+      handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
+      handleToggleListed, handleDelete, handleBatchDelete,
       handleImportClick, handleFileChange, submitImport, handleExport,
       handleViewTrend, viewSingleTrend, renderTrendChart
     }
@@ -1004,19 +1127,9 @@ export default {
 .promo-price { font-size: 12px; color: #bbb; text-decoration: line-through; }
 .suggest-price { font-size: 12px; color: #52c41a; font-weight: 500; }
 
-/* 销量 */
-.sales-block { text-align: center; }
-.sales-main { font-size: 15px; font-weight: 700; color: #667eea; }
-.sales-sub { font-size: 12px; color: #999; margin-top: 2px; }
-.sales-label { font-size: 11px; color: #bbb; font-weight: 400; }
-
-/* 毛利 */
-.profit-block { text-align: right; }
-.profit-main { font-size: 14px; font-weight: 700; }
-.profit-sub { font-size: 12px; color: #999; margin-top: 2px; }
-.profit-label { font-size: 11px; color: #bbb; font-weight: 400; }
-.profit-pos { color: #10b981; }
-.profit-neg { color: #ef4444; }
+/* 毛利颜色 */
+.profit-pos { color: #10b981; font-weight: 600; }
+.profit-neg { color: #ef4444; font-weight: 600; }
 
 /* 广告 */
 .ad-block { font-size: 12px; color: #666; line-height: 1.5; }
@@ -1069,9 +1182,9 @@ export default {
   display: flex; align-items: center; gap: 10px; overflow: hidden;
 }
 .batch-text { font-size: 14px; color: #555; }
-.batch-asins {
-  font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 300px; font-family: monospace;
+.batch-tags {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  max-width: 380px; overflow: hidden;
 }
 .batch-right { display: flex; gap: 10px; flex-shrink: 0; }
 
@@ -1124,15 +1237,9 @@ export default {
 }
 
 /* ===== 响应式 ===== */
-@media (max-width: 1200px) {
-  .stats-row { grid-template-columns: repeat(3, 1fr); }
-}
 @media (max-width: 768px) {
   .product-board-page { padding: 16px 16px 100px; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .stat-card { padding: 14px; }
-  .stat-value { font-size: 18px; }
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-group { justify-content: stretch; }
   .batch-bar {
@@ -1140,7 +1247,7 @@ export default {
     min-width: auto; width: auto;
     flex-direction: column; gap: 10px; padding: 12px;
   }
-  .batch-asins { max-width: 200px; }
+  .batch-tags { max-width: 260px; }
   .trend-chart-body { height: 260px; }
 }
 </style>
