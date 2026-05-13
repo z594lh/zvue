@@ -1,7 +1,7 @@
 <template>
   <div class="pdf-tools-container">
     <div class="header">
-      <h1>PDF 裁剪与拆分工具</h1>
+      <h1>PDF 裁剪拆分工具</h1>
       <div class="header-actions">
         <el-button type="primary" @click="uploadPdf" :loading="loading">上传PDF文件</el-button>
       </div>
@@ -498,7 +498,7 @@ export default {
       try {
         ElMessage.info('正在裁剪PDF...')
         const res = await editPdf(originalPdfFile.value, operations)
-        const filename = res.headers['content-disposition']?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)?.[1]?.replace(/['"]/g, '') || '裁剪后.pdf'
+        const filename = res.headers['content-disposition']?.split('filename=')[1]?.split(';')[0]?.trim() || '裁剪后.pdf'
         downloadBlob(new Blob([res.data], { type: 'application/pdf' }), filename)
         ElMessage.success('裁剪导出成功')
       } catch (e) {
