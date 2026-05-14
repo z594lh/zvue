@@ -856,15 +856,8 @@ export const syncListingToProduct = (sku, shop_id) => {
 // ==================== 选品看板（备货看板）相关接口 ====================
 
 /**
- * 获取选品看板批次列表
- */
-export const getProductBoardBatches = () => {
-  return api.get('/product-board/batches');
-};
-
-/**
  * 获取选品看板产品列表
- * @param {Object} params {batch, keyword, amazon_status, min_sales, sort_by, sort_dir, page, page_size}
+ * @param {Object} params {keyword, amazon_status, is_listed, min_sales, sort_by, sort_dir, page, page_size}
  */
 export const getProductBoardList = (params = {}) => {
   return api.get('/product-board', { params });
@@ -872,14 +865,14 @@ export const getProductBoardList = (params = {}) => {
 
 /**
  * 获取选品看板统计概览
- * @param {Object} params {batch}
  */
-export const getProductBoardStats = (params = {}) => {
-  return api.get('/product-board/stats', { params });
+export const getProductBoardStats = () => {
+  return api.get('/product-board/stats');
 };
 
 /**
  * 获取选品看板筛选选项
+ * 返回 { amazon_statuses: [] }
  */
 export const getProductBoardFilters = () => {
   return api.get('/product-board/filters');
@@ -921,7 +914,7 @@ export const importProductBoard = (formData) => {
 
 /**
  * 导出选品看板数据
- * @param {Object} params {batch, keyword}
+ * @param {Object} params {keyword, amazon_status, is_listed, min_sales}
  */
 export const exportProductBoard = (params = {}) => {
   return api.get('/product-board/export', {

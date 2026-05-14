@@ -18,9 +18,6 @@
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="filter-group">
-        <el-select v-model="searchForm.batch" placeholder="选择批次" clearable style="width:200px" @change="handleBatchChange">
-          <el-option v-for="item in batchList" :key="item.import_batch" :label="formatBatchLabel(item)" :value="item.import_batch" />
-        </el-select>
         <el-select v-model="searchForm.amazon_status" placeholder="AMZ状态" clearable style="width:130px" @change="handleSearch">
           <el-option v-for="status in amazonStatusList" :key="status" :label="status" :value="status" />
         </el-select>
@@ -436,7 +433,7 @@ import {
 } from '@element-plus/icons-vue'
 import { Chart } from 'chart.js/auto'
 import {
-  getProductBoardBatches, getProductBoardList,
+  getProductBoardList,
   getProductBoardFilters, getProductBoardTrend, deleteProductBoardItem,
   batchDeleteProductBoardItems, importProductBoard, exportProductBoard,
   toggleProductBoardListed
@@ -459,12 +456,10 @@ export default {
     const tableRef = ref(null)
     const uploadRef = ref(null)
     const productList = ref([])
-    const batchList = ref([])
     const amazonStatusList = ref([])
     const selectedRows = ref([])
     const selectedRowMap = ref(new Map())
     const selectAll = ref(false)
-    const currentBatch = ref('')
     const importFile = ref(null)
     const trendProducts = ref([])
     const trendChartRef = ref(null)
@@ -473,7 +468,7 @@ export default {
 
     const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHZpZXdCb3g9IjAgMCA1NiA1NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIgZmlsbD0iI2Y1ZjdmYSIvPgo8cGF0aCBkPSJNMjggMjBDMjQuMTM0IDIwIDIxIDIzLjEzNCAyMSAyN0MyMSAzMC44NjYgMjQuMTM0IDM0IDI4IDM0QzMxLjg2NiAzNCAzNSAzMC44NjYgMzUgMjdDMzUgMjMuMTM0IDMxLjg2NiAyMCAyOCAyMFoiIGZpbGw9IiNkZGUiLz4KPC9zdmc+'
 
-    const searchForm = reactive({ batch: '', keyword: '', amazon_status: '', is_listed: null, min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
+    const searchForm = reactive({ keyword: '', amazon_status: '', is_listed: null, min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
     const pagination = reactive({ page: 1, page_size: 20, total: 0 })
 
     const formatNumber = (val) => {
@@ -501,13 +496,6 @@ export default {
       return (num * 100).toFixed(1) + '%'
     }
 
-    const formatBatchLabel = (item) => {
-      const batch = item.import_batch || ''
-      const date = batch.replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1-$2-$3 $4:$5')
-      const latest = item.is_latest || item.latest_batch ? ' · 最新' : ''
-      return `${date}${latest}`
-    }
-
     const getProfitClass = (val) => {
       const num = Number(val)
       if (isNaN(num) || num >= 0) return 'profit-pos'
@@ -530,21 +518,6 @@ export default {
       return 'text-red'
     }
 
-    // 数据获取
-    const fetchBatches = async () => {
-      try {
-        const res = await getProductBoardBatches()
-        if (res.data.status === 'success') {
-          batchList.value = res.data.data?.batches || []
-          const latest = batchList.value.find(b => b.is_latest || b.latest_batch)
-          if (latest && !searchForm.batch) {
-            searchForm.batch = latest.import_batch
-            currentBatch.value = latest.import_batch
-          }
-        }
-      } catch (e) { console.error(e) }
-    }
-
     const fetchFilters = async () => {
       try {
         const res = await getProductBoardFilters()
@@ -556,7 +529,6 @@ export default {
       loading.value = true
       try {
         const params = { page: pagination.page, page_size: pagination.page_size, sort_by: searchForm.sort_by, sort_dir: searchForm.sort_dir }
-        if (searchForm.batch) params.batch = searchForm.batch
         if (searchForm.keyword) params.keyword = searchForm.keyword
         if (searchForm.amazon_status) params.amazon_status = searchForm.amazon_status
         if (searchForm.min_sales != null && searchForm.min_sales !== '') params.min_sales = searchForm.min_sales
@@ -564,7 +536,10 @@ export default {
         const res = await getProductBoardList(params)
         if (res.data.status === 'success') {
           const d = res.data.data || {}
-          productList.value = d.list || []
+          productList.value = (d.list || []).map(item => ({
+            ...item,
+            is_listed: !!item.is_listed
+          }))
           pagination.total = d.total || 0
           pagination.page = d.page || 1
           pagination.page_size = d.page_size || 20
@@ -582,7 +557,6 @@ export default {
     }
 
     const refreshAll = async () => { 
-      await fetchBatches(); 
       await fetchList()
     }
 
@@ -605,7 +579,6 @@ export default {
       searchForm.sort_by = 'sales_30d'; searchForm.sort_dir = 'desc'
       clearSelection(); pagination.page = 1; fetchList()
     }
-    const handleBatchChange = (val) => { currentBatch.value = val; clearSelection(); pagination.page = 1; fetchList() }
     const handlePageChange = (page) => { pagination.page = page; fetchList() }
     const handleSizeChange = (size) => { pagination.page_size = size; clearSelection(); pagination.page = 1; fetchList() }
 
@@ -700,7 +673,7 @@ export default {
         const fd = new FormData(); fd.append('file', importFile.value)
         const res = await importProductBoard(fd)
         if (res.data.status === 'success') {
-          ElMessage.success(`导入成功，批次: ${res.data.data?.batch || ''}`)
+          ElMessage.success(res.data.message || '导入成功')
           importDialogVisible.value = false; await refreshAll()
         } else ElMessage.error(res.data.message || '导入失败')
       } catch (e) { ElMessage.error('导入失败') } finally { importLoading.value = false }
@@ -710,14 +683,14 @@ export default {
       exportLoading.value = true
       try {
         const params = {}
-        if (searchForm.batch) params.batch = searchForm.batch
         if (searchForm.keyword) params.keyword = searchForm.keyword
+        if (searchForm.amazon_status) params.amazon_status = searchForm.amazon_status
         if (searchForm.is_listed !== null && searchForm.is_listed !== '') params.is_listed = searchForm.is_listed
         const res = await exportProductBoard(params)
         const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
         const link = document.createElement('a')
         link.href = URL.createObjectURL(blob)
-        link.download = `product-board-${searchForm.batch || 'latest'}.csv`
+        link.download = `product-board-export.csv`
         link.click()
         URL.revokeObjectURL(link.href)
         ElMessage.success('导出成功')
@@ -778,27 +751,31 @@ export default {
         const metric = trendMetric.value
         const config = METRIC_CONFIG[metric] || METRIC_CONFIG.sales_30d
 
-        // 统一批次轴
-        const allBatchesSet = new Set()
+        // 统一时间轴
+        const allDatesSet = new Set()
         trendProducts.value.forEach(p => {
-          (p.data_points || []).forEach(d => allBatchesSet.add(d.import_batch || d.batch_time || ''))
+          (p.data_points || []).forEach(d => allDatesSet.add(d.created_at || ''))
         })
-        const batchAxis = Array.from(allBatchesSet).filter(Boolean).sort()
-        const labels = batchAxis.map(b => {
-          if (b.length >= 12) return b.slice(4,6) + '-' + b.slice(6,8) + ' ' + b.slice(8,10) + ':' + b.slice(10,12)
-          return b
+        const dateAxis = Array.from(allDatesSet).filter(Boolean).sort()
+        const labels = dateAxis.map(d => {
+          const datePart = d.split(' ')[0]
+          if (datePart) {
+            const parts = datePart.split('-')
+            if (parts.length >= 3) return `${parts[1]}-${parts[2]}`
+          }
+          return d
         })
 
         // 构建 datasets
         const datasets = trendProducts.value.map((product, idx) => {
           const dataMap = new Map()
           ;(product.data_points || []).forEach(d => {
-            dataMap.set(d.import_batch || d.batch_time || '', d[metric] ?? null)
+            dataMap.set(d.created_at || '', d[metric] ?? null)
           })
           const color = COLOR_PALETTE[idx % COLOR_PALETTE.length]
           return {
             label: product.product_name_cn || product.asin,
-            data: batchAxis.map(b => dataMap.get(b) ?? null),
+            data: dateAxis.map(d => dataMap.get(d) ?? null),
             borderColor: color,
             backgroundColor: color + '15',
             borderWidth: 2.5,
@@ -824,7 +801,7 @@ export default {
           const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length
           datasets.push({
             label: '平均值',
-            data: batchAxis.map(() => avg),
+            data: dateAxis.map(() => avg),
             borderColor: '#999',
             borderWidth: 1.5,
             borderDash: [6, 4],
@@ -928,12 +905,12 @@ export default {
     return {
       loading, exportLoading, importLoading, trendLoading,
       importDialogVisible, trendDialogVisible, tableRef, uploadRef,
-      productList, batchList, amazonStatusList, selectedRows, selectAll,
-      currentBatch, searchForm, pagination, defaultImage,
+      productList, amazonStatusList, selectedRows, selectAll,
+      searchForm, pagination, defaultImage,
       trendChartRef, trendProducts, trendMetric,
-      formatNumber, formatPercent, formatPercentDecimal, formatBatchLabel,
+      formatNumber, formatPercent, formatPercentDecimal,
       getProfitClass, getMarginTagType, getRefundClass,
-      handleSearch, resetSearch, handleBatchChange, handlePageChange, handleSizeChange,
+      handleSearch, resetSearch, handlePageChange, handleSizeChange,
       handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
       handleToggleListed, handleDelete, handleBatchDelete,
       handleImportClick, handleFileChange, submitImport, handleExport,
