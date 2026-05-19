@@ -118,7 +118,7 @@
         v-loading="loading"
         stripe
         style="width: 100%"
-        :default-sort="{ prop: 'shipment_sync_time', order: 'descending' }"
+        :default-sort="{ prop: 'plan_created_at', order: 'descending' }"
       >
         <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
           <template #default>
@@ -150,9 +150,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="shipment_sync_time" label="同步时间" width="170" align="center">
+        <el-table-column prop="plan_created_at" label="创建时间" width="170" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.shipment_sync_time) }}
+            {{ formatDate(scope.row.plan_created_at) }}
           </template>
         </el-table-column>
 
@@ -452,7 +452,7 @@ export default {
       shipment_confirmation_id: '',
       amazon_reference_id: '',
       destination_warehouse_id: '',
-      status: 'WORKING'
+      status: ''
     })
 
     // 分页状态
