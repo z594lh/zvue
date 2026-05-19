@@ -24,6 +24,8 @@ import ReportView from '../views/ReportView.vue'
 import AdvertisingReportView from '../views/AdvertisingReportView.vue'
 import { isAuthenticated } from '@/services/api.js'
 
+const CronTasksView = () => import('../views/CronTasksView.vue')
+
 const routes = [
   {
     path: '/',
@@ -139,6 +141,11 @@ const routes = [
     path: '/reports/advertising',
     name: 'AdvertisingReports',
     component: AdvertisingReportView
+  },
+  {
+    path: '/system/cron-tasks',
+    name: 'CronTasks',
+    component: CronTasksView
   }
 ]
 

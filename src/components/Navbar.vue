@@ -158,6 +158,12 @@ const navGroups = [
       { label: 'FBA标签', path: '/fba-label' },
       { label: 'PDF工具', path: '/pdf-tools' }
     ]
+  },
+  {
+    label: '系统',
+    children: [
+      { label: '计划任务', path: '/system/cron-tasks' }
+    ]
   }
 ]
 

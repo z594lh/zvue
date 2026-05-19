@@ -1138,4 +1138,11 @@ export const getAvailableShipments = (params = {}) => {
   return api.get('/logistics-waybills/available-shipments', { params });
 };
 
+/**
+ * 获取计划任务（Cron Tasks）列表
+ */
+export const getCronTasks = (params = {}) => {
+  return api.get('/cron/tasks', { params });
+};
+
 
