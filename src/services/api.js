@@ -932,6 +932,161 @@ export const toggleProductBoardListed = (asin, is_listed) => {
   return api.post('/product-board/toggle-listed', { asin, is_listed });
 };
 
+// ==================== 报表中心相关接口 ====================
+
+/**
+ * 获取经营报表列表
+ * @param {Object} params {type, start_date, end_date, shop_id, page, page_size}
+ */
+export const getBusinessReports = (params = {}) => {
+  return api.get('/reports/business', { params });
+};
+
+/**
+ * 获取经营报表汇总
+ * @param {Object} params {type, start_date, end_date, shop_id}
+ */
+export const getBusinessSummary = (params = {}) => {
+  return api.get('/reports/business/summary', { params });
+};
+
+/**
+ * 获取经营趋势
+ * @param {Object} params {type, start_date, end_date, shop_id}
+ */
+export const getBusinessTrend = (params = {}) => {
+  return api.get('/reports/business/trend', { params });
+};
+
+/**
+ * 手动触发经营报表生成
+ * @param {Object} data {report_type, period, shop_id}
+ */
+export const generateBusinessReport = (data = {}) => {
+  return api.post('/reports/business/generate', data);
+};
+
+/**
+ * 获取SKU利润列表
+ * @param {Object} params {keyword, start_date, end_date, shop_id, page, page_size}
+ */
+export const getSkuProfitList = (params = {}) => {
+  return api.get('/reports/sku-profit', { params });
+};
+
+/**
+ * 获取SKU利润排行
+ * @param {Object} params {sort_by, sort_dir, limit, start_date, end_date, shop_id}
+ */
+export const getSkuProfitTop = (params = {}) => {
+  return api.get('/reports/sku-profit/top', { params });
+};
+
+/**
+ * 手动触发SKU利润生成
+ * @param {Object} data {period_start, period_end, shop_id}
+ */
+export const generateSkuProfit = (data = {}) => {
+  return api.post('/reports/sku-profit/generate', data);
+};
+
+/**
+ * 获取库存周转列表
+ * @param {Object} params {status, keyword, sku, shop_id, page, page_size}
+ */
+export const getInventoryTurnover = (params = {}) => {
+  return api.get('/reports/inventory-turnover', { params });
+};
+
+/**
+ * 获取库存周转统计
+ * @param {Object} params {shop_id}
+ */
+export const getInventoryStats = (params = {}) => {
+  return api.get('/reports/inventory-turnover/stats', { params });
+};
+
+/**
+ * 手动触发库存周转生成
+ * @param {Object} data {shop_id}
+ */
+export const generateInventoryTurnover = (data = {}) => {
+  return api.post('/reports/inventory-turnover/generate', data);
+};
+
+/**
+ * 批量更新库存状态
+ * @param {Object} data {ids, status}
+ */
+export const batchUpdateInventoryStatus = (data = {}) => {
+  return api.post('/reports/inventory-turnover/batch-update-status', data);
+};
+
+/**
+ * 一键生成昨日全部报表
+ */
+export const generateYesterdayReports = () => {
+  return api.post('/reports/generate-yesterday');
+};
+
+/**
+ * 查询生成日志
+ * @param {Object} params {report_type, status, page, page_size}
+ */
+export const getGenerationLogs = (params = {}) => {
+  return api.get('/reports/generation-logs', { params });
+};
+
+/**
+ * 导入广告费明细
+ * @param {Object} data {records}
+ */
+export const importAdSpend = (data = {}) => {
+  return api.post('/reports/ad-spend/import', data);
+};
+
+/**
+ * 导入退款明细
+ * @param {Object} data {records}
+ */
+export const importRefundRecords = (data = {}) => {
+  return api.post('/reports/refund/import', data);
+};
+
+// ==================== 广告效果报表接口 ====================
+
+/**
+ * 广告效果报表列表
+ * @param {Object} params {type, dimension, campaign_id, ad_group_id, asin, start_date, end_date, shop_id, page, page_size}
+ */
+export const getAdvertisingReports = (params = {}) => {
+  return api.get('/reports/advertising', { params });
+};
+
+/**
+ * 广告效果汇总统计
+ * @param {Object} params {type, dimension, start_date, end_date, shop_id}
+ */
+export const getAdvertisingSummary = (params = {}) => {
+  return api.get('/reports/advertising/summary', { params });
+};
+
+/**
+ * 广告效果趋势
+ * @param {Object} params {type, dimension, start_date, end_date, shop_id}
+ */
+export const getAdvertisingTrend = (params = {}) => {
+  return api.get('/reports/advertising/trend', { params });
+};
+
+/**
+ * 手动触发广告效果报表生成
+ * @param {Object} data {report_type, period, period_start, period_end, shop_id}
+ */
+export const generateAdvertisingReport = (data = {}) => {
+  return api.post('/reports/advertising/generate', data);
+};
+
 // ==================== 货代运单管理相关接口 ====================
 
 /**

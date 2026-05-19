@@ -20,6 +20,8 @@ import LogisticsProviderView from '../views/LogisticsProviderView.vue'
 import LogisticsWaybillView from '../views/LogisticsWaybillView.vue'
 import ShopView from '../views/ShopView.vue'
 import ProductBoardView from '../views/ProductBoardView.vue'
+import ReportView from '../views/ReportView.vue'
+import AdvertisingReportView from '../views/AdvertisingReportView.vue'
 import { isAuthenticated } from '@/services/api.js'
 
 const routes = [
@@ -127,6 +129,16 @@ const routes = [
     path: '/product-board',
     name: 'ProductBoard',
     component: ProductBoardView
+  },
+  {
+    path: '/reports',
+    name: 'Reports',
+    component: ReportView
+  },
+  {
+    path: '/reports/advertising',
+    name: 'AdvertisingReports',
+    component: AdvertisingReportView
   }
 ]
 
