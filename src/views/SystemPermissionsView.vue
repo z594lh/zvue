@@ -82,6 +82,22 @@
           </div>
 
           <el-table :data="users" v-loading="usersLoading" border stripe>
+            <el-table-column label="头像" width="70" align="center">
+              <template #default="{ row }">
+                <el-popover v-if="row.avatar" trigger="hover" placement="right" :show-arrow="false" :popper-style="{ width: '232px', padding: '16px' }">
+                  <template #reference>
+                    <img :src="row.avatar" class="user-avatar-img" alt="avatar" />
+                  </template>
+                  <img :src="row.avatar" class="avatar-preview" alt="avatar" />
+                </el-popover>
+                <el-popover v-else trigger="hover" placement="right" :show-arrow="false" :popper-style="{ width: '232px', padding: '16px' }">
+                  <template #reference>
+                    <div class="user-avatar-default">{{ row.nickname?.charAt(0)?.toUpperCase() || row.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
+                  </template>
+                  <div class="avatar-preview avatar-preview-default">{{ row.nickname?.charAt(0)?.toUpperCase() || row.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
+                </el-popover>
+              </template>
+            </el-table-column>
             <el-table-column prop="username" label="用户名" width="120" />
             <el-table-column prop="nickname" label="昵称" width="120" />
             <el-table-column label="角色" min-width="160">
@@ -449,7 +465,7 @@ export default {
         }
       } catch (error) {
         console.error('获取角色失败:', error)
-        proxy.$message.error({ message: '获取角色失败', offset: 60 })
+        // proxy.$message.error({ message: '获取角色失败', offset: 60 })
       } finally {
         rolesLoading.value = false
       }
@@ -901,5 +917,49 @@ export default {
   background: #f5f7fa;
   border-radius: 6px;
   font-size: 14px;
+}
+
+.user-avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.user-avatar-default {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  margin: 0 auto;
+  cursor: pointer;
+}
+
+.avatar-preview {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-preview-default {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+  font-weight: bold;
 }
 </style>
