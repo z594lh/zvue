@@ -12,7 +12,7 @@
     </button>
 
     <div class="nav-links">
-      <template v-for="group in navGroups" :key="group.label">
+      <template v-for="group in visibleNavGroups" :key="group.label">
         <!-- 只有一个子项：直接跳转 -->
         <router-link
           v-if="group.children.length === 1"
@@ -52,7 +52,7 @@
 
     <!-- 移动端菜单 -->
     <div v-show="mobileMenuOpen" class="mobile-menu">
-      <template v-for="group in navGroups" :key="group.label">
+      <template v-for="group in visibleNavGroups" :key="group.label">
         <!-- 单个子项直接显示 -->
         <router-link
           v-if="group.children.length === 1"
@@ -88,7 +88,8 @@
     <div class="nav-user">
       <template v-if="isLoggedIn">
         <div class="user-menu" @click="toggleMenu" ref="menuRef">
-          <div class="user-avatar">
+          <img v-if="userAvatar" :src="userAvatar" class="user-avatar-img" alt="avatar" />
+          <div v-else class="user-avatar">
             {{ userNickname?.charAt(0)?.toUpperCase() || 'U' }}
           </div>
           <span class="username">{{ userNickname || '用户' }}</span>
@@ -97,6 +98,9 @@
           <div v-show="showMenu" class="dropdown-menu">
             <div class="menu-item" @click="goToProfile">
               <span class="icon">👤</span> 个人中心
+            </div>
+            <div class="menu-item" @click="handleRefreshMenus">
+              <span class="icon">🔄</span> 刷新权限
             </div>
             <div class="menu-divider"></div>
             <div class="menu-item logout" @click="handleLogout">
@@ -113,11 +117,12 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { isAuthenticated, getUserProfile, logout, setAuthToken } from '@/services/api.js'
+import { isAuthenticated, getUserProfile, getMenus, logout, setAuthToken, setUserPermissions, clearUserPermissions, getUserPermissions, setUserMenus, clearUserMenus } from '@/services/api.js'
 
-const navGroups = [
+// 本地兜底菜单（当 /api/menus 接口不可用时使用）
+const fallbackNavGroups = [
   {
     label: '财务',
     children: [
@@ -133,6 +138,13 @@ const navGroups = [
       { label: 'Listing列表', path: '/amazon-listings' },
       { label: '货件列表', path: '/amazon-shipments' },
       { label: '库存列表', path: '/amazon-inventory' }
+    ]
+  },
+  {
+    label: '报表',
+    children: [
+      { label: '店铺报表', path: '/reports' },
+      { label: '广告报表', path: '/reports/advertising' }
     ]
   },
   {
@@ -162,7 +174,8 @@ const navGroups = [
   {
     label: '系统',
     children: [
-      { label: '计划任务', path: '/system/cron-tasks' }
+      { label: '计划任务', path: '/system/cron-tasks' },
+      { label: '权限管理', path: '/system/permissions' }
     ]
   }
 ]
@@ -174,10 +187,12 @@ export default {
     const route = useRoute()
     const isLoggedIn = ref(false)
     const userNickname = ref('')
+    const userAvatar = ref('')
     const showMenu = ref(false)
     const menuRef = ref(null)
     const openGroup = ref(null)
     const mobileMenuOpen = ref(false)
+    const dynamicMenus = ref(null) // 从 /api/menus 获取的原始菜单
 
     const toggleMobileMenu = () => {
       mobileMenuOpen.value = !mobileMenuOpen.value
@@ -187,8 +202,59 @@ export default {
       mobileMenuOpen.value = false
     }
 
+    // 将后端扁平菜单转成树形结构
+    const buildMenuTree = (flatMenus) => {
+      if (!flatMenus || !flatMenus.length) return []
+      const groups = []
+      const groupMap = {}
+
+      // 第一遍：先创建所有 parent_id=0 的组
+      flatMenus.forEach((item) => {
+        if (item.parent_id === 0 || item.parent_id === null) {
+          if (item.path) {
+            // 独立页面（如首页看板），包装成单个子项的组
+            groups.push({
+              label: item.label,
+              children: [{ label: item.label, path: item.path }]
+            })
+          } else {
+            // 分组（如财务、亚马逊）
+            groupMap[item.id] = {
+              label: item.label,
+              children: []
+            }
+            groups.push(groupMap[item.id])
+          }
+        }
+      })
+
+      // 第二遍：添加子项到对应分组
+      flatMenus.forEach((item) => {
+        if (item.parent_id !== 0 && item.parent_id !== null && groupMap[item.parent_id]) {
+          groupMap[item.parent_id].children.push({
+            label: item.label,
+            path: item.path
+          })
+        }
+      })
+
+      return groups.filter((g) => g.children.length > 0)
+    }
+
+    // 动态菜单（优先使用 /api/menus，失败则回退到本地兜底）
+    const visibleNavGroups = computed(() => {
+      if (dynamicMenus.value) {
+        return buildMenuTree(dynamicMenus.value)
+      }
+      const permissions = getUserPermissions()
+      if (permissions.length === 0) {
+        return fallbackNavGroups
+      }
+      return fallbackNavGroups
+    })
+
     const isGroupActive = (group) => {
-      return group.children.some(item => item.path === route.path)
+      return group.children.some((item) => item.path === route.path)
     }
 
     const checkLoginStatus = async () => {
@@ -198,6 +264,10 @@ export default {
           if (res.data.status === 'success') {
             isLoggedIn.value = true
             userNickname.value = res.data.data.nickname || res.data.data.username
+            userAvatar.value = res.data.data.avatar || ''
+            setUserPermissions(res.data.data.permissions || [])
+            // 登录成功后拉取菜单
+            fetchMenus()
           } else {
             setAuthToken(null)
             isLoggedIn.value = false
@@ -209,6 +279,19 @@ export default {
         }
       } else {
         isLoggedIn.value = false
+      }
+    }
+
+    const fetchMenus = async () => {
+      try {
+        const res = await getMenus()
+        if (res.data.status === 'success') {
+          dynamicMenus.value = res.data.data || []
+          setUserMenus(dynamicMenus.value)
+        }
+      } catch (error) {
+        console.error('获取菜单失败:', error)
+        dynamicMenus.value = null
       }
     }
 
@@ -224,7 +307,7 @@ export default {
 
     const goToProfile = () => {
       showMenu.value = false
-      alert('个人中心功能开发中...')
+      router.push('/profile')
     }
 
     const handleLogout = async () => {
@@ -235,8 +318,12 @@ export default {
         console.error('登出请求失败:', error)
       } finally {
         setAuthToken(null)
+        clearUserPermissions()
+        clearUserMenus()
+        dynamicMenus.value = null
         isLoggedIn.value = false
         userNickname.value = ''
+        userAvatar.value = ''
         router.push('/login')
       }
     }
@@ -245,22 +332,35 @@ export default {
       checkLoginStatus()
     }
 
+    const handleRefreshMenus = () => {
+      fetchMenus()
+      // 同时重新获取用户信息（权限列表可能变了）
+      getUserProfile().then((res) => {
+        if (res.data.status === 'success') {
+          setUserPermissions(res.data.data.permissions || [])
+        }
+      }).catch(() => {})
+    }
+
     onMounted(() => {
       checkLoginStatus()
       document.addEventListener('click', handleClickOutside)
       window.addEventListener('login-success', handleLoginSuccess)
+      window.addEventListener('refresh-menus', handleRefreshMenus)
     })
 
     onUnmounted(() => {
       document.removeEventListener('click', handleClickOutside)
       window.removeEventListener('login-success', handleLoginSuccess)
+      window.removeEventListener('refresh-menus', handleRefreshMenus)
     })
 
     return {
-      navGroups,
+      visibleNavGroups,
       route,
       isLoggedIn,
       userNickname,
+      userAvatar,
       showMenu,
       menuRef,
       openGroup,
@@ -269,6 +369,7 @@ export default {
       closeMobileMenu,
       toggleMenu,
       goToProfile,
+      handleRefreshMenus,
       handleLogout,
       isGroupActive
     }
@@ -449,6 +550,13 @@ export default {
   justify-content: center;
   font-size: 14px;
   font-weight: bold;
+}
+
+.user-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .username {

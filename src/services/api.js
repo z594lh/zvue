@@ -120,6 +120,16 @@ export const changePassword = (data) => {
   return api.put('/user/password', data);
 };
 
+/**
+ * 上传用户头像
+ * @param {FormData} formData 包含 avatar 图片文件
+ */
+export const uploadAvatar = (formData) => {
+  return api.post('/user/profile/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
 // 设置认证token
 export const setAuthToken = (token) => {
   if (token) {
@@ -144,6 +154,71 @@ export const restoreAuthToken = () => {
 // 检查是否已登录
 export const isAuthenticated = () => {
   return !!localStorage.getItem('auth_token');
+};
+
+// ==================== 权限缓存 ====================
+
+const PERMISSIONS_KEY = 'user_permissions';
+
+export const setUserPermissions = (permissions) => {
+  if (permissions && Array.isArray(permissions)) {
+    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(permissions));
+  }
+};
+
+export const getUserPermissions = () => {
+  try {
+    const raw = localStorage.getItem(PERMISSIONS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const clearUserPermissions = () => {
+  localStorage.removeItem(PERMISSIONS_KEY);
+};
+
+// ==================== 菜单缓存 ====================
+
+const MENUS_KEY = 'user_menus';
+
+export const setUserMenus = (menus) => {
+  if (menus && Array.isArray(menus)) {
+    localStorage.setItem(MENUS_KEY, JSON.stringify(menus));
+  }
+};
+
+export const getUserMenus = () => {
+  try {
+    const raw = localStorage.getItem(MENUS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const clearUserMenus = () => {
+  localStorage.removeItem(MENUS_KEY);
+};
+
+/**
+ * 根据路径从菜单缓存中查找对应的 permission_code
+ * @param {string} path 路由路径
+ * @returns {string|null}
+ */
+export const findPermissionCodeByPath = (path) => {
+  const menus = getUserMenus();
+  const flat = [];
+  const walk = (list) => {
+    list.forEach((item) => {
+      flat.push(item);
+      if (item.children) walk(item.children);
+    });
+  };
+  walk(menus);
+  const found = flat.find((item) => item.path === path && item.permission_code);
+  return found ? found.permission_code : null;
 };
 
 // ==================== 记账相关接口 ====================
@@ -1143,6 +1218,173 @@ export const getAvailableShipments = (params = {}) => {
  */
 export const getCronTasks = (params = {}) => {
   return api.get('/cron/tasks', { params });
+};
+
+/**
+ * 获取当前用户的菜单列表（后端已按权限过滤）
+ */
+export const getMenus = () => {
+  return api.get('/menus');
+};
+
+// ==================== 权限管理（RBAC）接口 ====================
+
+/**
+ * 获取全部权限树（按模块分组）
+ */
+export const getPermissionsTree = () => {
+  return api.get('/permissions');
+};
+
+/**
+ * 创建权限
+ * @param {Object} data {code, name, type, module, description}
+ */
+export const createPermission = (data) => {
+  return api.post('/permissions', data);
+};
+
+/**
+ * 修改权限
+ * @param {number} id 权限ID
+ * @param {Object} data
+ */
+export const updatePermission = (id, data) => {
+  return api.put(`/permissions/${id}`, data);
+};
+
+/**
+ * 删除权限
+ * @param {number} id 权限ID
+ */
+export const deletePermission = (id) => {
+  return api.delete(`/permissions/${id}`);
+};
+
+/**
+ * 获取角色列表
+ */
+export const getRoles = () => {
+  return api.get('/roles');
+};
+
+/**
+ * 创建角色
+ * @param {Object} data {name, code, description, status}
+ */
+export const createRole = (data) => {
+  return api.post('/roles', data);
+};
+
+/**
+ * 修改角色
+ * @param {number} id 角色ID
+ * @param {Object} data {name, code, description, status}
+ */
+export const updateRole = (id, data) => {
+  return api.put(`/roles/${id}`, data);
+};
+
+/**
+ * 删除角色
+ * @param {number} id 角色ID
+ */
+export const deleteRole = (id) => {
+  return api.delete(`/roles/${id}`);
+};
+
+/**
+ * 获取角色权限码列表
+ * @param {number} id 角色ID
+ */
+export const getRolePermissions = (id) => {
+  return api.get(`/roles/${id}/permissions`);
+};
+
+/**
+ * 分配角色权限
+ * @param {number} id 角色ID
+ * @param {Object} data {permission_codes: string[]}
+ */
+export const assignRolePermissions = (id, data) => {
+  return api.put(`/roles/${id}/permissions`, data);
+};
+
+/**
+ * 获取用户列表（含角色）
+ * @param {Object} params {keyword, page, page_size}
+ */
+export const getAdminUsers = (params = {}) => {
+  return api.get('/users', { params });
+};
+
+/**
+ * 分配用户角色
+ * @param {number} id 用户ID
+ * @param {Object} data {role_ids: number[]}
+ */
+export const assignUserRoles = (id, data) => {
+  return api.put(`/users/${id}/roles`, data);
+};
+
+/**
+ * 启用/禁用用户账号
+ * @param {number} id 用户ID
+ * @param {Object} data {status: 0|1}
+ */
+export const updateUserStatus = (id, data) => {
+  return api.put(`/users/${id}/status`, data);
+};
+
+/**
+ * 获取用户直接授予的权限ID列表
+ * @param {number} id 用户ID
+ */
+export const getUserDirectPermissions = (id) => {
+  return api.get(`/users/${id}/permissions/direct`);
+};
+
+/**
+ * 设置用户直接权限（全量覆盖）
+ * @param {number} id 用户ID
+ * @param {Object} data {permission_ids: number[]}
+ */
+export const setUserDirectPermissions = (id, data) => {
+  return api.put(`/users/${id}/permissions`, data);
+};
+
+// ==================== 菜单管理接口 ====================
+
+/**
+ * 获取全部菜单（管理端，不过滤权限）
+ */
+export const getAdminMenus = () => {
+  return api.get('/menus/admin');
+};
+
+/**
+ * 创建菜单
+ * @param {Object} data {parent_id, label, path, icon, permission_id, sort_order, status}
+ */
+export const createMenu = (data) => {
+  return api.post('/menus', data);
+};
+
+/**
+ * 修改菜单
+ * @param {number} id 菜单ID
+ * @param {Object} data
+ */
+export const updateMenu = (id, data) => {
+  return api.put(`/menus/${id}`, data);
+};
+
+/**
+ * 删除菜单（会级联删除子菜单）
+ * @param {number} id 菜单ID
+ */
+export const deleteMenu = (id) => {
+  return api.delete(`/menus/${id}`);
 };
 
 

@@ -22,7 +22,10 @@ import ShopView from '../views/ShopView.vue'
 import ProductBoardView from '../views/ProductBoardView.vue'
 import ReportView from '../views/ReportView.vue'
 import AdvertisingReportView from '../views/AdvertisingReportView.vue'
-import { isAuthenticated } from '@/services/api.js'
+import ProfileView from '../views/ProfileView.vue'
+import ForbiddenView from '../views/ForbiddenView.vue'
+import SystemPermissionsView from '../views/SystemPermissionsView.vue'
+import { isAuthenticated, getUserPermissions, findPermissionCodeByPath } from '@/services/api.js'
 
 const CronTasksView = () => import('../views/CronTasksView.vue')
 
@@ -146,6 +149,21 @@ const routes = [
     path: '/system/cron-tasks',
     name: 'CronTasks',
     component: CronTasksView
+  },
+  {
+    path: '/system/permissions',
+    name: 'SystemPermissions',
+    component: SystemPermissionsView
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: ProfileView
+  },
+  {
+    path: '/403',
+    name: 'Forbidden',
+    component: ForbiddenView
   }
 ]
 
@@ -154,15 +172,29 @@ const router = createRouter({
   routes
 })
 
-// 全局前置守卫：未登录用户访问需要登录的页面时重定向到登录页
-const publicPaths = ['/', '/json', '/login']
+// 全局前置守卫
+const publicPaths = ['/', '/json', '/login', '/403']
 
 router.beforeEach((to, from, next) => {
+  // 1. 未登录检查
   if (!publicPaths.includes(to.path) && !isAuthenticated()) {
     next({ path: '/login', query: { redirect: to.fullPath } })
-  } else {
-    next()
+    return
   }
+
+  // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if (isAuthenticated()) {
+    const needed = findPermissionCodeByPath(to.path)
+    if (needed) {
+      const permissions = getUserPermissions()
+      if (permissions.length > 0 && !permissions.includes(needed)) {
+        next('/403')
+        return
+      }
+    }
+  }
+
+  next()
 })
 
 export default router

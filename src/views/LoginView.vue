@@ -112,7 +112,7 @@
 <script>
 import { reactive, ref, getCurrentInstance } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { login, register, setAuthToken } from '@/services/api.js'
+import { login, register, setAuthToken, setUserPermissions } from '@/services/api.js'
 
 export default {
   name: 'LoginView',
@@ -154,6 +154,8 @@ export default {
         if (res.data.status === 'success') {
           // 保存token
           setAuthToken(res.data.data.token)
+          // 缓存权限列表
+          setUserPermissions(res.data.data.user?.permissions || res.data.data.permissions || [])
           // 提示成功
           proxy.$message.success({ message: '登录成功！', offset: window.innerHeight / 2 - 50 })
           // 触发登录成功事件，通知导航栏更新
