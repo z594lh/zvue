@@ -1,144 +1,181 @@
 <template>
   <div class="amazon-inventory-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">亚马逊库存列表</h1>
-      <p class="page-subtitle">查看亚马逊FBA库存汇总，掌握商品库存状态</p>
-    </div>
-
-    <!-- 搜索和筛选区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="店铺">
-          <el-select
-            v-model="selectedShopId"
-            placeholder="选择店铺"
-            style="width: 180px"
-            @change="handleShopChange"
-          >
-            <el-option
-              v-for="shop in shopList"
-              :key="shop.id"
-              :label="shop.shop_name"
-              :value="shop.id"
-            />
-            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="卖家SKU">
-          <el-input
-            v-model="searchForm.seller_sku"
-            placeholder="输入卖家SKU"
-            clearable
-            style="width: 180px"
-          />
-        </el-form-item>
-
-        <el-form-item label="ASIN">
-          <el-input
-            v-model="searchForm.asin"
-            placeholder="输入ASIN"
-            clearable
-            style="width: 180px"
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">库存列表</h3>
-        <div class="header-actions">
-          <el-tooltip
-            effect="dark"
-            placement="top"
-            content="从亚马逊卖家后台手动同步最新库存数据。页面数据每小时自动更新一次，如需查看最新库存状态可点击此按钮。"
-          >
-            <el-button type="warning" @click="syncInventoryData" :loading="syncLoading">
-              <el-icon><RefreshRight /></el-icon>
-              同步最新数据
-            </el-button>
-          </el-tooltip>
-          <el-button type="primary" @click="refreshData" :loading="loading">
-            <el-icon><RefreshRight /></el-icon>
-            刷新
-          </el-button>
-        </div>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><Box /></el-icon>
+          亚马逊库存列表
+        </h1>
+        <p class="page-subtitle">查看亚马逊FBA库存汇总，掌握商品库存状态</p>
       </div>
+      <div class="header-actions">
+        <el-tooltip
+          effect="dark"
+          placement="top"
+          content="从亚马逊卖家后台手动同步最新库存数据。页面数据每小时自动更新一次，如需查看最新库存状态可点击此按钮。"
+        >
+          <el-button type="warning" @click="syncInventoryData" :loading="syncLoading">
+            <el-icon><RefreshRight /></el-icon>
+            同步最新数据
+          </el-button>
+        </el-tooltip>
+        <el-button type="primary" @click="refreshData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+      </div>
+    </div>
 
-      <!-- 库存列表 -->
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-select
+          v-model="selectedShopId"
+          placeholder="选择店铺"
+          style="width: 180px"
+          @change="handleShopChange"
+        >
+          <el-option
+            v-for="shop in shopList"
+            :key="shop.id"
+            :label="shop.shop_name"
+            :value="shop.id"
+          />
+          <el-option value="__refresh__" label="🔄 刷新店铺列表" />
+        </el-select>
+        <el-input
+          v-model="searchForm.seller_sku"
+          placeholder="卖家SKU"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
+          v-model="searchForm.asin"
+          placeholder="ASIN"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
       <el-table
         :data="inventoryList"
         v-loading="loading"
-        stripe
         style="width: 100%"
+        height="calc(100vh - 260px)"
         :default-sort="{ prop: 'sync_time', order: 'descending' }"
+        row-class-name="inventory-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
       >
         <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
           <template #default>
-            {{ getShopName(selectedShopId) || '-' }}
+            <el-tag size="small" effect="plain" type="info">{{ getShopName(selectedShopId) || '-' }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="seller_sku" label="卖家SKU" width="150" fixed="left" />
+        <el-table-column prop="seller_sku" label="卖家SKU" width="150" fixed="left">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;">{{ scope.row.seller_sku }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="asin" label="ASIN" width="130" />
+        <el-table-column prop="asin" label="ASIN" width="130">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="fn_sku" label="FNSKU" width="130" />
+        <el-table-column prop="fn_sku" label="FNSKU" width="130">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.fn_sku }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="product_name" label="商品名称" min-width="240" show-overflow-tooltip />
+        <el-table-column prop="product_name" label="商品名称" min-width="240" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.product_name }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="产品中文名" min-width="180" show-overflow-tooltip>
           <template #default="scope">
-            {{ scope.row.declare_name_cn || scope.row.product_name || '-' }}
+            <span style="color:#555;">{{ scope.row.declare_name_cn || scope.row.product_name || '-' }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="fulfillable_quantity" label="可售数量" width="100" align="center">
           <template #default="scope">
-            <el-tag v-if="scope.row.fulfillable_quantity > 0" type="success">{{ scope.row.fulfillable_quantity }}</el-tag>
-            <span v-else>{{ scope.row.fulfillable_quantity }}</span>
+            <span v-if="scope.row.fulfillable_quantity > 0" class="qty-good">{{ scope.row.fulfillable_quantity }}</span>
+            <span v-else class="qty-zero">{{ scope.row.fulfillable_quantity }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="total_quantity" label="总数量" width="100" align="center" />
+        <el-table-column prop="total_quantity" label="总数量" width="100" align="center">
+          <template #default="scope">
+            <span class="qty-total">{{ scope.row.total_quantity }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="inbound_working_quantity" label="入库处理中" width="110" align="center" />
+        <el-table-column prop="inbound_working_quantity" label="入库处理中" width="110" align="center">
+          <template #default="scope">
+            <span v-if="scope.row.inbound_working_quantity > 0" class="qty-warn">{{ scope.row.inbound_working_quantity }}</span>
+            <span v-else class="qty-zero">{{ scope.row.inbound_working_quantity }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="inbound_shipped_quantity" label="已发货" width="90" align="center" />
+        <el-table-column prop="inbound_shipped_quantity" label="已发货" width="90" align="center">
+          <template #default="scope">
+            <span v-if="scope.row.inbound_shipped_quantity > 0" class="qty-info">{{ scope.row.inbound_shipped_quantity }}</span>
+            <span v-else class="qty-zero">{{ scope.row.inbound_shipped_quantity }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="inbound_receiving_quantity" label="接收中" width="90" align="center" />
+        <el-table-column prop="inbound_receiving_quantity" label="接收中" width="90" align="center">
+          <template #default="scope">
+            <span v-if="scope.row.inbound_receiving_quantity > 0" class="qty-info">{{ scope.row.inbound_receiving_quantity }}</span>
+            <span v-else class="qty-zero">{{ scope.row.inbound_receiving_quantity }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="reserved_total" label="预留总数" width="100" align="center" />
+        <el-table-column prop="reserved_total" label="预留总数" width="100" align="center">
+          <template #default="scope">
+            <span v-if="scope.row.reserved_total > 0" class="qty-warn">{{ scope.row.reserved_total }}</span>
+            <span v-else class="qty-zero">{{ scope.row.reserved_total }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="unfulfillable_total" label="不可售总数" width="110" align="center">
           <template #default="scope">
-            <el-tag v-if="scope.row.unfulfillable_total > 0" type="danger">{{ scope.row.unfulfillable_total }}</el-tag>
-            <span v-else>{{ scope.row.unfulfillable_total }}</span>
+            <span v-if="scope.row.unfulfillable_total > 0" class="qty-bad">{{ scope.row.unfulfillable_total }}</span>
+            <span v-else class="qty-zero">{{ scope.row.unfulfillable_total }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="sync_time" label="同步时间" width="160" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.sync_time) }}
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ formatDate(scope.row.sync_time) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column label="操作" width="100" fixed="right" align="center">
           <template #default="scope">
-            <el-button type="primary" link @click="showInventoryDetails(scope.row)">
+            <el-button type="primary" text size="small" @click="showInventoryDetails(scope.row)">
               查看详情
             </el-button>
           </template>
@@ -146,7 +183,7 @@
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -166,6 +203,7 @@
       :title="`库存详情 - ${currentItem?.seller_sku}`"
       width="75%"
       :destroy-on-close="true"
+      align-center
     >
       <div v-if="currentItem" class="inventory-detail">
         <!-- 基础信息 -->
@@ -188,7 +226,7 @@
           <h4>可售与入库数量</h4>
           <el-descriptions :column="2" border>
             <el-descriptions-item label="可售数量">
-              <el-tag v-if="currentItem.fulfillable_quantity > 0" type="success">{{ currentItem.fulfillable_quantity }}</el-tag>
+              <span v-if="currentItem.fulfillable_quantity > 0" class="qty-good">{{ currentItem.fulfillable_quantity }}</span>
               <span v-else>{{ currentItem.fulfillable_quantity }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="总数量">{{ currentItem.total_quantity }}</el-descriptions-item>
@@ -235,7 +273,7 @@
           <h4>不可售数量</h4>
           <el-descriptions :column="2" border>
             <el-descriptions-item label="不可售总数">
-              <el-tag v-if="currentItem.unfulfillable_total > 0" type="danger">{{ currentItem.unfulfillable_total }}</el-tag>
+              <span v-if="currentItem.unfulfillable_total > 0" class="qty-bad">{{ currentItem.unfulfillable_total }}</span>
               <span v-else>{{ currentItem.unfulfillable_total }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="客户损坏">{{ currentItem.unfulfillable_customer_damaged }}</el-descriptions-item>
@@ -272,7 +310,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Box } from '@element-plus/icons-vue'
 import { getAmazonInventory, syncAmazonInventory } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -281,7 +319,8 @@ export default {
   components: {
     Search,
     Refresh,
-    RefreshRight
+    RefreshRight,
+    Box
   },
   setup() {
     const loading = ref(false)
@@ -498,126 +537,115 @@ export default {
 
 <style scoped>
 .amazon-inventory-page {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
-  margin-bottom: 24px;
-  text-align: center;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin: 0;
-}
-
-.search-card,
-.content-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-end;
+  margin-bottom: 24px;
 }
-
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+.page-subtitle {
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
-
 .header-actions {
   display: flex;
   gap: 10px;
 }
 
+/* ===== 筛选栏 ===== */
+.filter-bar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.inventory-row:hover) { background-color: #fafbff !important; }
+
+/* 数量样式 */
+.qty-good { color: #10b981; font-weight: 700; font-size: 14px; }
+.qty-total { color: #1a1a2e; font-weight: 700; font-size: 14px; }
+.qty-warn { color: #f59e0b; font-weight: 700; font-size: 14px; }
+.qty-info { color: #667eea; font-weight: 700; font-size: 14px; }
+.qty-bad { color: #ef4444; font-weight: 700; font-size: 14px; }
+.qty-zero { color: #bbb; font-size: 13px; }
+
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 详情弹窗 */
 .inventory-detail .detail-section {
   margin-top: 20px;
 }
-
 .inventory-detail .detail-section:first-child {
   margin-top: 0;
 }
-
 .inventory-detail .detail-section h4 {
   margin-bottom: 12px;
-  color: #333;
+  color: #1a1a2e;
   font-size: 16px;
   font-weight: 600;
 }
-
 .detail-tag {
   margin-right: 6px;
   margin-bottom: 4px;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  text-align: right;
-}
-
-/* 响应式 */
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .amazon-inventory-page {
-    padding: 12px;
+    padding: 16px 16px 40px;
   }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-
-  .pagination-container {
-    text-align: center;
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
-
-  .inventory-detail .detail-section h4 {
-    font-size: 14px;
-  }
-
-  .detail-tag {
-    margin-right: 4px;
-    margin-bottom: 4px;
+  .filter-group {
+    justify-content: stretch;
   }
 }
 </style>

@@ -1,134 +1,128 @@
 <template>
   <div class="amazon-listing-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">Amazon Listing 列表</h1>
-      <p class="page-subtitle">查看和管理亚马逊商品 Listing 信息</p>
-    </div>
-
-    <!-- 搜索和筛选区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="店铺">
-          <el-select
-            v-model="selectedShopId"
-            placeholder="选择店铺"
-            style="width: 180px"
-            @change="handleShopChange"
-          >
-            <el-option
-              v-for="shop in shopList"
-              :key="shop.id"
-              :label="shop.shop_name"
-              :value="shop.id"
-            />
-            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="SKU">
-          <el-input
-            v-model="searchForm.sku"
-            placeholder="精确匹配"
-            clearable
-            style="width: 160px"
-          />
-        </el-form-item>
-
-        <el-form-item label="ASIN">
-          <el-input
-            v-model="searchForm.asin"
-            placeholder="精确匹配"
-            clearable
-            style="width: 160px"
-          />
-        </el-form-item>
-
-        <el-form-item label="商品类型">
-          <el-input
-            v-model="searchForm.product_type"
-            placeholder="如 MARKING_PEN"
-            clearable
-            style="width: 160px"
-          />
-        </el-form-item>
-
-        <el-form-item label="状态">
-          <el-select
-            v-model="searchForm.status"
-            placeholder="选择状态"
-            clearable
-            style="width: 160px"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="正常在售" value="DISCOVERABLE" />
-            <el-option label="被抑制" value="SUPPRESSED" />
-            <el-option label="信息不完整" value="INCOMPLETE" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="父 SKU">
-          <el-input
-            v-model="searchForm.parent_sku"
-            placeholder="精确匹配"
-            clearable
-            style="width: 160px"
-          />
-        </el-form-item>
-
-        <el-form-item label="关键词">
-          <el-input
-            v-model="searchForm.keyword"
-            placeholder="标题/品牌/SKU 模糊搜索"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">Listing 列表</h3>
-        <div class="header-actions">
-          <el-tooltip
-            effect="dark"
-            placement="top"
-            content="从亚马逊 SP-API 手动同步最新 Listing 数据到本地数据库。"
-          >
-            <el-button type="warning" @click="syncListings" :loading="syncLoading">
-              <el-icon><RefreshRight /></el-icon>
-              同步 Listing
-            </el-button>
-          </el-tooltip>
-          <el-button type="primary" @click="refreshData" :loading="loading">
-            <el-icon><RefreshRight /></el-icon>
-            刷新
-          </el-button>
-        </div>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><Goods /></el-icon>
+          Amazon Listing 列表
+        </h1>
+        <p class="page-subtitle">查看和管理亚马逊商品 Listing 信息</p>
       </div>
+      <div class="header-actions">
+        <el-tooltip
+          effect="dark"
+          placement="top"
+          content="从亚马逊 SP-API 手动同步最新 Listing 数据到本地数据库。"
+        >
+          <el-button type="warning" @click="syncListings" :loading="syncLoading">
+            <el-icon><RefreshRight /></el-icon>
+            同步 Listing
+          </el-button>
+        </el-tooltip>
+        <el-button type="primary" @click="refreshData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+      </div>
+    </div>
 
-      <!-- Listing 列表 -->
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-select
+          v-model="selectedShopId"
+          placeholder="选择店铺"
+          style="width: 180px"
+          @change="handleShopChange"
+        >
+          <el-option
+            v-for="shop in shopList"
+            :key="shop.id"
+            :label="shop.shop_name"
+            :value="shop.id"
+          />
+          <el-option value="__refresh__" label="🔄 刷新店铺列表" />
+        </el-select>
+        <el-input
+          v-model="searchForm.sku"
+          placeholder="SKU"
+          clearable
+          style="width: 160px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
+          v-model="searchForm.asin"
+          placeholder="ASIN"
+          clearable
+          style="width: 160px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
+          v-model="searchForm.product_type"
+          placeholder="商品类型"
+          clearable
+          style="width: 160px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select
+          v-model="searchForm.status"
+          placeholder="状态"
+          clearable
+          style="width: 130px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="正常在售" value="DISCOVERABLE" />
+          <el-option label="被抑制" value="SUPPRESSED" />
+          <el-option label="信息不完整" value="INCOMPLETE" />
+        </el-select>
+        <el-input
+          v-model="searchForm.parent_sku"
+          placeholder="父 SKU"
+          clearable
+          style="width: 160px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
+          v-model="searchForm.keyword"
+          placeholder="标题/品牌/SKU"
+          clearable
+          style="width: 200px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
       <el-table
         :data="listings"
         v-loading="loading"
-        stripe
         style="width: 100%"
+        height="calc(100vh - 260px)"
+        row-class-name="listing-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
       >
         <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
           <template #default>
-            {{ getShopName(selectedShopId) || '-' }}
+            <el-tag size="small" effect="plain" type="info">{{ getShopName(selectedShopId) || '-' }}</el-tag>
           </template>
         </el-table-column>
 
@@ -140,32 +134,44 @@
               :preview-src-list="[scope.row.main_image_url]"
               preview-teleported
               fit="cover"
-              style="width: 50px; height: 50px; border-radius: 4px; cursor: pointer"
+              class="product-thumb-small"
             />
-            <div v-else class="no-image">无图</div>
+            <div v-else class="thumb-placeholder-small"><el-icon><Picture /></el-icon></div>
           </template>
         </el-table-column>
 
         <el-table-column prop="sku" label="SKU" width="150" show-overflow-tooltip fixed="left">
           <template #default="scope">
-            <el-button type="primary" link @click="viewDetail(scope.row)">
+            <el-button type="primary" text size="small" @click="viewDetail(scope.row)">
               {{ scope.row.sku }}
             </el-button>
           </template>
         </el-table-column>
 
-        <el-table-column prop="asin" label="ASIN" width="120" show-overflow-tooltip />
+        <el-table-column prop="asin" label="ASIN" width="120" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="item_name" label="商品标题" min-width="240" show-overflow-tooltip />
+        <el-table-column prop="item_name" label="商品标题" min-width="240" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.item_name }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="brand" label="品牌" width="110" show-overflow-tooltip />
+        <el-table-column prop="brand" label="品牌" width="110" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#555;">{{ scope.row.brand }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="价格" width="110" align="right">
           <template #default="scope">
-            <span v-if="scope.row.list_price !== undefined && scope.row.list_price !== null">
+            <span v-if="scope.row.list_price !== undefined && scope.row.list_price !== null" style="font-weight:600;color:#1a1a2e;">
               {{ scope.row.list_price }} {{ scope.row.list_price_currency || '' }}
             </span>
-            <span v-else>-</span>
+            <span v-else style="color:#bbb;">-</span>
           </template>
         </el-table-column>
 
@@ -177,39 +183,55 @@
               :content="getStatusList(scope.row.status).join(', ')"
               placement="top"
             >
-              <el-tag :type="getStatusType(scope.row.status)" size="small">
+              <el-tag :type="getStatusType(scope.row.status)" size="small" effect="dark" round>
                 {{ getStatusText(scope.row.status) }}
               </el-tag>
             </el-tooltip>
-            <el-tag v-else :type="getStatusType(scope.row.status)" size="small">
+            <el-tag v-else :type="getStatusType(scope.row.status)" size="small" effect="dark" round>
               {{ getStatusText(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="product_type" label="商品类型" width="140" show-overflow-tooltip />
+        <el-table-column prop="product_type" label="商品类型" width="140" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;">{{ scope.row.product_type }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="parentage_level" label="层级" width="80" align="center">
           <template #default="scope">
-            <el-tag v-if="scope.row.parentage_level === 'parent'" type="warning" size="small">父体</el-tag>
-            <el-tag v-else-if="scope.row.parentage_level === 'child'" type="success" size="small">子体</el-tag>
-            <span v-else>-</span>
+            <el-tag v-if="scope.row.parentage_level === 'parent'" type="warning" size="small" effect="plain">父体</el-tag>
+            <el-tag v-else-if="scope.row.parentage_level === 'child'" type="success" size="small" effect="plain">子体</el-tag>
+            <span v-else style="color:#bbb;">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="parent_sku" label="父 SKU" width="130" show-overflow-tooltip />
+        <el-table-column prop="parent_sku" label="父 SKU" width="130" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.parent_sku }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="variation_theme" label="变体主题" width="120" show-overflow-tooltip />
+        <el-table-column prop="variation_theme" label="变体主题" width="120" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;">{{ scope.row.variation_theme }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="fn_sku" label="FNSKU" width="130" show-overflow-tooltip />
+        <el-table-column prop="fn_sku" label="FNSKU" width="130" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.fn_sku }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="sync_time" label="同步时间" width="160" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.sync_time) }}
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ formatDate(scope.row.sync_time) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="170" fixed="right" align="center">
+        <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="scope">
             <el-tooltip content="查看详情" placement="top">
               <el-button type="primary" link @click="viewDetail(scope.row)">
@@ -231,7 +253,7 @@
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -251,6 +273,7 @@
       :title="`Listing 详情 - ${currentListing?.sku}`"
       width="80%"
       :destroy-on-close="true"
+      align-center
     >
       <div v-loading="detailLoading">
         <div v-if="listingDetail" class="listing-detail">
@@ -389,7 +412,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, View } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, View, Goods, Picture } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
@@ -404,7 +427,9 @@ export default {
     Search,
     Refresh,
     RefreshRight,
-    View
+    View,
+    Goods,
+    Picture
   },
   setup() {
     const loading = ref(false)
@@ -727,74 +752,93 @@ export default {
 
 <style scoped>
 .amazon-listing-page {
-  max-width: 1500px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
-  margin-bottom: 24px;
-  text-align: center;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin: 0;
-}
-
-.search-card,
-.content-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-end;
+  margin-bottom: 24px;
 }
-
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+.page-subtitle {
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
-
 .header-actions {
   display: flex;
   gap: 10px;
 }
 
-.no-image {
-  width: 50px;
-  height: 50px;
-  border-radius: 4px;
-  background: #f0f0f0;
-  color: #999;
-  font-size: 12px;
+/* ===== 筛选栏 ===== */
+.filter-bar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.listing-row:hover) { background-color: #fafbff !important; }
+
+/* 小图 */
+.product-thumb-small {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
+  cursor: pointer;
+}
+.thumb-placeholder-small {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: #f5f7fa;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #ccc;
+  font-size: 18px;
+  margin: 0 auto;
+}
+
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .listing-detail .detail-section {
@@ -807,7 +851,7 @@ export default {
 
 .listing-detail .detail-section h4 {
   margin-bottom: 12px;
-  color: #333;
+  color: #1a1a2e;
   font-size: 16px;
   font-weight: 600;
 }
@@ -844,50 +888,30 @@ export default {
   flex-wrap: wrap;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  text-align: right;
-}
-
-/* 响应式 */
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .amazon-listing-page {
-    padding: 12px;
+    padding: 16px 16px 40px;
   }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-
-  .pagination-container {
-    text-align: center;
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
-
+  .filter-group {
+    justify-content: stretch;
+  }
   .image-list {
     gap: 8px;
   }
-
   .description-box {
     padding: 10px;
     font-size: 13px;
   }
-
   .listing-detail .detail-section h4 {
     font-size: 14px;
   }

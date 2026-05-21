@@ -1,66 +1,93 @@
 <template>
   <div class="category-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">类目维护</h1>
-      <p class="page-subtitle">管理产品分类与佣金比例</p>
-    </div>
-
-    <!-- 搜索和操作区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="关键词">
-          <el-input
-            v-model="searchForm.keyword"
-            placeholder="分类名称/中文名"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-          <el-button type="success" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
-            新增类目
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">类目列表</h3>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><CollectionTag /></el-icon>
+          类目维护
+        </h1>
+        <p class="page-subtitle">管理产品分类与佣金比例</p>
       </div>
+      <div class="header-actions">
+        <el-button type="success" @click="handleCreate">
+          <el-icon><Plus /></el-icon>
+          新增类目
+        </el-button>
+      </div>
+    </div>
 
-      <el-table :data="categoryList" v-loading="loading" stripe style="width: 100%">
-        <el-table-column type="index" label="序号" width="70" align="center" />
-        <el-table-column prop="category" label="分类名称（EN）" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="category_cn" label="分类名称（CN）" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="commission_rate" label="佣金比例" width="120" align="center">
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-input
+          v-model="searchForm.keyword"
+          placeholder="分类名称/中文名"
+          clearable
+          style="width: 220px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
+      <el-table
+        :data="categoryList"
+        v-loading="loading"
+        style="width: 100%"
+        height="calc(100vh - 260px)"
+        row-class-name="category-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
+      >
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="category" label="分类名称（EN）" min-width="160" show-overflow-tooltip>
           <template #default="scope">
-            {{ formatPercent(scope.row.commission_rate) }}
+            <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.category }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="160" align="center" />
-        <el-table-column prop="updated_at" label="更新时间" width="160" align="center" />
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column prop="category_cn" label="分类名称（CN）" min-width="140" show-overflow-tooltip>
           <template #default="scope">
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+            <span style="color:#555;">{{ scope.row.category_cn }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="commission_rate" label="佣金比例" width="120" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.commission_rate != null" type="warning" size="small" effect="dark" round>
+              {{ formatPercent(scope.row.commission_rate) }}
+            </el-tag>
+            <span v-else style="color:#bbb;">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="160" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.created_at }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updated_at" label="更新时间" width="160" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.updated_at }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right" align="center">
+          <template #default="scope">
+            <el-button type="primary" text size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button type="danger" text size="small" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -81,6 +108,7 @@
       width="520px"
       :destroy-on-close="true"
       :close-on-click-modal="false"
+      align-center
     >
       <el-form :model="formData" label-width="110px" :rules="formRules" ref="formRef">
         <el-form-item label="英文名称" prop="category">
@@ -112,7 +140,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, CollectionTag } from '@element-plus/icons-vue'
 import {
   getCategories,
   getCategory,
@@ -126,7 +154,8 @@ export default {
   components: {
     Search,
     Refresh,
-    Plus
+    Plus,
+    CollectionTag
   },
   setup() {
     const loading = ref(false)
@@ -335,62 +364,71 @@ export default {
 
 <style scoped>
 .category-page {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: 24px;
-  text-align: center;
 }
-
 .page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
 }
-
 .page-subtitle {
-  font-size: 16px;
-  color: #666;
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
 
-.search-card,
-.content-card {
+/* ===== 筛选栏 ===== */
+.filter-bar {
   background: #fff;
   border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
+  padding: 14px 18px;
+  margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
 }
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.category-row:hover) { background-color: #fafbff !important; }
 
-.pagination-container {
-  margin-top: 20px;
-  text-align: right;
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .input-hint {
@@ -400,34 +438,22 @@ export default {
   display: block;
 }
 
-/* 响应式 */
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .category-page {
-    padding: 12px;
+    padding: 16px 16px 40px;
   }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-
-  .pagination-container {
-    text-align: center;
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-group {
+    justify-content: stretch;
   }
 }
 </style>

@@ -1,86 +1,126 @@
 <template>
   <div class="supplier-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">供应商管理</h1>
-      <p class="page-subtitle">管理供应商信息，维护合作方档案</p>
-    </div>
-
-    <!-- 搜索和操作区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="关键词">
-          <el-input
-            v-model="searchForm.keyword"
-            placeholder="名称/联系人/电话"
-            clearable
-            style="width: 200px"
-          />
-        </el-form-item>
-
-        <el-form-item label="状态">
-          <el-select
-            v-model="searchForm.status"
-            placeholder="选择状态"
-            clearable
-            style="width: 120px"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-          <el-button type="success" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
-            新增供应商
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">供应商列表</h3>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><OfficeBuilding /></el-icon>
+          供应商管理
+        </h1>
+        <p class="page-subtitle">管理供应商信息，维护合作方档案</p>
       </div>
+      <div class="header-actions">
+        <el-button type="success" @click="handleCreate">
+          <el-icon><Plus /></el-icon>
+          新增供应商
+        </el-button>
+      </div>
+    </div>
 
-      <el-table :data="supplierList" v-loading="loading" stripe style="width: 100%">
-        <el-table-column type="index" label="序号" width="70" align="center" />
-        <el-table-column prop="name" label="供应商名称" min-width="160" />
-        <el-table-column prop="contact_person" label="联系人" width="100" />
-        <el-table-column prop="phone" label="联系电话" width="130" />
-        <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="address" label="地址" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="shop_address" label="店铺地址" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="80" align="center">
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-input
+          v-model="searchForm.keyword"
+          placeholder="名称/联系人/电话"
+          clearable
+          style="width: 220px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select
+          v-model="searchForm.status"
+          placeholder="状态"
+          clearable
+          style="width: 120px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="启用" :value="1" />
+          <el-option label="禁用" :value="0" />
+        </el-select>
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
+      <el-table
+        :data="supplierList"
+        v-loading="loading"
+        style="width: 100%"
+        height="calc(100vh - 260px)"
+        row-class-name="supplier-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
+      >
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="name" label="供应商名称" min-width="160">
           <template #default="scope">
-            <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
-              {{ scope.row.status === 1 ? '启用' : '禁用' }}
-            </el-tag>
+            <span style="font-weight:600;color:#1a1a2e;">{{ scope.row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="160" align="center" />
-        <el-table-column prop="updated_at" label="更新时间" width="160" align="center" />
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column prop="contact_person" label="联系人" width="100">
           <template #default="scope">
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+            <span style="color:#555;">{{ scope.row.contact_person }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="phone" label="联系电话" width="130">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.phone }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#555;font-size:13px;">{{ scope.row.email }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="address" label="地址" min-width="180" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.address }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="shop_address" label="店铺地址" min-width="160" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.shop_address }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.remark }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="80" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.status === 1" type="success" size="small" effect="dark" round>启用</el-tag>
+            <el-tag v-else type="danger" size="small" effect="dark" round>禁用</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="160" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.created_at }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updated_at" label="更新时间" width="160" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.updated_at }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right" align="center">
+          <template #default="scope">
+            <el-button type="primary" text size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button type="danger" text size="small" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -100,6 +140,7 @@
       :title="isEdit ? '编辑供应商' : '新增供应商'"
       width="520px"
       :destroy-on-close="true"
+      align-center
     >
       <el-form :model="formData" label-width="100px" :rules="formRules" ref="formRef">
         <el-form-item label="供应商名称" prop="name">
@@ -141,7 +182,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, OfficeBuilding } from '@element-plus/icons-vue'
 import {
   getSuppliers,
   createSupplier,
@@ -154,7 +195,8 @@ export default {
   components: {
     Search,
     Refresh,
-    Plus
+    Plus,
+    OfficeBuilding
   },
   setup() {
     const loading = ref(false)
@@ -368,92 +410,89 @@ export default {
 
 <style scoped>
 .supplier-page {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: 24px;
-  text-align: center;
 }
-
 .page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
 }
-
 .page-subtitle {
-  font-size: 16px;
-  color: #666;
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
 
-.search-card,
-.content-card {
+/* ===== 筛选栏 ===== */
+.filter-bar {
   background: #fff;
   border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
+  padding: 14px 18px;
+  margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.supplier-row:hover) { background-color: #fafbff !important; }
+
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  text-align: right;
-}
-
-/* 响应式 */
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .supplier-page {
-    padding: 12px;
+    padding: 16px 16px 40px;
   }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-
-  .pagination-container {
-    text-align: center;
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-group {
+    justify-content: stretch;
   }
 }
 </style>

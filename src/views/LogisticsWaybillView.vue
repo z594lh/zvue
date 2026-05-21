@@ -1,140 +1,204 @@
 <template>
   <div class="waybill-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">货代运单管理</h1>
-      <p class="page-subtitle">管理货代运单，跟踪物流运输状态与费用</p>
-    </div>
-
-    <!-- 搜索和操作区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="运单号">
-          <el-input
-            v-model="searchForm.waybill_no"
-            placeholder="货代运单号"
-            clearable
-            style="width: 180px"
-          />
-        </el-form-item>
-
-        <el-form-item label="货代">
-          <el-select
-            v-model="searchForm.provider_id"
-            placeholder="选择货代"
-            clearable
-            filterable
-            style="width: 160px"
-          >
-            <el-option
-              v-for="p in providerOptions"
-              :key="p.id"
-              :label="p.name"
-              :value="p.id"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="运输方式">
-          <el-select
-            v-model="searchForm.transport_type"
-            placeholder="选择方式"
-            clearable
-            style="width: 120px"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="海运" :value="1" />
-            <el-option label="空运" :value="2" />
-            <el-option label="快递" :value="3" />
-            <el-option label="铁路" :value="4" />
-            <el-option label="卡航" :value="5" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="状态">
-          <el-select
-            v-model="searchForm.status"
-            placeholder="选择状态"
-            clearable
-            style="width: 120px"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="待发货" :value="0" />
-            <el-option label="运输中" :value="1" />
-            <el-option label="已到港" :value="2" />
-            <el-option label="已清关" :value="3" />
-            <el-option label="已入仓" :value="4" />
-            <el-option label="已完成" :value="5" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-          <el-button type="success" @click="handleCreate">
-            <el-icon><Plus /></el-icon>
-            新增运单
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">运单列表</h3>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><MapLocation /></el-icon>
+          货代运单管理
+        </h1>
+        <p class="page-subtitle">管理货代运单，跟踪物流运输状态与费用</p>
       </div>
+      <div class="header-actions">
+        <el-button type="success" @click="handleCreate">
+          <el-icon><Plus /></el-icon>
+          新增运单
+        </el-button>
+      </div>
+    </div>
 
-      <el-table :data="waybillList" v-loading="loading" stripe style="width: 100%">
-        <el-table-column type="index" label="序号" width="70" align="center" />
-        <el-table-column prop="waybill_no" label="运单号" width="150" />
-        <el-table-column prop="provider_name" label="货代" width="130" />
-        <el-table-column prop="shipment_id" label="亚马逊货件" width="150" show-overflow-tooltip />
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-input
+          v-model="searchForm.waybill_no"
+          placeholder="货代运单号"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select
+          v-model="searchForm.provider_id"
+          placeholder="货代"
+          clearable
+          filterable
+          style="width: 160px"
+        >
+          <el-option
+            v-for="p in providerOptions"
+            :key="p.id"
+            :label="p.name"
+            :value="p.id"
+          />
+        </el-select>
+        <el-select
+          v-model="searchForm.transport_type"
+          placeholder="运输方式"
+          clearable
+          style="width: 130px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="海运" :value="1" />
+          <el-option label="空运" :value="2" />
+          <el-option label="快递" :value="3" />
+          <el-option label="铁路" :value="4" />
+          <el-option label="卡航" :value="5" />
+        </el-select>
+        <el-select
+          v-model="searchForm.status"
+          placeholder="状态"
+          clearable
+          style="width: 120px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="待发货" :value="0" />
+          <el-option label="运输中" :value="1" />
+          <el-option label="已到港" :value="2" />
+          <el-option label="已清关" :value="3" />
+          <el-option label="已入仓" :value="4" />
+          <el-option label="已完成" :value="5" />
+        </el-select>
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
+      <el-table
+        :data="waybillList"
+        v-loading="loading"
+        style="width: 100%"
+        height="calc(100vh - 260px)"
+        row-class-name="waybill-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
+      >
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="waybill_no" label="运单号" width="150">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;">{{ scope.row.waybill_no }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="provider_name" label="货代" width="130">
+          <template #default="scope">
+            <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.provider_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="shipment_id" label="亚马逊货件" width="150" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.shipment_id }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="transport_type" label="运输方式" width="90" align="center">
           <template #default="scope">
-            {{ getTransportTypeText(scope.row.transport_type) }}
+            <el-tag size="small" effect="plain">{{ getTransportTypeText(scope.row.transport_type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="destination_warehouse" label="目的仓库" width="120" />
-        <el-table-column prop="route_name" label="线路" width="120" />
-        <el-table-column prop="total_cartons" label="箱数" width="80" align="right" />
+        <el-table-column prop="destination_warehouse" label="目的仓库" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.destination_warehouse" size="small" effect="plain" type="info">{{ scope.row.destination_warehouse }}</el-tag>
+            <span v-else style="color:#bbb;">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="route_name" label="线路" width="120">
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.route_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="total_cartons" label="箱数" width="80" align="right">
+          <template #default="scope">
+            <span class="qty-total">{{ scope.row.total_cartons }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="total_cost_cny" label="总费用" width="110" align="right">
           <template #default="scope">
-            <strong>{{ formatAmount(scope.row.total_cost_cny) }}</strong>
+            <span class="amount-total">{{ formatAmount(scope.row.total_cost_cny) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="total_weight_kg" label="重量(kg)" width="100" align="right" />
-        <el-table-column prop="total_volume_cbm" label="体积(m³)" width="100" align="right" />
-        <el-table-column prop="departure_port" label="起运港" width="100" />
-        <el-table-column prop="destination_port" label="目的港" width="100" />
+        <el-table-column prop="total_weight_kg" label="重量(kg)" width="100" align="right">
+          <template #default="scope">
+            <span style="color:#555;font-size:13px;">{{ scope.row.total_weight_kg }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="total_volume_cbm" label="体积(m³)" width="100" align="right">
+          <template #default="scope">
+            <span style="color:#555;font-size:13px;">{{ scope.row.total_volume_cbm }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="departure_port" label="起运港" width="100">
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.departure_port }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="destination_port" label="目的港" width="100">
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.destination_port }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
+            <el-tag :type="getStatusType(scope.row.status)" size="small" effect="dark" round>
               {{ getStatusText(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="ship_date" label="发货日期" width="110" align="center" />
-        <el-table-column prop="eta_date" label="预计到港" width="110" align="center" />
-        <el-table-column prop="arrival_date" label="实际到港" width="110" align="center" />
-        <el-table-column prop="delivery_date" label="实际入仓" width="110" align="center" />
-        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="created_at" label="创建时间" width="160" align="center" />
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column prop="ship_date" label="发货日期" width="110" align="center">
           <template #default="scope">
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.ship_date }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="eta_date" label="预计到港" width="110" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.eta_date }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="arrival_date" label="实际到港" width="110" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.arrival_date }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="delivery_date" label="实际入仓" width="110" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.delivery_date }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#888;font-size:13px;">{{ scope.row.remark }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="160" align="center">
+          <template #default="scope">
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ scope.row.created_at }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right" align="center">
+          <template #default="scope">
+            <el-button type="primary" text size="small" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button type="danger" text size="small" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -155,6 +219,7 @@
       width="720px"
       :destroy-on-close="true"
       :close-on-click-modal="false"
+      align-center
     >
       <el-form :model="formData" label-width="100px" :rules="formRules" ref="formRef">
         <el-row :gutter="16">
@@ -417,7 +482,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, MapLocation } from '@element-plus/icons-vue'
 import {
   getLogisticsProviders,
   getLogisticsWaybills,
@@ -432,7 +497,8 @@ export default {
   components: {
     Search,
     Refresh,
-    Plus
+    Plus,
+    MapLocation
   },
   setup() {
     const loading = ref(false)
@@ -784,92 +850,92 @@ export default {
 
 <style scoped>
 .waybill-page {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: 24px;
-  text-align: center;
 }
-
 .page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
 }
-
 .page-subtitle {
-  font-size: 16px;
-  color: #666;
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
 
-.search-card,
-.content-card {
+/* ===== 筛选栏 ===== */
+.filter-bar {
   background: #fff;
   border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
+  padding: 14px 18px;
+  margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.waybill-row:hover) { background-color: #fafbff !important; }
+
+.qty-total { color: #1a1a2e; font-weight: 700; font-size: 14px; }
+.amount-total { color: #f59e0b; font-weight: 700; font-size: 14px; }
+
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  text-align: right;
-}
-
-/* 响应式 */
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .waybill-page {
-    padding: 12px;
+    padding: 16px 16px 40px;
   }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-
-  .pagination-container {
-    text-align: center;
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-group {
+    justify-content: stretch;
   }
 }
 </style>

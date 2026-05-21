@@ -1,150 +1,158 @@
 <template>
   <div class="amazon-shipment-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">亚马逊货件列表</h1>
-      <p class="page-subtitle">查看您的亚马逊FBA货件，查看货件状态和详情</p>
-    </div>
-
-    <!-- 搜索和筛选区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="店铺">
-          <el-select
-            v-model="selectedShopId"
-            placeholder="选择店铺"
-            style="width: 180px"
-            @change="handleShopChange"
-          >
-            <el-option
-              v-for="shop in shopList"
-              :key="shop.id"
-              :label="shop.shop_name"
-              :value="shop.id"
-            />
-            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="货件编号">
-          <el-input
-            v-model="searchForm.shipment_confirmation_id"
-            placeholder="如 FBA19CDP5H0W"
-            clearable
-            style="width: 180px"
-          />
-        </el-form-item>
-
-        <el-form-item label="亚马逊参考号">
-          <el-input
-            v-model="searchForm.amazon_reference_id"
-            placeholder="如 8AAFYNCI"
-            clearable
-            style="width: 160px"
-          />
-        </el-form-item>
-
-        <el-form-item label="目标仓库">
-          <el-select
-            v-model="searchForm.destination_warehouse_id"
-            placeholder="选择仓库"
-            clearable
-            filterable
-            style="width: 140px"
-          >
-            <el-option
-              v-for="wh in warehouses"
-              :key="wh.warehouse_id"
-              :label="wh.warehouse_id"
-              :value="wh.warehouse_id"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="状态筛选">
-          <el-select
-            v-model="searchForm.status"
-            placeholder="选择状态"
-            clearable
-            style="width: 140px"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="处理中" value="WORKING" />
-            <el-option label="已发货" value="SHIPPED" />
-            <el-option label="接收中" value="RECEIVING" />
-            <el-option label="已关闭" value="CLOSED" />
-            <el-option label="已删除" value="DELETED" />
-            <el-option label="已取消" value="CANCELLED" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">货件列表</h3>
-        <div class="header-actions">
-          <el-tooltip
-            effect="dark"
-            placement="top"
-            content="从亚马逊卖家后台手动同步最新货件数据。页面数据每小时自动更新一次，如需查看最新货件信息可点击此按钮。"
-          >
-            <el-button type="warning" @click="syncAllData" :loading="syncLoading">
-              <el-icon><RefreshRight /></el-icon>
-              同步最新数据
-            </el-button>
-          </el-tooltip>
-          <el-button type="primary" @click="refreshData" :loading="loading">
-            <el-icon><RefreshRight /></el-icon>
-            刷新
-          </el-button>
-        </div>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><Van /></el-icon>
+          亚马逊货件列表
+        </h1>
+        <p class="page-subtitle">查看您的亚马逊FBA货件，掌握货件状态和详情</p>
       </div>
+      <div class="header-actions">
+        <el-tooltip
+          effect="dark"
+          placement="top"
+          content="从亚马逊卖家后台手动同步最新货件数据。页面数据每小时自动更新一次，如需查看最新货件信息可点击此按钮。"
+        >
+          <el-button type="warning" @click="syncAllData" :loading="syncLoading">
+            <el-icon><RefreshRight /></el-icon>
+            同步最新数据
+          </el-button>
+        </el-tooltip>
+        <el-button type="primary" @click="refreshData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+      </div>
+    </div>
 
-      <!-- 货件列表 -->
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-select
+          v-model="selectedShopId"
+          placeholder="选择店铺"
+          style="width: 180px"
+          @change="handleShopChange"
+        >
+          <el-option
+            v-for="shop in shopList"
+            :key="shop.id"
+            :label="shop.shop_name"
+            :value="shop.id"
+          />
+          <el-option value="__refresh__" label="🔄 刷新店铺列表" />
+        </el-select>
+        <el-input
+          v-model="searchForm.shipment_confirmation_id"
+          placeholder="货件编号"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
+          v-model="searchForm.amazon_reference_id"
+          placeholder="亚马逊参考号"
+          clearable
+          style="width: 160px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select
+          v-model="searchForm.destination_warehouse_id"
+          placeholder="目标仓库"
+          clearable
+          filterable
+          style="width: 140px"
+        >
+          <el-option
+            v-for="wh in warehouses"
+            :key="wh.warehouse_id"
+            :label="wh.warehouse_id"
+            :value="wh.warehouse_id"
+          />
+        </el-select>
+        <el-select
+          v-model="searchForm.status"
+          placeholder="状态"
+          clearable
+          style="width: 130px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="处理中" value="WORKING" />
+          <el-option label="已发货" value="SHIPPED" />
+          <el-option label="接收中" value="RECEIVING" />
+          <el-option label="已关闭" value="CLOSED" />
+          <el-option label="已删除" value="DELETED" />
+          <el-option label="已取消" value="CANCELLED" />
+        </el-select>
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
       <el-table
         :data="shipments"
         v-loading="loading"
-        stripe
         style="width: 100%"
+        height="calc(100vh - 260px)"
         :default-sort="{ prop: 'plan_created_at', order: 'descending' }"
+        row-class-name="shipment-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
       >
         <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
           <template #default>
-            {{ getShopName(selectedShopId) || '-' }}
+            <el-tag size="small" effect="plain" type="info">{{ getShopName(selectedShopId) || '-' }}</el-tag>
           </template>
         </el-table-column>
 
         <el-table-column prop="shipment_id" label="货件ID" width="220" fixed="left">
           <template #default="scope">
-            <el-button type="primary" link @click="viewShipmentDetail(scope.row)">
+            <el-button type="primary" text size="small" @click="viewShipmentDetail(scope.row)">
               {{ scope.row.shipment_id }}
             </el-button>
           </template>
         </el-table-column>
 
-        <el-table-column prop="shipment_name" label="货件名称" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="shipment_name" label="货件名称" min-width="220" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.shipment_name }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="shipment_confirmation_id" label="货件编号" width="140" />
+        <el-table-column prop="shipment_confirmation_id" label="货件编号" width="140">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.shipment_confirmation_id }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="amazon_reference_id" label="亚马逊参考号" width="130" />
+        <el-table-column prop="amazon_reference_id" label="亚马逊参考号" width="130">
+          <template #default="scope">
+            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.amazon_reference_id }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column prop="destination_warehouse_id" label="目标仓库" width="100" align="center" />
+        <el-table-column prop="destination_warehouse_id" label="目标仓库" width="100" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.destination_warehouse_id" size="small" effect="plain">{{ scope.row.destination_warehouse_id }}</el-tag>
+            <span v-else style="color:#bbb;">-</span>
+          </template>
+        </el-table-column>
         
         <el-table-column prop="shipment_status" label="状态" width="100" align="center">
           <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.shipment_status)">
+            <el-tag :type="getStatusType(scope.row.shipment_status)" size="small" effect="dark" round>
               {{ getStatusText(scope.row.shipment_status) }}
             </el-tag>
           </template>
@@ -152,7 +160,7 @@
 
         <el-table-column prop="plan_created_at" label="创建时间" width="170" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.plan_created_at) }}
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ formatDate(scope.row.plan_created_at) }}</span>
           </template>
         </el-table-column>
 
@@ -183,7 +191,7 @@
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -203,6 +211,7 @@
       :title="`货件详情 - ${currentShipment?.shipment_id}`"
       width="70%"
       :destroy-on-close="true"
+      align-center
     >
       <div v-loading="detailLoading">
         <div v-if="shipmentDetailData" class="shipment-detail">
@@ -216,7 +225,7 @@
               <el-descriptions-item label="货件编号">{{ shipmentDetailData.shipment_confirmation_id || '-' }}</el-descriptions-item>
               <el-descriptions-item label="亚马逊参考号">{{ shipmentDetailData.amazon_reference_id || '-' }}</el-descriptions-item>
               <el-descriptions-item label="状态">
-                <el-tag :type="getStatusType(shipmentDetailData.status)">
+                <el-tag :type="getStatusType(shipmentDetailData.status)" size="small" effect="dark" round>
                   {{ getStatusText(shipmentDetailData.status) }}
                 </el-tag>
               </el-descriptions-item>
@@ -311,6 +320,7 @@
       width="85%"
       :destroy-on-close="true"
       @closed="allBoxesExpanded = false"
+      align-center
     >
       <div v-loading="boxesLoading">
         <div class="boxes-dialog-header">
@@ -412,7 +422,7 @@
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, InfoFilled, Box, Printer, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, InfoFilled, Box, Printer, Download, Van } from '@element-plus/icons-vue'
 import {
   getInboundShipments,
   getInboundShipmentDetail,
@@ -434,7 +444,8 @@ export default {
     InfoFilled,
     Box,
     Printer,
-    Download
+    Download,
+    Van
   },
   setup() {
     const loading = ref(false)
@@ -956,71 +967,82 @@ export default {
 
 <style scoped>
 .amazon-shipment-page {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
-  margin-bottom: 24px;
-  text-align: center;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin: 0;
-}
-
-.search-card,
-.content-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-end;
+  margin-bottom: 24px;
 }
-
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+.page-subtitle {
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
-
 .header-actions {
   display: flex;
   gap: 10px;
 }
 
+/* ===== 筛选栏 ===== */
+.filter-bar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.shipment-row:hover) { background-color: #fafbff !important; }
+
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .shipment-detail .detail-section {
   margin-top: 20px;
 }
-
+.shipment-detail .detail-section:first-child {
+  margin-top: 0;
+}
 .shipment-detail .detail-section h4 {
   margin-bottom: 12px;
-  color: #333;
+  color: #1a1a2e;
   font-size: 16px;
   font-weight: 600;
 }
@@ -1043,54 +1065,11 @@ export default {
   text-align: right;
 }
 
-/* 响应式 */
-@media (max-width: 768px) {
-  .amazon-shipment-page {
-    padding: 12px;
-  }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .pagination-container {
-    text-align: center;
-  }
-
-  .shipment-detail .detail-section h4 {
-    font-size: 14px;
-  }
-
-  .json-pre {
-    font-size: 11px;
-    max-height: 200px;
-  }
-
-  .box-expand-content {
-    padding: 10px 12px;
-  }
-}
-
 .boxes-dialog-header {
   margin-bottom: 12px;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 
 /* 箱子展开详情 */
@@ -1111,7 +1090,39 @@ export default {
 .box-items-section h5 {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #333;
+  color: #1a1a2e;
   font-weight: 600;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 768px) {
+  .amazon-shipment-page {
+    padding: 16px 16px 40px;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-group {
+    justify-content: stretch;
+  }
+  .pagination-container {
+    text-align: center;
+  }
+  .shipment-detail .detail-section h4 {
+    font-size: 14px;
+  }
+  .json-pre {
+    font-size: 11px;
+    max-height: 200px;
+  }
+  .box-expand-content {
+    padding: 10px 12px;
+  }
 }
 </style>

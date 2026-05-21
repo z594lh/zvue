@@ -1,130 +1,121 @@
 <template>
   <div class="amazon-order-page">
+    <!-- 头部 -->
     <div class="page-header">
-      <h1 class="page-title">亚马逊订单列表</h1>
-      <p class="page-subtitle">查看亚马逊订单状态、详情及商品信息</p>
-    </div>
-
-    <!-- 搜索和筛选区域 -->
-    <div class="search-card">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="店铺">
-          <el-select
-            v-model="selectedShopId"
-            placeholder="选择店铺"
-            style="width: 180px"
-            @change="handleShopChange"
-          >
-            <el-option
-              v-for="shop in shopList"
-              :key="shop.id"
-              :label="shop.shop_name"
-              :value="shop.id"
-            />
-            <el-option value="__refresh__" label="🔄 刷新店铺列表" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="订单状态">
-          <el-select
-            v-model="searchForm.order_status"
-            placeholder="选择状态"
-            clearable
-            style="width: 160px"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="待处理" value="Pending" />
-            <el-option label="未发货" value="Unshipped" />
-            <el-option label="部分发货" value="PartiallyShipped" />
-            <el-option label="已发货" value="Shipped" />
-            <el-option label="发票未确认" value="InvoiceUnconfirmed" />
-            <el-option label="已取消" value="Canceled" />
-            <el-option label="无法配送" value="Unfulfillable" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="亚马逊订单号">
-          <el-input
-            v-model="searchForm.amazon_order_id"
-            placeholder="精确匹配"
-            clearable
-            style="width: 180px"
-          />
-        </el-form-item>
-
-        <el-form-item label="买家姓名">
-          <el-input
-            v-model="searchForm.buyer_name"
-            placeholder="模糊匹配"
-            clearable
-            style="width: 160px"
-          />
-        </el-form-item>
-
-        <el-form-item label="下单日期">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            value-format="YYYY-MM-DD"
-            style="width: 260px"
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 数据展示区域 -->
-    <div class="content-card">
-      <div class="card-header">
-        <h3 class="section-title">订单列表</h3>
-        <div class="header-actions">
-          <el-tooltip
-            effect="dark"
-            placement="top"
-            content="从亚马逊卖家后台手动同步最新订单及商品数据。页面数据定时自动更新，如需查看最新订单信息可点击此按钮。"
-          >
-            <el-button type="warning" @click="syncAllData" :loading="syncLoading">
-              <el-icon><RefreshRight /></el-icon>
-              同步最新数据
-            </el-button>
-          </el-tooltip>
-          <el-button type="primary" @click="refreshData" :loading="loading">
-            <el-icon><RefreshRight /></el-icon>
-            刷新
-          </el-button>
-        </div>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><ShoppingCart /></el-icon>
+          亚马逊订单列表
+        </h1>
+        <p class="page-subtitle">查看亚马逊订单状态、详情及商品信息</p>
       </div>
+      <div class="header-actions">
+        <el-tooltip
+          effect="dark"
+          placement="top"
+          content="从亚马逊卖家后台手动同步最新订单及商品数据。页面数据定时自动更新，如需查看最新订单信息可点击此按钮。"
+        >
+          <el-button type="warning" @click="syncAllData" :loading="syncLoading">
+            <el-icon><RefreshRight /></el-icon>
+            同步最新数据
+          </el-button>
+        </el-tooltip>
+        <el-button type="primary" @click="refreshData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+      </div>
+    </div>
 
-      <!-- 订单列表 -->
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <el-select
+          v-model="selectedShopId"
+          placeholder="选择店铺"
+          style="width: 180px"
+          @change="handleShopChange"
+        >
+          <el-option
+            v-for="shop in shopList"
+            :key="shop.id"
+            :label="shop.shop_name"
+            :value="shop.id"
+          />
+          <el-option value="__refresh__" label="🔄 刷新店铺列表" />
+        </el-select>
+        <el-select
+          v-model="searchForm.order_status"
+          placeholder="订单状态"
+          clearable
+          style="width: 140px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="待处理" value="Pending" />
+          <el-option label="未发货" value="Unshipped" />
+          <el-option label="部分发货" value="PartiallyShipped" />
+          <el-option label="已发货" value="Shipped" />
+          <el-option label="发票未确认" value="InvoiceUnconfirmed" />
+          <el-option label="已取消" value="Canceled" />
+          <el-option label="无法配送" value="Unfulfillable" />
+        </el-select>
+        <el-input
+          v-model="searchForm.amazon_order_id"
+          placeholder="亚马逊订单号"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
+          v-model="searchForm.buyer_name"
+          placeholder="买家姓名"
+          clearable
+          style="width: 160px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          value-format="YYYY-MM-DD"
+          style="width: 260px"
+        />
+        <el-button type="primary" @click="handleSearch" :loading="loading">
+          <el-icon><Search /></el-icon> 搜索
+        </el-button>
+        <el-button plain @click="resetSearch">
+          <el-icon><Refresh /></el-icon> 重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-card">
       <el-table
         :data="orders"
         v-loading="loading"
-        stripe
         style="width: 100%"
+        height="calc(100vh - 260px)"
         :default-sort="{ prop: 'purchase_date', order: 'descending' }"
+        row-class-name="order-row"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :cell-style="{padding:'10px 0'}"
       >
         <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
           <template #default>
-            {{ getShopName(selectedShopId) || '-' }}
+            <el-tag size="small" effect="plain" type="info">{{ getShopName(selectedShopId) || '-' }}</el-tag>
           </template>
         </el-table-column>
 
         <el-table-column prop="amazon_order_id" label="订单号" width="170" fixed="left">
           <template #default="scope">
-            <el-button type="primary" link @click="viewOrderDetail(scope.row)">
+            <el-button type="primary" text size="small" @click="viewOrderDetail(scope.row)">
               {{ scope.row.amazon_order_id }}
             </el-button>
           </template>
@@ -132,24 +123,28 @@
 
         <el-table-column prop="purchase_date" label="下单时间" width="160" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.purchase_date) }}
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ formatDate(scope.row.purchase_date) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="buyer_name" label="买家姓名" width="130" show-overflow-tooltip />
+        <el-table-column prop="buyer_name" label="买家姓名" width="130" show-overflow-tooltip>
+          <template #default="scope">
+            <span style="color:#555;">{{ scope.row.buyer_name }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="订单金额" width="120" align="right">
           <template #default="scope">
-            <span v-if="scope.row.order_total_amount">
+            <span v-if="scope.row.order_total_amount" class="amount-val">
               {{ scope.row.order_total_amount }} {{ scope.row.order_total_currency_code || '' }}
             </span>
-            <span v-else>-</span>
+            <span v-else style="color:#bbb;">-</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="order_status" label="状态" width="110" align="center">
           <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.order_status)">
+            <el-tag :type="getStatusType(scope.row.order_status)" size="small" effect="dark" round>
               {{ getStatusText(scope.row.order_status) }}
             </el-tag>
           </template>
@@ -157,18 +152,18 @@
 
         <el-table-column prop="fulfillment_channel" label="配送渠道" width="110" align="center">
           <template #default="scope">
-            <el-tag v-if="scope.row.fulfillment_channel === 'AFN'" type="success" size="small">FBA</el-tag>
-            <el-tag v-else-if="scope.row.fulfillment_channel === 'MFN'" type="info" size="small">自配送</el-tag>
-            <span v-else>{{ scope.row.fulfillment_channel || '-' }}</span>
+            <el-tag v-if="scope.row.fulfillment_channel === 'AFN'" type="success" size="small" effect="plain">FBA</el-tag>
+            <el-tag v-else-if="scope.row.fulfillment_channel === 'MFN'" type="info" size="small" effect="plain">自配送</el-tag>
+            <span v-else style="color:#bbb;">{{ scope.row.fulfillment_channel || '-' }}</span>
           </template>
         </el-table-column>
 
         <el-table-column label="商品数" width="100" align="center">
           <template #default="scope">
-            <span v-if="scope.row.item_count !== undefined && scope.row.item_count !== null">
+            <span v-if="scope.row.item_count !== undefined && scope.row.item_count !== null" class="qty-total">
               {{ scope.row.item_count }}
             </span>
-            <span v-else>
+            <span v-else style="color:#888;">
               {{ scope.row.number_of_items_shipped || 0 }} / {{ scope.row.number_of_items_unshipped || 0 }}
             </span>
           </template>
@@ -176,7 +171,7 @@
 
         <el-table-column prop="sync_time" label="同步时间" width="160" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.sync_time) }}
+            <span style="font-size:12px;color:#888;font-family:monospace;">{{ formatDate(scope.row.sync_time) }}</span>
           </template>
         </el-table-column>
 
@@ -197,7 +192,7 @@
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-wrap">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.page_size"
@@ -217,6 +212,7 @@
       :title="`订单详情 - ${currentOrder?.amazon_order_id}`"
       width="75%"
       :destroy-on-close="true"
+      align-center
     >
       <div v-loading="detailLoading">
         <div v-if="orderDetail" class="order-detail">
@@ -229,20 +225,20 @@
               <el-descriptions-item label="下单时间">{{ formatDate(orderDetail.purchase_date) }}</el-descriptions-item>
               <el-descriptions-item label="最后更新时间">{{ formatDate(orderDetail.last_update_date) }}</el-descriptions-item>
               <el-descriptions-item label="状态">
-                <el-tag :type="getStatusType(orderDetail.order_status)">
+                <el-tag :type="getStatusType(orderDetail.order_status)" size="small" effect="dark" round>
                   {{ getStatusText(orderDetail.order_status) }}
                 </el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="配送渠道">
-                <el-tag v-if="orderDetail.fulfillment_channel === 'AFN'" type="success" size="small">FBA</el-tag>
-                <el-tag v-else-if="orderDetail.fulfillment_channel === 'MFN'" type="info" size="small">自配送</el-tag>
+                <el-tag v-if="orderDetail.fulfillment_channel === 'AFN'" type="success" size="small" effect="plain">FBA</el-tag>
+                <el-tag v-else-if="orderDetail.fulfillment_channel === 'MFN'" type="info" size="small" effect="plain">自配送</el-tag>
                 <span v-else>{{ orderDetail.fulfillment_channel || '-' }}</span>
               </el-descriptions-item>
               <el-descriptions-item label="订单类型">{{ orderDetail.order_type || '-' }}</el-descriptions-item>
               <el-descriptions-item label="配送服务">{{ orderDetail.shipment_service_level_category || '-' }}</el-descriptions-item>
               <el-descriptions-item label="支付方式">{{ orderDetail.payment_method || '-' }}</el-descriptions-item>
               <el-descriptions-item label="订单金额">
-                <span v-if="orderDetail.order_total_amount">
+                <span v-if="orderDetail.order_total_amount" class="amount-val">
                   {{ orderDetail.order_total_amount }} {{ orderDetail.order_total_currency_code || '' }}
                 </span>
                 <span v-else>-</span>
@@ -381,7 +377,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, View } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, View, ShoppingCart } from '@element-plus/icons-vue'
 import {
   getAmazonOrders,
   getAmazonOrder,
@@ -396,7 +392,8 @@ export default {
     Search,
     Refresh,
     RefreshRight,
-    View
+    View,
+    ShoppingCart
   },
   setup() {
     const loading = ref(false)
@@ -723,62 +720,75 @@ export default {
 
 <style scoped>
 .amazon-order-page {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 
+/* ===== 头部 ===== */
 .page-header {
-  margin-bottom: 24px;
-  text-align: center;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin: 0;
-}
-
-.search-card,
-.content-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  margin-bottom: 24px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-end;
+  margin-bottom: 24px;
 }
-
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+.page-subtitle {
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
-
 .header-actions {
   display: flex;
   gap: 10px;
+}
+
+/* ===== 筛选栏 ===== */
+.filter-bar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ===== 表格卡片 ===== */
+.table-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+:deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.order-row:hover) { background-color: #fafbff !important; }
+
+/* 金额 */
+.amount-val { font-weight: 700; color: #1a1a2e; font-size: 14px; }
+.qty-total { color: #1a1a2e; font-weight: 700; font-size: 14px; }
+
+/* 分页 */
+.pagination-wrap {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .order-detail .detail-section {
@@ -791,7 +801,7 @@ export default {
 
 .order-detail .detail-section h4 {
   margin-bottom: 12px;
-  color: #333;
+  color: #1a1a2e;
   font-size: 16px;
   font-weight: 600;
 }
@@ -814,45 +824,26 @@ export default {
   margin-bottom: 12px;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  text-align: right;
-}
-
-/* 响应式 */
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
   .amazon-order-page {
-    padding: 12px;
+    padding: 16px 16px 40px;
   }
-
-  .page-title {
-    font-size: 24px;
-  }
-
-  .search-card,
-  .content-card {
-    padding: 16px;
-  }
-
-  .search-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-
-  .pagination-container {
-    text-align: center;
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
-
+  .filter-group {
+    justify-content: stretch;
+  }
   .order-detail .detail-section h4 {
     font-size: 14px;
   }
-
   .items-header {
     flex-direction: column;
     align-items: flex-start;
