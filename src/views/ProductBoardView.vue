@@ -265,29 +265,31 @@
         </el-table-column>
         <el-table-column width="170" align="center">
           <template #header>
-            <el-tooltip content="开发 / 首到 / 最早 / FBA" placement="top">
+            <el-tooltip content="导入 / 开发 / 到货" placement="top">
               <span>时间节点</span>
             </el-tooltip>
           </template>
           <template #default="scope">
             <div class="timeline-block">
+              <div v-if="scope.row.created_at" class="timeline-row">
+                <el-tooltip :content="getDataAgeTip(scope.row.created_at)" placement="left">
+                  <span class="timeline-tag">导入</span>
+                </el-tooltip>
+                <span class="timeline-val">{{ scope.row.created_at }}</span>
+              </div>
               <div v-if="scope.row.dev_time" class="timeline-row">
-                <span class="timeline-tag">开发</span>
+                <el-tooltip content="产品开发时间" placement="left">
+                  <span class="timeline-tag">开发</span>
+                </el-tooltip>
                 <span class="timeline-val">{{ scope.row.dev_time }}</span>
               </div>
               <div v-if="scope.row.first_arrival_time" class="timeline-row">
-                <span class="timeline-tag">首到</span>
+                <el-tooltip content="最早到货时间" placement="left">
+                  <span class="timeline-tag">到货</span>
+                </el-tooltip>
                 <span class="timeline-val">{{ scope.row.first_arrival_time }}</span>
               </div>
-              <div v-if="scope.row.earliest_arrival_time" class="timeline-row">
-                <span class="timeline-tag">最早</span>
-                <span class="timeline-val">{{ scope.row.earliest_arrival_time }}</span>
-              </div>
-              <div v-if="scope.row.fba_arrival_time" class="timeline-row">
-                <span class="timeline-tag">FBA</span>
-                <span class="timeline-val">{{ scope.row.fba_arrival_time }}</span>
-              </div>
-              <span v-if="!scope.row.dev_time && !scope.row.first_arrival_time && !scope.row.earliest_arrival_time && !scope.row.fba_arrival_time" style="color:#ccc;font-size:12px;">-</span>
+              <span v-if="!scope.row.created_at && !scope.row.dev_time && !scope.row.first_arrival_time" style="color:#ccc;font-size:12px;">-</span>
             </div>
           </template>
         </el-table-column>
@@ -494,6 +496,19 @@ export default {
       const num = Number(val)
       if (isNaN(num)) return '-'
       return (num * 100).toFixed(1) + '%'
+    }
+
+    // 数据时效提示：根据导入时间计算距今天数
+    const getDataAgeTip = (createdAt) => {
+      if (!createdAt) return ''
+      const datePart = createdAt.split(' ')[0]
+      if (!datePart) return ''
+      const importDate = new Date(datePart + 'T00:00:00')
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const diffMs = today - importDate
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      return `该ASIN所有指标最新数据是截止 ${datePart}，距今已 ${diffDays}天。`
     }
 
     const getProfitClass = (val) => {
@@ -908,7 +923,7 @@ export default {
       productList, amazonStatusList, selectedRows, selectAll,
       searchForm, pagination, defaultImage,
       trendChartRef, trendProducts, trendMetric,
-      formatNumber, formatPercent, formatPercentDecimal,
+      formatNumber, formatPercent, formatPercentDecimal, getDataAgeTip,
       getProfitClass, getMarginTagType, getRefundClass,
       handleSearch, resetSearch, handlePageChange, handleSizeChange,
       handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
