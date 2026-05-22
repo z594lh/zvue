@@ -98,6 +98,9 @@
                   <span v-else style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
                 </div>
                 <div class="product-tags">
+                  <el-tooltip :content="getProductAgeTip(scope.row.dev_time)" placement="top">
+                    <el-tag v-if="scope.row.dev_time" size="small" effect="plain" :type="isNewProduct(scope.row.dev_time) ? 'success' : 'danger'">{{ isNewProduct(scope.row.dev_time) ? '新品' : '老品' }}</el-tag>
+                  </el-tooltip>
                   <el-tag v-if="scope.row.amazon_status" size="small" effect="plain" type="info">{{ scope.row.amazon_status }}</el-tag>
                   <el-switch
                     v-model="scope.row.is_listed"
@@ -533,6 +536,28 @@ export default {
       return 'text-red'
     }
 
+    const isNewProduct = (devTime) => {
+      if (!devTime) return false
+      const devDate = new Date(devTime)
+      const now = new Date()
+      const diffMs = now - devDate
+      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+      return diffDays <= 90
+    }
+
+    const getProductAgeTip = (devTime) => {
+      if (!devTime) return ''
+      const devDate = new Date(devTime)
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const devDay = new Date(devDate.getFullYear(), devDate.getMonth(), devDate.getDate())
+      const diffMs = today - devDay
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      const dateStr = devTime.split(' ')[0] || devTime
+      const isNew = diffDays <= 90
+      return `开发于 ${dateStr}，距今 ${diffDays} 天，${isNew ? '属于新品（≤3个月）' : '属于老品（>3个月）'}`
+    }
+
     const fetchFilters = async () => {
       try {
         const res = await getProductBoardFilters()
@@ -923,8 +948,8 @@ export default {
       productList, amazonStatusList, selectedRows, selectAll,
       searchForm, pagination, defaultImage,
       trendChartRef, trendProducts, trendMetric,
-      formatNumber, formatPercent, formatPercentDecimal, getDataAgeTip,
-      getProfitClass, getMarginTagType, getRefundClass,
+      formatNumber, formatPercent, formatPercentDecimal, getDataAgeTip, getProductAgeTip,
+      getProfitClass, getMarginTagType, getRefundClass, isNewProduct,
       handleSearch, resetSearch, handlePageChange, handleSizeChange,
       handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
       handleToggleListed, handleDelete, handleBatchDelete,
