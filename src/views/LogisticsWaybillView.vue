@@ -10,6 +10,10 @@
         <p class="page-subtitle">管理货代运单，跟踪物流运输状态与费用</p>
       </div>
       <div class="header-actions">
+        <el-button type="primary" @click="handleImportClick">
+          <el-icon><UploadFilled /></el-icon>
+          导入运单
+        </el-button>
         <el-button type="success" @click="handleCreate">
           <el-icon><Plus /></el-icon>
           新增运单
@@ -211,6 +215,49 @@
         />
       </div>
     </div>
+
+    <!-- 导入运单对话框 -->
+    <el-dialog v-model="importDialogVisible" title="导入运单" width="460px" align-center :close-on-click-modal="false">
+      <el-form label-width="80px">
+        <el-form-item label="货代" required>
+          <el-select
+            v-model="importProviderId"
+            placeholder="选择货代"
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in providerOptions"
+              :key="p.id"
+              :label="p.name"
+              :value="p.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="文件" required>
+          <el-upload
+            ref="uploadRef"
+            drag
+            action="#"
+            :auto-upload="false"
+            :on-change="handleImportFileChange"
+            :limit="1"
+            accept=".xlsx,.xls"
+            style="width: 100%"
+          >
+            <el-icon class="el-icon--upload" size="40"><UploadFilled /></el-icon>
+            <div class="el-upload__text">拖拽文件到此处或 <em>点击上传</em></div>
+            <template #tip>
+              <div class="el-upload__tip">支持 .xlsx / .xls 格式</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitImport" :loading="importLoading">确定导入</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
@@ -482,14 +529,15 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, MapLocation } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, MapLocation, UploadFilled } from '@element-plus/icons-vue'
 import {
   getLogisticsProviders,
   getLogisticsWaybills,
   createLogisticsWaybill,
   updateLogisticsWaybill,
   deleteLogisticsWaybill,
-  getAvailableShipments
+  getAvailableShipments,
+  importLogisticsWaybills
 } from '@/services/api.js'
 
 export default {
@@ -498,17 +546,23 @@ export default {
     Search,
     Refresh,
     Plus,
-    MapLocation
+    MapLocation,
+    UploadFilled
   },
   setup() {
     const loading = ref(false)
     const submitLoading = ref(false)
     const dialogVisible = ref(false)
+    const importDialogVisible = ref(false)
+    const importLoading = ref(false)
     const isEdit = ref(false)
     const formRef = ref(null)
     const waybillList = ref([])
     const providerOptions = ref([])
     const shipmentOptions = ref([])
+    const importProviderId = ref(null)
+    const importFile = ref(null)
+    const uploadRef = ref(null)
 
     const searchForm = reactive({
       waybill_no: '',
@@ -780,6 +834,47 @@ export default {
       }
     }
 
+    const handleImportClick = () => {
+      importDialogVisible.value = true
+      importProviderId.value = null
+      importFile.value = null
+      uploadRef.value?.clearFiles?.()
+    }
+
+    const handleImportFileChange = (file) => {
+      importFile.value = file.raw
+    }
+
+    const submitImport = async () => {
+      if (!importProviderId.value) {
+        ElMessage.warning('请选择货代')
+        return
+      }
+      if (!importFile.value) {
+        ElMessage.warning('请选择要导入的 Excel 文件')
+        return
+      }
+      importLoading.value = true
+      try {
+        const fd = new FormData()
+        fd.append('file', importFile.value)
+        fd.append('provider_id', importProviderId.value)
+        const response = await importLogisticsWaybills(fd)
+        if (response.data.status === 'success') {
+          ElMessage.success(response.data.message || '导入成功')
+          importDialogVisible.value = false
+          await fetchList()
+        } else {
+          ElMessage.error(response.data.message || '导入失败')
+        }
+      } catch (error) {
+        console.error('导入失败:', error)
+        ElMessage.error('导入失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        importLoading.value = false
+      }
+    }
+
     const handlePageChange = (page) => {
       pagination.page = page
       fetchList()
@@ -821,8 +916,11 @@ export default {
       loading,
       submitLoading,
       dialogVisible,
+      importDialogVisible,
+      importLoading,
       isEdit,
       formRef,
+      uploadRef,
       waybillList,
       providerOptions,
       shipmentOptions,
@@ -830,12 +928,17 @@ export default {
       pagination,
       formData,
       formRules,
+      importProviderId,
+      importFile,
       handleSearch,
       resetSearch,
       handleCreate,
       handleEdit,
       handleDelete,
       handleSubmit,
+      handleImportClick,
+      handleImportFileChange,
+      submitImport,
       handlePageChange,
       handleSizeChange,
       formatAmount,

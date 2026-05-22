@@ -1214,6 +1214,16 @@ export const getAvailableShipments = (params = {}) => {
 };
 
 /**
+ * 导入运单
+ * @param {FormData} formData
+ */
+export const importLogisticsWaybills = (formData) => {
+  return api.post('/logistics-waybills/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+/**
  * 获取计划任务（Cron Tasks）列表
  */
 export const getCronTasks = (params = {}) => {
