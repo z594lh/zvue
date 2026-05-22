@@ -25,6 +25,10 @@
           <el-option label="已上架" :value="true" />
           <el-option label="未上架" :value="false" />
         </el-select>
+        <el-select v-model="searchForm.is_new_product" placeholder="新品/老品" clearable style="width:120px" @change="handleSearch">
+          <el-option label="新品" :value="true" />
+          <el-option label="老品" :value="false" />
+        </el-select>
         <el-input v-model="searchForm.keyword" placeholder="搜索 ASIN / 名称" clearable style="width:200px" @keyup.enter="handleSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
@@ -99,7 +103,7 @@
                 </div>
                 <div class="product-tags">
                   <el-tooltip :content="getProductAgeTip(scope.row.dev_time)" placement="top">
-                    <el-tag v-if="scope.row.dev_time" size="small" effect="plain" :type="isNewProduct(scope.row.dev_time) ? 'success' : 'danger'">{{ isNewProduct(scope.row.dev_time) ? '新品' : '老品' }}</el-tag>
+                    <el-tag v-if="scope.row.dev_time" size="small" effect="plain" :type="scope.row.is_new_product ? 'success' : 'danger'">{{ scope.row.is_new_product ? '新品' : '老品' }}</el-tag>
                   </el-tooltip>
                   <el-tag v-if="scope.row.amazon_status" size="small" effect="plain" type="info">{{ scope.row.amazon_status }}</el-tag>
                   <el-switch
@@ -473,7 +477,7 @@ export default {
 
     const defaultImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHZpZXdCb3g9IjAgMCA1NiA1NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIgZmlsbD0iI2Y1ZjdmYSIvPgo8cGF0aCBkPSJNMjggMjBDMjQuMTM0IDIwIDIxIDIzLjEzNCAyMSAyN0MyMSAzMC44NjYgMjQuMTM0IDM0IDI4IDM0QzMxLjg2NiAzNCAzNSAzMC44NjYgMzUgMjdDMzUgMjMuMTM0IDMxLjg2NiAyMCAyOCAyMFoiIGZpbGw9IiNkZGUiLz4KPC9zdmc+'
 
-    const searchForm = reactive({ keyword: '', amazon_status: '', is_listed: null, min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
+    const searchForm = reactive({ keyword: '', amazon_status: '', is_listed: null, is_new_product: null, min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
     const pagination = reactive({ page: 1, page_size: 20, total: 0 })
 
     const formatNumber = (val) => {
@@ -536,15 +540,6 @@ export default {
       return 'text-red'
     }
 
-    const isNewProduct = (devTime) => {
-      if (!devTime) return false
-      const devDate = new Date(devTime)
-      const now = new Date()
-      const diffMs = now - devDate
-      const diffDays = diffMs / (1000 * 60 * 60 * 24)
-      return diffDays <= 90
-    }
-
     const getProductAgeTip = (devTime) => {
       if (!devTime) return ''
       const devDate = new Date(devTime)
@@ -573,6 +568,7 @@ export default {
         if (searchForm.amazon_status) params.amazon_status = searchForm.amazon_status
         if (searchForm.min_sales != null && searchForm.min_sales !== '') params.min_sales = searchForm.min_sales
         if (searchForm.is_listed !== null && searchForm.is_listed !== '') params.is_listed = searchForm.is_listed
+        if (searchForm.is_new_product !== null && searchForm.is_new_product !== '') params.is_new_product = searchForm.is_new_product
         const res = await getProductBoardList(params)
         if (res.data.status === 'success') {
           const d = res.data.data || {}
@@ -615,7 +611,7 @@ export default {
 
     const handleSearch = () => { clearSelection(); pagination.page = 1; fetchList() }
     const resetSearch = () => {
-      searchForm.keyword = ''; searchForm.amazon_status = ''; searchForm.is_listed = null; searchForm.min_sales = null
+      searchForm.keyword = ''; searchForm.amazon_status = ''; searchForm.is_listed = null; searchForm.is_new_product = null; searchForm.min_sales = null
       searchForm.sort_by = 'sales_30d'; searchForm.sort_dir = 'desc'
       clearSelection(); pagination.page = 1; fetchList()
     }
@@ -949,7 +945,7 @@ export default {
       searchForm, pagination, defaultImage,
       trendChartRef, trendProducts, trendMetric,
       formatNumber, formatPercent, formatPercentDecimal, getDataAgeTip, getProductAgeTip,
-      getProfitClass, getMarginTagType, getRefundClass, isNewProduct,
+      getProfitClass, getMarginTagType, getRefundClass,
       handleSearch, resetSearch, handlePageChange, handleSizeChange,
       handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
       handleToggleListed, handleDelete, handleBatchDelete,
