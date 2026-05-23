@@ -282,7 +282,7 @@
                 <el-tooltip :content="getDataAgeTip(scope.row.created_at)" placement="left">
                   <span class="timeline-tag">导入</span>
                 </el-tooltip>
-                <span class="timeline-val">{{ scope.row.created_at }}</span>
+                <span class="timeline-val">{{ formatDate(scope.row.created_at) }}</span>
               </div>
               <div v-if="scope.row.dev_time" class="timeline-row">
                 <el-tooltip content="产品开发时间" placement="left">
@@ -502,6 +502,11 @@ export default {
       if (isNaN(num)) return '-'
       if (Number.isInteger(num)) return num.toLocaleString()
       return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+
+    const formatDate = (val) => {
+      if (!val) return '-'
+      return String(val).split(' ')[0]
     }
 
     // 后端已返回百分比数值（如 36.62 表示 36.62%），直接格式化
@@ -960,7 +965,7 @@ export default {
       productList, amazonStatusList, selectedRows, selectAll,
       searchForm, pagination, defaultImage,
       trendChartRef, trendProducts, trendMetric,
-      formatNumber, formatPercent, formatPercentDecimal, getDataAgeTip, getProductAgeTip,
+      formatNumber, formatPercent, formatPercentDecimal, formatDate, getDataAgeTip, getProductAgeTip,
       getProfitClass, getMarginTagType, getRefundClass,
       handleSearch, resetSearch, handlePageChange, handleSizeChange,
       handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
