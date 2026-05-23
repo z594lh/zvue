@@ -300,9 +300,25 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="purchase_cost_rmb" label="采购成本" width="100" align="right">
+        <el-table-column width="150" align="right">
+          <template #header>
+            <span>采购成本</span>
+          </template>
           <template #default="scope">
-            <span style="color:#888;font-size:13px;">¥{{ formatNumber(scope.row.purchase_cost_rmb) }}</span>
+            <div class="cost-block">
+              <div class="cost-row">
+                <span class="cost-label">成本</span>
+                <span class="cost-val">¥{{ formatNumber(scope.row.purchase_cost_rmb) }}</span>
+              </div>
+              <div class="cost-row">
+                <a v-if="scope.row.supplier_reference" :href="scope.row.supplier_reference" target="_blank" class="cost-link" :title="scope.row.supplier_reference">供应商链接参考</a>
+                <span v-else class="cost-link-empty">暂无供应商链接</span>
+              </div>
+              <div class="cost-row">
+                <a v-if="scope.row.competitor_link_reference" :href="scope.row.competitor_link_reference" target="_blank" class="cost-link" :title="scope.row.competitor_link_reference">竞品链接</a>
+                <span v-else class="cost-link-empty">暂无竞品链接</span>
+              </div>
+            </div>
           </template>
         </el-table-column>
 
@@ -1151,6 +1167,13 @@ export default {
 /* 广告费 */
 .adfee-block { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .adfee-row { display: flex; align-items: center; gap: 4px; }
+.cost-block { line-height: 1.6; text-align: right; font-size: 13px; }
+.cost-row { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.cost-label { color: #888; font-size: 11px; }
+.cost-val { color: #555; font-weight: 500; }
+.cost-link { color: #409eff; font-size: 12px; text-decoration: none; }
+.cost-link:hover { text-decoration: underline; }
+.cost-link-empty { color: #f56c6c; font-size: 12px; cursor: default; }
 .adfee-tag { font-size: 10px; color: #999; background: #f5f5f5; padding: 1px 4px; border-radius: 3px; line-height: 1; }
 .adfee-val { font-size: 12px; color: #333; }
 
