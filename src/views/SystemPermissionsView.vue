@@ -4,67 +4,6 @@
       <h1 class="page-title">🔐 权限管理</h1>
 
       <el-tabs v-model="activeTab" type="border-card">
-        <!-- 权限定义 -->
-        <el-tab-pane label="权限定义" name="permissions">
-          <div class="toolbar">
-            <el-button type="primary" @click="openPermDefDialog()">+ 新增权限</el-button>
-            <el-button @click="toggleExpandAll">
-              {{ isAllExpanded ? '全部折叠' : '全部展开' }}
-            </el-button>
-          </div>
-
-          <el-collapse v-model="expandedModules">
-            <el-collapse-item
-              v-for="(perms, module) in permissionGroups"
-              :key="module"
-              :title="`${module}（${perms.length}）`"
-              :name="module"
-            >
-              <el-table :data="perms" border stripe size="small">
-                <el-table-column prop="code" label="权限码" width="180" />
-                <el-table-column prop="name" label="权限名称" width="160" />
-                <el-table-column prop="type" label="类型" width="80">
-                  <template #default="{ row }">
-                    <el-tag size="small" :type="row.type === 'page' ? 'success' : ''">{{ row.type }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="description" label="说明" show-overflow-tooltip />
-                <el-table-column label="操作" width="140" fixed="right">
-                  <template #default="{ row }">
-                    <el-button size="small" @click="openPermDefDialog(row)">编辑</el-button>
-                    <el-button size="small" type="danger" @click="handleDeletePermission(row)">删除</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </el-collapse-item>
-          </el-collapse>
-        </el-tab-pane>
-
-        <!-- 角色管理 -->
-        <el-tab-pane label="角色管理" name="roles">
-          <div class="toolbar">
-            <el-button type="primary" @click="openRoleDialog()">+ 新增角色</el-button>
-          </div>
-
-          <el-table :data="roles" v-loading="rolesLoading" border stripe>
-            <el-table-column prop="name" label="角色名称" width="140" />
-            <el-table-column prop="code" label="标识码" width="140" />
-            <el-table-column prop="description" label="描述" show-overflow-tooltip />
-            <el-table-column prop="status" label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.status ? 'success' : 'info'">{{ row.status ? '启用' : '禁用' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="220" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="openRoleDialog(row)">编辑</el-button>
-                <el-button size="small" type="primary" @click="openPermissionDialog(row)">权限</el-button>
-                <el-button size="small" type="danger" @click="handleDeleteRole(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-
         <!-- 用户管理 -->
         <el-tab-pane label="用户管理" name="users">
           <div class="toolbar">
@@ -143,7 +82,7 @@
             </el-button>
           </div>
 
-          <el-table ref="menuTableRef" :data="menuTree" row-key="id" :tree-props="{ children: 'children' }" border stripe>
+          <el-table ref="menuTableRef" :data="menuTree" row-key="id" :tree-props="{ children: 'children' }" border stripe @row-click="handleRowClick">
             <el-table-column prop="label" label="菜单名称" min-width="160">
               <template #default="{ row }">
                 <span :style="{ paddingLeft: row.parent_id === 0 ? '0' : '20px' }">{{ row.label }}</span>
@@ -169,6 +108,67 @@
               </template>
             </el-table-column>
           </el-table>
+        </el-tab-pane>
+
+        <!-- 角色管理 -->
+        <el-tab-pane label="角色管理" name="roles">
+          <div class="toolbar">
+            <el-button type="primary" @click="openRoleDialog()">+ 新增角色</el-button>
+          </div>
+
+          <el-table :data="roles" v-loading="rolesLoading" border stripe>
+            <el-table-column prop="name" label="角色名称" width="140" />
+            <el-table-column prop="code" label="标识码" width="140" />
+            <el-table-column prop="description" label="描述" show-overflow-tooltip />
+            <el-table-column prop="status" label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.status ? 'success' : 'info'">{{ row.status ? '启用' : '禁用' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="220" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" @click="openRoleDialog(row)">编辑</el-button>
+                <el-button size="small" type="primary" @click="openPermissionDialog(row)">权限</el-button>
+                <el-button size="small" type="danger" @click="handleDeleteRole(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <!-- 权限定义 -->
+        <el-tab-pane label="权限定义" name="permissions">
+          <div class="toolbar">
+            <el-button type="primary" @click="openPermDefDialog()">+ 新增权限</el-button>
+            <el-button @click="toggleExpandAll">
+              {{ isAllExpanded ? '全部折叠' : '全部展开' }}
+            </el-button>
+          </div>
+
+          <el-collapse v-model="expandedModules">
+            <el-collapse-item
+              v-for="(perms, module) in permissionGroups"
+              :key="module"
+              :title="`${module}（${perms.length}）`"
+              :name="module"
+            >
+              <el-table :data="perms" border stripe size="small">
+                <el-table-column prop="code" label="权限码" width="180" />
+                <el-table-column prop="name" label="权限名称" width="160" />
+                <el-table-column prop="type" label="类型" width="80">
+                  <template #default="{ row }">
+                    <el-tag size="small" :type="row.type === 'page' ? 'success' : ''">{{ row.type }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="description" label="说明" show-overflow-tooltip />
+                <el-table-column label="操作" width="140" fixed="right">
+                  <template #default="{ row }">
+                    <el-button size="small" @click="openPermDefDialog(row)">编辑</el-button>
+                    <el-button size="small" type="danger" @click="handleDeletePermission(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-collapse-item>
+          </el-collapse>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -344,7 +344,7 @@ export default {
   name: 'SystemPermissionsView',
   setup() {
     const { proxy } = getCurrentInstance()
-    const activeTab = ref('permissions')
+    const activeTab = ref('users')
     const permTreeRef = ref(null)
 
     // ========== 权限定义 ==========
@@ -801,6 +801,14 @@ export default {
 
     const menusExpanded = ref(false)
 
+    const handleRowClick = (row, column) => {
+      if (column.label === '操作') return
+      const table = menuTableRef.value
+      if (table && row.children && row.children.length > 0) {
+        table.toggleRowExpansion(row)
+      }
+    }
+
     const toggleExpandAllMenus = () => {
       const table = menuTableRef.value
       if (!table) return
@@ -842,6 +850,7 @@ export default {
       menuDialog,
       menusExpanded,
       toggleExpandAllMenus,
+      handleRowClick,
       expandedModules,
       isAllExpanded,
       toggleExpandAll,
