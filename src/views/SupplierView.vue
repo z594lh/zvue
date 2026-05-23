@@ -65,6 +65,17 @@
             <span style="font-weight:600;color:#1a1a2e;">{{ scope.row.name }}</span>
           </template>
         </el-table-column>
+        <el-table-column prop="shop_address" label="店铺地址" min-width="160" show-overflow-tooltip>
+          <template #default="scope">
+            <a
+              v-if="scope.row.shop_address"
+              :href="scope.row.shop_address"
+              target="_blank"
+              class="shop-link"
+            >{{ scope.row.shop_address }}</a>
+            <span v-else style="color:#888;font-size:13px;">—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="contact_person" label="联系人" width="100">
           <template #default="scope">
             <span style="color:#555;">{{ scope.row.contact_person }}</span>
@@ -73,21 +84,6 @@
         <el-table-column prop="phone" label="联系电话" width="130">
           <template #default="scope">
             <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.phone }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip>
-          <template #default="scope">
-            <span style="color:#555;font-size:13px;">{{ scope.row.email }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="address" label="地址" min-width="180" show-overflow-tooltip>
-          <template #default="scope">
-            <span style="color:#888;font-size:13px;">{{ scope.row.address }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="shop_address" label="店铺地址" min-width="160" show-overflow-tooltip>
-          <template #default="scope">
-            <span style="color:#888;font-size:13px;">{{ scope.row.shop_address }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip>
@@ -469,6 +465,15 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.supplier-row:hover) { background-color: #fafbff !important; }
+
+.shop-link {
+  color: #409eff;
+  font-size: 13px;
+  text-decoration: none;
+}
+.shop-link:hover {
+  text-decoration: underline;
+}
 
 /* 分页 */
 .pagination-wrap {
