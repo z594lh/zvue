@@ -50,7 +50,21 @@
 
     <!-- 数据表格 -->
     <div class="table-card">
+      <!-- 批量操作栏 -->
+      <div v-if="selectedRows.length > 0" class="batch-bar">
+        <span class="batch-tip">已选择 <strong>{{ selectedRows.length }}</strong> 项</span>
+        <el-select v-model="batchStatusValue" placeholder="修改状态" style="width: 120px" size="small">
+          <el-option label="启用" :value="1" />
+          <el-option label="禁用" :value="0" />
+        </el-select>
+        <el-button type="primary" size="small" :loading="batchLoading" :disabled="batchStatusValue === ''" @click="handleBatchStatus">
+          批量修改状态
+        </el-button>
+        <el-button size="small" @click="tableRef?.clearSelection?.()">取消选择</el-button>
+      </div>
+
       <el-table
+        ref="tableRef"
         :data="supplierList"
         v-loading="loading"
         style="width: 100%"
@@ -58,7 +72,9 @@
         row-class-name="supplier-row"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="name" label="供应商名称" min-width="160">
           <template #default="scope">
@@ -183,7 +199,8 @@ import {
   getSuppliers,
   createSupplier,
   updateSupplier,
-  deleteSupplier
+  deleteSupplier,
+  batchUpdateSupplierStatus
 } from '@/services/api.js'
 
 export default {
@@ -200,7 +217,11 @@ export default {
     const dialogVisible = ref(false)
     const isEdit = ref(false)
     const formRef = ref(null)
+    const tableRef = ref(null)
     const supplierList = ref([])
+    const selectedRows = ref([])
+    const batchStatusValue = ref('')
+    const batchLoading = ref(false)
 
     const searchForm = reactive({
       keyword: '',
@@ -376,6 +397,42 @@ export default {
       fetchList()
     }
 
+    const handleSelectionChange = (rows) => {
+      selectedRows.value = rows
+    }
+
+    const handleBatchStatus = async () => {
+      if (selectedRows.value.length === 0) {
+        ElMessage.warning('请先选择要操作的记录')
+        return
+      }
+      if (batchStatusValue.value === '') {
+        ElMessage.warning('请选择要修改的状态')
+        return
+      }
+      batchLoading.value = true
+      try {
+        const response = await batchUpdateSupplierStatus({
+          ids: selectedRows.value.map(r => r.id),
+          status: batchStatusValue.value
+        })
+        if (response.data.status === 'success') {
+          ElMessage.success(response.data.message || '批量修改成功')
+          selectedRows.value = []
+          batchStatusValue.value = ''
+          tableRef.value?.clearSelection?.()
+          await fetchList()
+        } else {
+          ElMessage.error(response.data.message || '批量修改失败')
+        }
+      } catch (error) {
+        console.error('批量修改状态失败:', error)
+        ElMessage.error('批量修改失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        batchLoading.value = false
+      }
+    }
+
     onMounted(() => {
       fetchList()
     })
@@ -386,7 +443,11 @@ export default {
       dialogVisible,
       isEdit,
       formRef,
+      tableRef,
       supplierList,
+      selectedRows,
+      batchStatusValue,
+      batchLoading,
       searchForm,
       pagination,
       formData,
@@ -398,7 +459,9 @@ export default {
       handleDelete,
       handleSubmit,
       handlePageChange,
-      handleSizeChange
+      handleSizeChange,
+      handleSelectionChange,
+      handleBatchStatus
     }
   }
 }
@@ -465,6 +528,24 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.supplier-row:hover) { background-color: #fafbff !important; }
+
+/* 批量操作栏 */
+.batch-bar {
+  padding: 10px 16px;
+  background: #f0f5ff;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.batch-tip {
+  color: #555;
+}
+.batch-tip strong {
+  color: #409eff;
+  font-weight: 600;
+}
 
 .shop-link {
   color: #409eff;

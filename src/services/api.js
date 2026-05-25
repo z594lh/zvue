@@ -585,6 +585,14 @@ export const deleteSupplier = (id) => {
   return api.delete(`/suppliers/${id}`);
 };
 
+/**
+ * 批量修改供应商状态
+ * @param {Object} data {ids: number[], status: number}
+ */
+export const batchUpdateSupplierStatus = (data) => {
+  return api.put('/suppliers/batch-status', data);
+};
+
 // ==================== 进货单管理相关接口 ====================
 
 /**
@@ -626,6 +634,14 @@ export const updatePurchaseOrder = (id, data) => {
  */
 export const deletePurchaseOrder = (id) => {
   return api.delete(`/purchase-orders/${id}`);
+};
+
+/**
+ * 批量修改进货单状态
+ * @param {Object} data {ids: number[], status: number}
+ */
+export const batchUpdatePurchaseOrderStatus = (data) => {
+  return api.put('/purchase-orders/batch-status', data);
 };
 
 // ==================== 产品管理相关接口 ====================
@@ -817,6 +833,14 @@ export const updateLogisticsProvider = (id, data) => {
  */
 export const deleteLogisticsProvider = (id) => {
   return api.delete(`/logistics-providers/${id}`);
+};
+
+/**
+ * 批量修改货代状态
+ * @param {Object} data {ids: number[], status: number}
+ */
+export const batchUpdateLogisticsProviderStatus = (data) => {
+  return api.put('/logistics-providers/batch-status', data);
 };
 
 // ==================== Amazon Listing 管理相关接口 ====================
@@ -1221,6 +1245,14 @@ export const importLogisticsWaybills = (formData) => {
   return api.post('/logistics-waybills/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
+};
+
+/**
+ * 批量修改运单状态
+ * @param {Object} data {ids: number[], status: number}
+ */
+export const batchUpdateLogisticsWaybillStatus = (data) => {
+  return api.put('/logistics-waybills/batch-status', data);
 };
 
 /**

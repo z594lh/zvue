@@ -85,7 +85,25 @@
 
     <!-- 数据表格 -->
     <div class="table-card">
+      <!-- 批量操作栏 -->
+      <div v-if="selectedRows.length > 0" class="batch-bar">
+        <span class="batch-tip">已选择 <strong>{{ selectedRows.length }}</strong> 项</span>
+        <el-select v-model="batchStatusValue" placeholder="修改状态" style="width: 130px" size="small">
+          <el-option label="待发货" :value="0" />
+          <el-option label="运输中" :value="1" />
+          <el-option label="已到港" :value="2" />
+          <el-option label="已清关" :value="3" />
+          <el-option label="已入仓" :value="4" />
+          <el-option label="已完成" :value="5" />
+        </el-select>
+        <el-button type="primary" size="small" :loading="batchLoading" :disabled="batchStatusValue === ''" @click="handleBatchStatus">
+          批量修改状态
+        </el-button>
+        <el-button size="small" @click="tableRef?.clearSelection?.()">取消选择</el-button>
+      </div>
+
       <el-table
+        ref="tableRef"
         :data="waybillList"
         v-loading="loading"
         style="width: 100%"
@@ -93,7 +111,9 @@
         row-class-name="waybill-row"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="waybill_no" label="运单号" width="150">
           <template #default="scope">
@@ -108,6 +128,13 @@
         <el-table-column prop="shipment_id" label="亚马逊货件" width="150" show-overflow-tooltip>
           <template #default="scope">
             <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.shipment_id }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="90" align="center">
+          <template #default="scope">
+            <el-tag :type="getStatusType(scope.row.status)" size="small" effect="dark" round>
+              {{ getStatusText(scope.row.status) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="transport_type" label="运输方式" width="90" align="center">
@@ -154,13 +181,6 @@
         <el-table-column prop="destination_port" label="目的港" width="100">
           <template #default="scope">
             <span style="color:#888;font-size:13px;">{{ scope.row.destination_port }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" align="center">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)" size="small" effect="dark" round>
-              {{ getStatusText(scope.row.status) }}
-            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="ship_date" label="发货日期" width="110" align="center">
@@ -536,6 +556,7 @@ import {
   createLogisticsWaybill,
   updateLogisticsWaybill,
   deleteLogisticsWaybill,
+  batchUpdateLogisticsWaybillStatus,
   getAvailableShipments,
   importLogisticsWaybills
 } from '@/services/api.js'
@@ -557,7 +578,11 @@ export default {
     const importLoading = ref(false)
     const isEdit = ref(false)
     const formRef = ref(null)
+    const tableRef = ref(null)
     const waybillList = ref([])
+    const selectedRows = ref([])
+    const batchStatusValue = ref('')
+    const batchLoading = ref(false)
     const providerOptions = ref([])
     const shipmentOptions = ref([])
     const importProviderId = ref(null)
@@ -886,6 +911,42 @@ export default {
       fetchList()
     }
 
+    const handleSelectionChange = (rows) => {
+      selectedRows.value = rows
+    }
+
+    const handleBatchStatus = async () => {
+      if (selectedRows.value.length === 0) {
+        ElMessage.warning('请先选择要操作的记录')
+        return
+      }
+      if (batchStatusValue.value === '') {
+        ElMessage.warning('请选择要修改的状态')
+        return
+      }
+      batchLoading.value = true
+      try {
+        const response = await batchUpdateLogisticsWaybillStatus({
+          ids: selectedRows.value.map(r => r.id),
+          status: batchStatusValue.value
+        })
+        if (response.data.status === 'success') {
+          ElMessage.success(response.data.message || '批量修改成功')
+          selectedRows.value = []
+          batchStatusValue.value = ''
+          tableRef.value?.clearSelection?.()
+          await fetchList()
+        } else {
+          ElMessage.error(response.data.message || '批量修改失败')
+        }
+      } catch (error) {
+        console.error('批量修改状态失败:', error)
+        ElMessage.error('批量修改失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        batchLoading.value = false
+      }
+    }
+
     const formatAmount = (val) => {
       if (val == null) return '-'
       return '¥ ' + Number(val).toFixed(2)
@@ -920,8 +981,12 @@ export default {
       importLoading,
       isEdit,
       formRef,
+      tableRef,
       uploadRef,
       waybillList,
+      selectedRows,
+      batchStatusValue,
+      batchLoading,
       providerOptions,
       shipmentOptions,
       searchForm,
@@ -941,6 +1006,8 @@ export default {
       submitImport,
       handlePageChange,
       handleSizeChange,
+      handleSelectionChange,
+      handleBatchStatus,
       formatAmount,
       getTransportTypeText,
       getStatusType,
@@ -1012,6 +1079,24 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.waybill-row:hover) { background-color: #fafbff !important; }
+
+/* 批量操作栏 */
+.batch-bar {
+  padding: 10px 16px;
+  background: #f0f5ff;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.batch-tip {
+  color: #555;
+}
+.batch-tip strong {
+  color: #409eff;
+  font-weight: 600;
+}
 
 .qty-total { color: #1a1a2e; font-weight: 700; font-size: 14px; }
 .amount-total { color: #f59e0b; font-weight: 700; font-size: 14px; }
