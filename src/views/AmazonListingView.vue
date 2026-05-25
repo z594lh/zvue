@@ -150,7 +150,15 @@
 
         <el-table-column prop="asin" label="ASIN" width="120" show-overflow-tooltip>
           <template #default="scope">
-            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
+            <a
+              v-if="scope.row.asin && scope.row.marketplace_id"
+              :href="`https://${getMarketplaceDomain(scope.row.marketplace_id)}/dp/${scope.row.asin}`"
+              target="_blank"
+              class="asin-link"
+            >
+              {{ scope.row.asin }}
+            </a>
+            <span v-else style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
           </template>
         </el-table-column>
 
@@ -706,6 +714,33 @@ export default {
       }
     }
 
+    // marketplace_id 对应亚马逊域名
+    const getMarketplaceDomain = (marketplaceId) => {
+      const domainMap = {
+        'ATVPDKIKX0DER': 'amazon.com',
+        'A2EUQ1WTGCTBG2': 'amazon.ca',
+        'A1AM78C64UM0Y8': 'amazon.com.mx',
+        'A2Q3Y263D00KWC': 'amazon.com.br',
+        'A2VIGQ35RCS4UG': 'amazon.ae',
+        'A1PA6795UKMFR9': 'amazon.de',
+        'A1RKKUPIHCS9HS': 'amazon.es',
+        'A13V1IB3VIYZZH': 'amazon.fr',
+        'APJ6JRA9NG5U4': 'amazon.it',
+        'A1F83G8C2ARO7P': 'amazon.co.uk',
+        'A21TJRUUN4KGV': 'amazon.in',
+        'A17E79C6D8DWNP': 'amazon.sa',
+        'A33AVAJ2PDY3EV': 'amazon.com.tr',
+        'A19VAU5U5O7RUS': 'amazon.sg',
+        'A39IBJ37TRP1C6': 'amazon.co.jp',
+        'A3H6HPSLHAK3XG': 'amazon.com.au',
+        'A1805IZSGTT6HS': 'amazon.eg',
+        'A2NODRKZP88ZB9': 'amazon.se',
+        'A1C3SOZRARQ6R3': 'amazon.pl',
+        'A1ZFFQZ3HTUKT9': 'amazon.be'
+      }
+      return domainMap[marketplaceId] || 'amazon.com'
+    }
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -742,6 +777,7 @@ export default {
       getShopName,
       formatDate,
       formatJson,
+      getMarketplaceDomain,
       getStatusList,
       getSingleStatusType,
       getSingleStatusText
@@ -811,6 +847,18 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.listing-row:hover) { background-color: #fafbff !important; }
+
+/* ASIN 链接 */
+.asin-link {
+  font-family: monospace;
+  font-size: 12px;
+  color: #409eff;
+  text-decoration: none;
+}
+.asin-link:hover {
+  text-decoration: underline;
+  color: #66b1ff;
+}
 
 /* 小图 */
 .product-thumb-small {
