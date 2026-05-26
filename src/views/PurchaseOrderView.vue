@@ -330,7 +330,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, DocumentChecked } from '@element-plus/icons-vue'
 import {
@@ -366,7 +366,13 @@ export default {
     const supplierOptions = ref([])
     const productOptions = ref([])
 
-    const route = useRoute()
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
+      page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
+      keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v },
+      supplier_id: { get: () => searchForm.supplier_id, set: v => searchForm.supplier_id = v ? Number(v) : null, type: 'number' },
+      status: { get: () => searchForm.status, set: v => searchForm.status = v }
+    })
 
     const searchForm = reactive({
       keyword: '',
@@ -453,6 +459,7 @@ export default {
     }
 
     const fetchList = async () => {
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -705,9 +712,7 @@ export default {
     }
 
     onMounted(() => {
-      if (route.query.keyword) {
-        searchForm.keyword = String(route.query.keyword)
-      }
+      initFromQuery()
       fetchSupplierOptions()
       fetchList()
     })

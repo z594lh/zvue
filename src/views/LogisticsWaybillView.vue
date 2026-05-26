@@ -548,7 +548,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, MapLocation, UploadFilled } from '@element-plus/icons-vue'
 import {
@@ -590,7 +590,14 @@ export default {
     const importFile = ref(null)
     const uploadRef = ref(null)
 
-    const route = useRoute()
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
+      page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
+      waybill_no: { get: () => searchForm.waybill_no, set: v => searchForm.waybill_no = v },
+      provider_id: { get: () => searchForm.provider_id, set: v => searchForm.provider_id = v ? Number(v) : null, type: 'number' },
+      transport_type: { get: () => searchForm.transport_type, set: v => searchForm.transport_type = v },
+      status: { get: () => searchForm.status, set: v => searchForm.status = v }
+    })
 
     const searchForm = reactive({
       waybill_no: '',
@@ -669,6 +676,7 @@ export default {
     }
 
     const fetchList = async () => {
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -971,9 +979,7 @@ export default {
     }
 
     onMounted(() => {
-      if (route.query.waybill_no) {
-        searchForm.waybill_no = String(route.query.waybill_no)
-      }
+      initFromQuery()
       fetchProviderOptions()
       fetchShipmentOptions()
       fetchList()

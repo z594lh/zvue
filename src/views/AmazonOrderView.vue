@@ -376,6 +376,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, RefreshRight, View, ShoppingCart } from '@element-plus/icons-vue'
 import {
@@ -420,6 +421,16 @@ export default {
       total: 0
     })
 
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
+      page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
+      order_status: { get: () => searchForm.order_status, set: v => searchForm.order_status = v },
+      amazon_order_id: { get: () => searchForm.amazon_order_id, set: v => searchForm.amazon_order_id = v },
+      buyer_name: { get: () => searchForm.buyer_name, set: v => searchForm.buyer_name = v },
+      purchase_date_from: { get: () => dateRange.value?.[0] || '', set: v => { if (!dateRange.value) dateRange.value = [null, null]; dateRange.value[0] = v || null } },
+      purchase_date_to: { get: () => dateRange.value?.[1] || '', set: v => { if (!dateRange.value) dateRange.value = [null, null]; dateRange.value[1] = v || null } }
+    })
+
     // 详情对话框
     const detailDialogVisible = ref(false)
     const detailLoading = ref(false)
@@ -433,6 +444,7 @@ export default {
         return
       }
 
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -679,6 +691,7 @@ export default {
       if (shopList.value.length > 0) {
         selectedShopId.value = defaultShopId()
       }
+      initFromQuery()
       fetchOrders()
     })
 

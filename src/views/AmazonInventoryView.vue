@@ -309,6 +309,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, RefreshRight, Box } from '@element-plus/icons-vue'
 import { getAmazonInventory, syncAmazonInventory } from '@/services/api.js'
@@ -344,6 +345,13 @@ export default {
       total: 0
     })
 
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
+      page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
+      seller_sku: { get: () => searchForm.seller_sku, set: v => searchForm.seller_sku = v },
+      asin: { get: () => searchForm.asin, set: v => searchForm.asin = v }
+    })
+
     // 详情对话框
     const detailDialogVisible = ref(false)
     const currentItem = ref(null)
@@ -355,6 +363,7 @@ export default {
         return
       }
 
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -504,6 +513,7 @@ export default {
       if (shopList.value.length > 0) {
         selectedShopId.value = defaultShopId()
       }
+      initFromQuery()
       fetchInventory()
     })
 

@@ -419,6 +419,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, RefreshRight, View, Goods, Picture } from '@element-plus/icons-vue'
 import {
@@ -464,6 +465,17 @@ export default {
       total: 0
     })
 
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
+      page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
+      sku: { get: () => searchForm.sku, set: v => searchForm.sku = v },
+      asin: { get: () => searchForm.asin, set: v => searchForm.asin = v },
+      product_type: { get: () => searchForm.product_type, set: v => searchForm.product_type = v },
+      status: { get: () => searchForm.status, set: v => searchForm.status = v },
+      parent_sku: { get: () => searchForm.parent_sku, set: v => searchForm.parent_sku = v },
+      keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v }
+    })
+
     // 详情对话框
     const detailDialogVisible = ref(false)
     const detailLoading = ref(false)
@@ -478,6 +490,7 @@ export default {
         return
       }
 
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -746,6 +759,7 @@ export default {
       if (shopList.value.length > 0) {
         selectedShopId.value = defaultShopId()
       }
+      initFromQuery()
       fetchListings()
     })
 

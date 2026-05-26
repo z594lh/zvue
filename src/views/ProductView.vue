@@ -409,6 +409,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Goods } from '@element-plus/icons-vue'
 import {
@@ -445,6 +446,14 @@ export default {
       keyword: '',
       status: '',
       category_id: ''
+    })
+
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
+      page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
+      keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v },
+      status: { get: () => searchForm.status, set: v => searchForm.status = v },
+      category_id: { get: () => searchForm.category_id, set: v => searchForm.category_id = v ? Number(v) : '', type: 'number' }
     })
 
     const pagination = reactive({
@@ -507,6 +516,7 @@ export default {
     }
 
     const fetchList = async () => {
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -767,6 +777,7 @@ export default {
     }
 
     onMounted(() => {
+      initFromQuery()
       fetchList()
       fetchCategories()
     })

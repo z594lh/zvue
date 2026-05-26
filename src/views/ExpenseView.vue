@@ -328,6 +328,7 @@ import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getExpenseList, createExpense, updateExpense, deleteExpense, toggleReimburseStatus, getExpenseLogs, getExpenseUsers } from '@/services/api.js'
+import { useListQuerySync } from '@/composables/useListQuerySync.js'
 
 const categories = [
   { label: '采购/货值（进货、备货、头程前的货款）', value: '采购/货值', color: '#e74c3c' },
@@ -358,6 +359,7 @@ export default {
     const submitting = ref(false)
     const exporting = ref(false)
     const records = ref([])
+    const total = ref(0)
     const dialogVisible = ref(false)
     const isEdit = ref(false)
     const formRef = ref(null)
@@ -422,6 +424,17 @@ export default {
       return false
     }
 
+    // 分页/筛选状态与 URL query 双向同步
+    const { initFromQuery, syncQuery } = useListQuerySync({
+      page: { get: () => currentPage.value, set: v => currentPage.value = v, type: 'number', default: 1 },
+      page_size: { get: () => pageSize.value, set: v => pageSize.value = v, type: 'number', default: 20 },
+      month: { get: () => filterMonth.value, set: v => filterMonth.value = v },
+      category: { get: () => filterCategory.value, set: v => filterCategory.value = v },
+      account_type: { get: () => filterAccountType.value, set: v => filterAccountType.value = v },
+      reimbursed: { get: () => filterReimbursed.value, set: v => filterReimbursed.value = v },
+      created_by: { get: () => filterCreatedBy.value, set: v => filterCreatedBy.value = v, type: 'number' }
+    })
+
     // 统一后端数据字段名（兼容 camelCase / snake_case）
     const normalizeRecord = (row) => {
       // 后端返回的 date 可能是 HTTP 格式（如 "Tue, 21 Apr 2026 00:00:00 GMT"），统一转为 YYYY-MM-DD
@@ -451,6 +464,7 @@ export default {
 
     // 从后端获取支出列表
     const fetchRecords = async () => {
+      syncQuery()
       loading.value = true
       try {
         const params = {
@@ -467,9 +481,11 @@ export default {
         if (res.data.status === 'success') {
           const list = res.data.data.list || []
           records.value = list.map(normalizeRecord)
+          total.value = res.data.data.total || 0
           console.log('[ExpenseView] fetchRecords:', list)
         } else {
           records.value = []
+          total.value = 0
         }
       } catch (err) {
         handleApiError(err)
@@ -543,7 +559,7 @@ export default {
 
     // 获取总记录数（用于分页）
     const totalRecords = computed(() => {
-      return records.value.length
+      return total.value
     })
 
     // 筛选后的记录（后端分页）
@@ -895,6 +911,7 @@ export default {
     })
 
     onMounted(() => {
+      initFromQuery()
       fetchRecords()
       fetchUsers()
     })
@@ -919,6 +936,7 @@ export default {
       usersList,
       currentPage,
       pageSize,
+      total,
       totalRecords,
       filteredRecords,
       companyMonthTotal,
