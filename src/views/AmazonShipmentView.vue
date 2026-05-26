@@ -83,6 +83,7 @@
           style="width: 130px"
         >
           <el-option label="全部" value="" />
+          <el-option label="待发货" value="READY_TO_SHIP" />
           <el-option label="处理中" value="WORKING" />
           <el-option label="已发货" value="SHIPPED" />
           <el-option label="接收中" value="RECEIVING" />
@@ -889,6 +890,7 @@ export default {
     // 状态样式
     const getStatusType = (status) => {
       const typeMap = {
+        'READY_TO_SHIP': 'primary',
         'WORKING': 'warning',
         'SHIPPED': 'info',
         'RECEIVING': 'success',
@@ -901,6 +903,7 @@ export default {
 
     const getStatusText = (status) => {
       const textMap = {
+        'READY_TO_SHIP': '待发货',
         'WORKING': '处理中',
         'SHIPPED': '已发货',
         'RECEIVING': '接收中',
