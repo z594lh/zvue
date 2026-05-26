@@ -91,29 +91,55 @@
       empty-text="暂无记录"
       v-loading="loading"
     >
-      <el-table-column prop="date" label="日期" width="115" sortable />
-      <el-table-column label="账目" width="90" align="center">
+      <el-table-column prop="date" label="日期" width="105" sortable />
+      <el-table-column label="账目" width="80" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.account_type === 'company' ? 'danger' : 'primary'" size="small" effect="dark">
             {{ scope.row.account_type === 'company' ? '公账' : '私账' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="category" label="分类" width="100">
+      <el-table-column prop="category" label="分类" width="90">
         <template #default="scope">
           <el-tag :color="getCategoryColor(scope.row.category)" effect="dark" size="small">
             {{ scope.row.category }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="amount" label="金额" width="110" sortable>
+      <el-table-column label="来源" width="85" align="center">
+        <template #default="scope">
+          <el-tag v-if="scope.row.source_type === 'purchase_order'" type="warning" size="small" effect="light">采购单</el-tag>
+          <el-tag v-else-if="scope.row.source_type === 'logistics_waybill'" type="success" size="small" effect="light">物流运单</el-tag>
+          <span v-else style="color: #bbb; font-size: 12px;">—</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="单号" width="130">
+        <template #default="scope">
+          <el-button
+            v-if="scope.row.source_type === 'purchase_order'"
+            link
+            type="primary"
+            size="small"
+            @click="router.push({ path: '/purchase-orders', query: { keyword: scope.row.source_no } })"
+          >{{ scope.row.source_no }}</el-button>
+          <el-button
+            v-else-if="scope.row.source_type === 'logistics_waybill'"
+            link
+            type="primary"
+            size="small"
+            @click="router.push({ path: '/logistics-waybills', query: { waybill_no: scope.row.source_no } })"
+          >{{ scope.row.source_no }}</el-button>
+          <span v-else style="color: #bbb; font-size: 12px;">—</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="amount" label="金额" width="105" sortable>
         <template #default="scope">
           <span style="color: #e74c3c; font-weight: 600;">¥{{ formatNumber(scope.row.amount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="created_by_name" label="创建人" width="90" align="center" />
-      <el-table-column label="报销" width="80" align="center">
+      <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="created_by_name" label="创建人" width="80" align="center" />
+      <el-table-column label="报销" width="75" align="center">
         <template #default="scope">
           <template v-if="scope.row.account_type === 'personal'">
             <el-button
@@ -134,7 +160,7 @@
           <span v-else style="color: #ccc;">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="发票" width="80" align="center">
+      <el-table-column label="发票" width="75" align="center">
         <template #default="scope">
           <div v-if="scope.row.invoice_url" class="invoice-thumb" @click="previewInvoice(scope.row.invoice_url)">
             <img :src="scope.row.invoice_url" />
@@ -142,7 +168,7 @@
           <el-tag v-else type="info" size="small">无</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="150" fixed="right">
         <template #default="scope">
           <el-button link type="primary" size="small" @click="editRecord(scope.row)">编辑</el-button>
           <el-button link type="danger" size="small" @click="deleteRecord(scope.row)">删除</el-button>
@@ -215,6 +241,13 @@
             :rows="2"
             placeholder="请输入备注信息"
           />
+        </el-form-item>
+        <el-form-item v-if="form.source_type" label="数据来源">
+          <div style="color: #e6a23c; font-size: 13px;">
+            <span v-if="form.source_type === 'purchase_order'">采购单 {{ form.source_no }}（系统导入）</span>
+            <span v-else-if="form.source_type === 'logistics_waybill'">物流运单 {{ form.source_no }}（系统导入）</span>
+            <span v-else>{{ form.source_type }} {{ form.source_no }}（系统导入）</span>
+          </div>
         </el-form-item>
         <el-form-item v-if="form.account_type === 'personal'" label="报销状态">
           <el-checkbox v-model="form.reimbursed">已报销</el-checkbox>
@@ -410,7 +443,9 @@ export default {
         has_invoice: !!(row.has_invoice ?? row.hasInvoice ?? false),
         invoice_url: row.invoice_url || row.invoiceUrl || row.invoice_image || row.invoiceImage || '',
         created_by_name: row.created_by_name || '',
-        updated_by_name: row.updated_by_name || ''
+        updated_by_name: row.updated_by_name || '',
+        source_type: row.source_type || '',
+        source_no: row.source_no || ''
       }
     }
 
@@ -466,11 +501,13 @@ export default {
           return
         }
 
-        const headers = ['日期', '账目类型', '分类', '金额', '备注', '报销状态', '发票', '发票链接', '创建人']
+        const headers = ['日期', '账目类型', '分类', '来源类型', '来源单号', '金额', '备注', '报销状态', '发票', '发票链接', '创建人']
         const rows = list.map(r => [
           r.date,
           r.account_type === 'company' ? '公账' : '私账',
           r.category,
+          r.source_type === 'purchase_order' ? '采购单' : (r.source_type === 'logistics_waybill' ? '物流运单' : ''),
+          r.source_no || '',
           r.amount,
           r.remark || '',
           r.account_type === 'personal' ? (r.reimbursed ? '已报销' : '未报销') : '—',
@@ -629,8 +666,14 @@ export default {
     // 删除记录
     const deleteRecord = async (row) => {
       try {
+        let msg = `确定删除 ${row.date} 的 ${row.category} 支出 ¥${row.amount} 吗？`
+        if (row.source_type === 'purchase_order') {
+          msg += `\n\n⚠️ 该记录由采购单 ${row.source_no} 自动导入，删除后将失去关联。`
+        } else if (row.source_type === 'logistics_waybill') {
+          msg += `\n\n⚠️ 该记录由物流运单 ${row.source_no} 自动导入，删除后将失去关联。`
+        }
         await ElMessageBox.confirm(
-          `确定删除 ${row.date} 的 ${row.category} 支出 ¥${row.amount} 吗？`,
+          msg,
           '确认删除',
           { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
         )
@@ -771,7 +814,9 @@ export default {
       created_by: '创建人',
       updated_by: '修改人',
       created_by_name: '创建人',
-      updated_by_name: '修改人'
+      updated_by_name: '修改人',
+      source_type: '来源类型',
+      source_no: '来源单号'
     }
 
     // 日志字段值友好展示
@@ -907,7 +952,8 @@ export default {
       fetchRecords,
       fetchUsers,
       exportData,
-      Plus
+      Plus,
+      router
     }
   }
 }
@@ -915,7 +961,7 @@ export default {
 
 <style scoped>
 .expense-page {
-  max-width: 1200px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 24px;
   overflow-x: hidden;

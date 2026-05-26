@@ -330,6 +330,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, DocumentChecked } from '@element-plus/icons-vue'
 import {
@@ -364,6 +365,8 @@ export default {
     const batchLoading = ref(false)
     const supplierOptions = ref([])
     const productOptions = ref([])
+
+    const route = useRoute()
 
     const searchForm = reactive({
       keyword: '',
@@ -702,6 +705,9 @@ export default {
     }
 
     onMounted(() => {
+      if (route.query.keyword) {
+        searchForm.keyword = String(route.query.keyword)
+      }
       fetchSupplierOptions()
       fetchList()
     })

@@ -548,6 +548,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, MapLocation, UploadFilled } from '@element-plus/icons-vue'
 import {
@@ -588,6 +589,8 @@ export default {
     const importProviderId = ref(null)
     const importFile = ref(null)
     const uploadRef = ref(null)
+
+    const route = useRoute()
 
     const searchForm = reactive({
       waybill_no: '',
@@ -968,6 +971,9 @@ export default {
     }
 
     onMounted(() => {
+      if (route.query.waybill_no) {
+        searchForm.waybill_no = String(route.query.waybill_no)
+      }
       fetchProviderOptions()
       fetchShipmentOptions()
       fetchList()
