@@ -302,23 +302,6 @@ export const generateFbaLabel = (data) => {
 // ==================== 亚马逊货件管理相关接口 ====================
 
 /**
- * 获取亚马逊货件列表
- * @param {Object} params {page, page_size, status, destination_fc}
- */
-export const getAmazonShipments = (params = {}) => {
-  return api.get('/amazon/shipments', { params });
-};
-
-/**
- * 获取货件商品列表
- * @param {string} shipment_id 货件ID
- * @param {Object} params {page, page_size}
- */
-export const getAmazonShipmentItems = (shipment_id, params = {}) => {
-  return api.get(`/amazon/shipments/${shipment_id}/items`, { params });
-};
-
-/**
  * 获取亚马逊货件箱唛标签 PDF
  * @param {string} shipment_id 货件ID
  * @param {number} shop_id 店铺ID（必填）
@@ -346,37 +329,6 @@ export const exportAmazonShipmentInvoice = (shipment_id, shop_id) => {
   });
 };
 
-/**
- * 一键同步所有数据
- */
-export const syncAmazonAll = () => {
-  return api.post('/amazon/sync/all');
-};
-
-/**
- * 同步货件数据
- * @param {Object} data {status_list, last_update_after}
- */
-export const syncAmazonShipments = (data = {}) => {
-  return api.post('/amazon/sync/shipments', data);
-};
-
-/**
- * 同步指定货件的商品数据
- * @param {string} shipment_id 货件ID
- */
-export const syncAmazonShipmentItems = (shipment_id) => {
-  return api.post(`/amazon/sync/shipments/${shipment_id}/items`);
-};
-
-/**
- * 同步入库计划箱子数据
- * @param {string} plan_id 入库计划ID
- * @param {Object} data {shop_id}
- */
-export const syncAmazonInboundPlanBoxes = (plan_id, data = {}) => {
-  return api.post(`/amazon/sync/inbound-plans/${plan_id}/boxes`, data);
-};
 
 /**
  * 获取仓库列表
@@ -386,17 +338,7 @@ export const getAmazonWarehouses = (shop_id) => {
   return api.get('/amazon/warehouses', { params: { shop_id } });
 };
 
-/**
- * 获取亚马逊入库计划箱子列表
- * @param {string} shipment_id 货件编号（必填）
- * @param {number} shop_id 店铺ID（必填）
- * @param {Object} params {page, page_size}
- */
-export const getAmazonInboundPlanBoxes = (shipment_id, shop_id, params = {}) => {
-  return api.get('/amazon/inbound-plan-boxes', {
-    params: { shipment_id, shop_id, ...params }
-  });
-};
+
 
 // ==================== 亚马逊入库计划货件相关接口（新接口）====================
 
@@ -424,6 +366,38 @@ export const syncInboundShipments = (data = {}) => {
 export const getInboundShipmentDetail = (shipment_id, shop_id) => {
   return api.get(`/amazon/inbound-shipments/${shipment_id}/detail`, { params: { shop_id } });
 };
+
+/**
+ * 同步单个货件详情
+ * @param {string} shipment_id 货件ID
+ * @param {number} shop_id 店铺ID
+ */
+export const syncInboundShipmentDetail = (shipment_id, shop_id) => {
+  return api.post(`/amazon/sync/inbound-shipments/${shipment_id}/detail`, { shop_id });
+};
+
+/**
+ * 获取亚马逊入库计划箱子列表
+ * @param {string} shipment_id 货件编号（必填）
+ * @param {number} shop_id 店铺ID（必填）
+ * @param {Object} params {page, page_size}
+ */
+export const getAmazonInboundPlanBoxes = (shipment_id, shop_id, params = {}) => {
+  return api.get('/amazon/inbound-plan-boxes', {
+    params: { shipment_id, shop_id, ...params }
+  });
+};
+
+
+/**
+ * 同步入库计划箱子数据
+ * @param {string} plan_id 入库计划ID
+ * @param {Object} data {shop_id}
+ */
+export const syncAmazonInboundPlanBoxes = (plan_id, data = {}) => {
+  return api.post(`/amazon/sync/inbound-plans/${plan_id}/boxes`, data);
+};
+
 
 // ==================== 亚马逊订单管理相关接口 ====================
 

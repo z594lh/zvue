@@ -209,11 +209,18 @@
     <!-- 货件详情对话框 -->
     <el-dialog
       v-model="detailDialogVisible"
-      :title="`货件详情 - ${currentShipment?.shipment_id}`"
       width="70%"
       :destroy-on-close="true"
       align-center
     >
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <span>{{ `货件详情 - ${currentShipment?.shipment_id}` }}</span>
+          <el-button type="warning" size="small" :loading="detailSyncLoading" @click="syncDetail">
+            <el-icon><RefreshRight /></el-icon> 同步详情
+          </el-button>
+        </div>
+      </template>
       <div v-loading="detailLoading">
         <div v-if="shipmentDetailData" class="shipment-detail">
           <!-- 基础信息 -->
@@ -429,6 +436,7 @@ import {
   getInboundShipments,
   getInboundShipmentDetail,
   syncInboundShipments,
+  syncInboundShipmentDetail,
   getAmazonShipmentLabels,
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
@@ -488,6 +496,7 @@ export default {
     // 详情对话框
     const detailDialogVisible = ref(false)
     const detailLoading = ref(false)
+    const detailSyncLoading = ref(false)
     const currentShipment = ref(null)
     const shipmentDetailData = ref(null)
 
@@ -667,6 +676,26 @@ export default {
         ElMessage.error('获取货件详情失败: ' + (error.response?.data?.message || error.message))
       } finally {
         detailLoading.value = false
+      }
+    }
+
+    // 同步单个货件详情
+    const syncDetail = async () => {
+      if (!currentShipment.value || !selectedShopId.value) return
+      detailSyncLoading.value = true
+      try {
+        const response = await syncInboundShipmentDetail(currentShipment.value.shipment_id, selectedShopId.value)
+        if (response.data.status === 'success') {
+          ElMessage.success('同步成功')
+          await viewShipmentDetail(currentShipment.value)
+        } else {
+          ElMessage.error(response.data.message || '同步失败')
+        }
+      } catch (error) {
+        console.error('同步货件详情失败:', error)
+        ElMessage.error('同步失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        detailSyncLoading.value = false
       }
     }
 
@@ -932,6 +961,7 @@ export default {
       pagination,
       detailDialogVisible,
       detailLoading,
+      detailSyncLoading,
       currentShipment,
       shipmentDetailData,
       syncLoading,
@@ -947,6 +977,7 @@ export default {
       handleSizeChange,
       handleShopChange,
       viewShipmentDetail,
+      syncDetail,
       viewShipmentBoxes,
       printShipmentLabels,
       exportInvoice,
