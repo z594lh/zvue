@@ -150,7 +150,13 @@
             <span v-else style="color:#bbb;">-</span>
           </template>
         </el-table-column>
-        
+
+        <el-table-column prop="box_count" label="箱数" width="80" align="center">
+          <template #default="scope">
+            <span style="font-weight:600;color:#409eff;">{{ scope.row.box_count ?? '-' }}</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="shipment_status" label="状态" width="100" align="center">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.shipment_status)" size="small" effect="dark" round>
