@@ -1369,6 +1369,82 @@ export const setUserDirectPermissions = (id, data) => {
   return api.put(`/users/${id}/permissions`, data);
 };
 
+// ==================== 亚马逊入库计划相关接口 ====================
+
+/**
+ * 获取入库计划列表
+ * @param {Object} params {shop_id, status, created_after, created_before, page, page_size}
+ */
+export const getAmazonInboundPlans = (params = {}) => {
+  return api.get('/amazon/inbound-plans', { params });
+};
+
+// ==================== 箱唛整理任务接口 ====================
+
+/**
+ * 新建箱唛整理任务
+ * @param {Object} data {shop_id, inbound_plan_id, crop_config}
+ */
+/**
+ * 新建箱唛整理任务（multipart/form-data）
+ * @param {FormData} formData 包含 shop_id, inbound_plan_id, crop_config(字符串), cargo_agent_zip(可选)
+ */
+export const createLabelOrganizeTask = (formData) => {
+  return api.post('/fba/organize-plan-labels', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+/**
+ * 获取箱唛整理任务列表
+ * @param {Object} params {shop_id, status, page, page_size}
+ */
+export const getLabelOrganizeTasks = (params = {}) => {
+  return api.get('/fba/organize-plan-labels/tasks', { params });
+};
+
+/**
+ * 获取箱唛整理任务详情
+ * @param {string} taskId 任务ID
+ */
+export const getLabelOrganizeTaskDetail = (taskId) => {
+  return api.get(`/fba/organize-plan-labels/tasks/${taskId}`);
+};
+
+/**
+ * 下载箱唛整理结果 ZIP
+ * @param {string} taskId 任务ID
+ */
+export const downloadLabelOrganizeResult = (taskId) => {
+  return api.get(`/fba/organize-plan-labels/tasks/${taskId}/download`, {
+    responseType: 'blob'
+  });
+};
+
+/**
+ * 删除箱唛整理任务
+ * @param {string} taskId 任务ID
+ */
+export const deleteLabelOrganizeTask = (taskId) => {
+  return api.delete(`/fba/organize-plan-labels/tasks/${taskId}`);
+};
+
+/**
+ * 取消箱唛整理任务
+ * @param {string} taskId 任务ID
+ */
+export const cancelLabelOrganizeTask = (taskId) => {
+  return api.post(`/fba/organize-plan-labels/tasks/${taskId}/cancel`);
+};
+
+/**
+ * 重试箱唛整理任务
+ * @param {string} taskId 任务ID
+ */
+export const retryLabelOrganizeTask = (taskId) => {
+  return api.post(`/fba/organize-plan-labels/tasks/${taskId}/retry`);
+};
+
 // ==================== 菜单管理接口 ====================
 
 /**

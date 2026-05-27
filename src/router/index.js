@@ -7,6 +7,7 @@ import LoginView from '../views/LoginView.vue'
 import ExpenseView from '../views/ExpenseView.vue'
 import PricingView from '../views/PricingView.vue'
 import FbaLabelView from '../views/FbaLabelView.vue'
+import LabelOrganizeView from '../views/LabelOrganizeView.vue'
 import PdfToolsView from '../views/PdfToolsView.vue'
 import AmazonShipmentView from '../views/AmazonShipmentView.vue'
 import AmazonInventoryView from '../views/AmazonInventoryView.vue'
@@ -69,6 +70,11 @@ const routes = [
     path: '/fba-label',
     name: 'FbaLabel',
     component: FbaLabelView
+  },
+  {
+    path: '/label-organize',
+    name: 'LabelOrganize',
+    component: LabelOrganizeView
   },
   {
     path: '/pdf-tools',

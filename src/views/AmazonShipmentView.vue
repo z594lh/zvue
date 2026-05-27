@@ -45,6 +45,15 @@
           <el-option value="__refresh__" label="🔄 刷新店铺列表" />
         </el-select>
         <el-input
+          v-model="searchForm.inbound_plan_id"
+          placeholder="入库计划ID"
+          clearable
+          style="width: 220px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
           v-model="searchForm.shipment_confirmation_id"
           placeholder="货件编号"
           clearable
@@ -127,11 +136,14 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="shipment_id" label="货件ID" width="220" fixed="left">
+        <el-table-column prop="inbound_plan_id" label="入库计划ID" width="260" fixed="left">
           <template #default="scope">
-            <el-button type="primary" text size="small" @click="viewShipmentDetail(scope.row)">
-              {{ scope.row.shipment_id }}
-            </el-button>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-family:monospace;font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ scope.row.inbound_plan_id }}</span>
+              <el-tooltip content="复制" placement="top">
+                <el-icon style="cursor:pointer;color:#909399;flex-shrink:0;" @click="copyText(scope.row.inbound_plan_id)"><DocumentCopy /></el-icon>
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
 
@@ -446,7 +458,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, InfoFilled, Box, Printer, Download, Van } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, InfoFilled, Box, Printer, Download, Van, DocumentCopy } from '@element-plus/icons-vue'
 import {
   getInboundShipments,
   getInboundShipmentDetail,
@@ -470,7 +482,8 @@ export default {
     Box,
     Printer,
     Download,
-    Van
+    Van,
+    DocumentCopy
   },
   setup() {
     const loading = ref(false)
@@ -559,6 +572,9 @@ export default {
           page_size: pagination.page_size
         }
 
+        if (searchForm.inbound_plan_id) {
+          params.inbound_plan_id = searchForm.inbound_plan_id
+        }
         if (searchForm.shipment_confirmation_id) {
           params.shipment_confirmation_id = searchForm.shipment_confirmation_id
         }
@@ -606,6 +622,7 @@ export default {
 
     // 重置搜索
     const resetSearch = () => {
+      searchForm.inbound_plan_id = ''
       searchForm.shipment_confirmation_id = ''
       searchForm.shipment_name = ''
       searchForm.amazon_reference_id = ''
@@ -964,6 +981,26 @@ export default {
       return textMap[status] || status
     }
 
+    // 复制文本到剪贴板
+    const copyText = async (text) => {
+      if (!text) return
+      try {
+        await navigator.clipboard.writeText(text)
+        ElMessage.success('已复制到剪贴板')
+      } catch (err) {
+        // 降级方案
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+        ElMessage.success('已复制到剪贴板')
+      }
+    }
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -1006,6 +1043,7 @@ export default {
       getStatusType,
       getStatusText,
       getShopName,
+      copyText,
       parsedDestinationAddress,
       parsedSourceAddress,
       parsedDeliveryWindow,
