@@ -54,6 +54,15 @@
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
         <el-input
+          v-model="searchForm.shipment_name"
+          placeholder="货件名称"
+          clearable
+          style="width: 180px"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-input
           v-model="searchForm.amazon_reference_id"
           placeholder="亚马逊参考号"
           clearable
@@ -477,6 +486,7 @@ export default {
     const searchForm = reactive({
       inbound_plan_id: '',
       shipment_confirmation_id: '',
+      shipment_name: '',
       amazon_reference_id: '',
       destination_warehouse_id: '',
       status: ''
@@ -494,6 +504,7 @@ export default {
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       inbound_plan_id: { get: () => searchForm.inbound_plan_id, set: v => searchForm.inbound_plan_id = v },
       shipment_confirmation_id: { get: () => searchForm.shipment_confirmation_id, set: v => searchForm.shipment_confirmation_id = v },
+      shipment_name: { get: () => searchForm.shipment_name, set: v => searchForm.shipment_name = v },
       amazon_reference_id: { get: () => searchForm.amazon_reference_id, set: v => searchForm.amazon_reference_id = v },
       destination_warehouse_id: { get: () => searchForm.destination_warehouse_id, set: v => searchForm.destination_warehouse_id = v },
       status: { get: () => searchForm.status, set: v => searchForm.status = v }
@@ -551,6 +562,9 @@ export default {
         if (searchForm.shipment_confirmation_id) {
           params.shipment_confirmation_id = searchForm.shipment_confirmation_id
         }
+        if (searchForm.shipment_name) {
+          params.shipment_name = searchForm.shipment_name
+        }
         if (searchForm.amazon_reference_id) {
           params.amazon_reference_id = searchForm.amazon_reference_id
         }
@@ -593,6 +607,7 @@ export default {
     // 重置搜索
     const resetSearch = () => {
       searchForm.shipment_confirmation_id = ''
+      searchForm.shipment_name = ''
       searchForm.amazon_reference_id = ''
       searchForm.destination_warehouse_id = ''
       searchForm.status = ''
