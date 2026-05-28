@@ -82,6 +82,13 @@
           <el-option label="被抑制" value="SUPPRESSED" />
           <el-option label="信息不完整" value="INCOMPLETE" />
         </el-select>
+        <div style="display:flex;align-items:center;white-space:nowrap;">
+          <el-switch
+            v-model="searchForm.has_issues"
+            @change="handleSearch"
+          />
+          <span style="margin-left:6px;font-size:13px;color:#666;">仅看有问题的</span>
+        </div>
         <el-input
           v-model="searchForm.parent_sku"
           placeholder="父 SKU"
@@ -100,6 +107,8 @@
         >
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
+      </div>
+      <div class="filter-actions">
         <el-button type="primary" @click="handleSearch" :loading="loading">
           <el-icon><Search /></el-icon> 搜索
         </el-button>
@@ -116,7 +125,7 @@
         v-loading="loading"
         style="width: 100%"
         height="calc(100vh - 260px)"
-        row-class-name="listing-row"
+        :row-class-name="getRowClassName"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
       >
@@ -140,11 +149,55 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="sku" label="SKU" width="150" show-overflow-tooltip fixed="left">
+        <el-table-column prop="sku" label="SKU" width="160" show-overflow-tooltip fixed="left">
           <template #default="scope">
-            <el-button type="primary" text size="small" @click="viewDetail(scope.row)">
-              {{ scope.row.sku }}
-            </el-button>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <el-button type="primary" text size="small" @click="viewDetail(scope.row)">
+                {{ scope.row.sku }}
+              </el-button>
+              <el-popover
+                v-if="scope.row.issues && scope.row.issues.length > 0"
+                placement="right"
+                trigger="hover"
+                :width="340"
+              >
+                <template #reference>
+                  <el-icon
+                    :size="15"
+                    :color="getIssuesIconColor(scope.row.issues)"
+                    style="cursor:pointer;flex-shrink:0;"
+                  >
+                    <WarningFilled />
+                  </el-icon>
+                </template>
+                <div style="max-height:260px;overflow-y:auto;">
+                  <div
+                    v-for="(issue, idx) in scope.row.issues"
+                    :key="idx"
+                    style="margin-bottom:8px;padding:10px;border-radius:4px;"
+                    :style="{
+                      background: issue.severity === 'ERROR' ? '#fef0f0' : '#fdf6ec',
+                      borderLeft: `3px solid ${issue.severity === 'ERROR' ? '#f56c6c' : '#e6a23c'}`
+                    }"
+                  >
+                    <div style="font-weight:600;font-size:13px;color:#333;margin-bottom:4px;">
+                      {{ issue.issue_code }}
+                      <el-tag
+                        :type="issue.severity === 'ERROR' ? 'danger' : 'warning'"
+                        size="small"
+                        effect="plain"
+                        style="margin-left:6px;"
+                      >
+                        {{ issue.severity }}
+                      </el-tag>
+                    </div>
+                    <div style="font-size:12px;color:#666;line-height:1.5;">
+                      {{ issue.message }}
+                    </div>
+                  </div>
+                </div>
+              </el-popover>
+            </div>
           </template>
         </el-table-column>
 
@@ -421,7 +474,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, View, Goods, Picture } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, View, Goods, Picture, WarningFilled } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
@@ -438,7 +491,8 @@ export default {
     RefreshRight,
     View,
     Goods,
-    Picture
+    Picture,
+    WarningFilled
   },
   setup() {
     const loading = ref(false)
@@ -455,7 +509,8 @@ export default {
       product_type: '',
       status: '',
       parent_sku: '',
-      keyword: ''
+      keyword: '',
+      has_issues: false
     })
 
     // 分页状态
@@ -473,7 +528,8 @@ export default {
       product_type: { get: () => searchForm.product_type, set: v => searchForm.product_type = v },
       status: { get: () => searchForm.status, set: v => searchForm.status = v },
       parent_sku: { get: () => searchForm.parent_sku, set: v => searchForm.parent_sku = v },
-      keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v }
+      keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v },
+      has_issues: { get: () => searchForm.has_issues, set: v => searchForm.has_issues = v, type: 'boolean', default: false }
     })
 
     // 详情对话框
@@ -505,6 +561,7 @@ export default {
         if (searchForm.status) params.status = searchForm.status
         if (searchForm.parent_sku) params.parent_sku = searchForm.parent_sku
         if (searchForm.keyword) params.keyword = searchForm.keyword
+        if (searchForm.has_issues) params.has_issues = '1'
 
         const response = await getAmazonListings(params)
 
@@ -543,6 +600,7 @@ export default {
       searchForm.status = ''
       searchForm.parent_sku = ''
       searchForm.keyword = ''
+      searchForm.has_issues = false
       pagination.page = 1
       pagination.page_size = 20
       fetchListings()
@@ -655,6 +713,22 @@ export default {
       } finally {
         syncToProductLoading.value = null
       }
+    }
+
+    // Issues 图标颜色
+    const getIssuesIconColor = (issues) => {
+      if (!issues || issues.length === 0) return ''
+      if (issues.some(i => i.severity === 'ERROR')) return '#f56c6c'
+      return '#e6a23c'
+    }
+
+    // 行样式：有问题的行高亮
+    const getRowClassName = ({ row }) => {
+      if (row.issues && row.issues.length > 0) {
+        const hasError = row.issues.some(i => i.severity === 'ERROR')
+        return hasError ? 'listing-row has-error' : 'listing-row has-warning'
+      }
+      return 'listing-row'
     }
 
     // 解析状态列表（逗号分隔）
@@ -794,7 +868,9 @@ export default {
       getMarketplaceDomain,
       getStatusList,
       getSingleStatusType,
-      getSingleStatusText
+      getSingleStatusText,
+      getIssuesIconColor,
+      getRowClassName
     }
   }
 }
@@ -839,9 +915,8 @@ export default {
   margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
-  flex-wrap: wrap;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .filter-group {
@@ -849,6 +924,13 @@ export default {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  flex: 1;
+}
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 /* ===== 表格卡片 ===== */
@@ -861,6 +943,28 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.listing-row:hover) { background-color: #fafbff !important; }
+:deep(.listing-row.has-error) { background-color: #fff8f8 !important; }
+:deep(.listing-row.has-warning) { background-color: #fffbf5 !important; }
+:deep(.listing-row.has-error td:first-child),
+:deep(.listing-row.has-warning td:first-child) { position: relative; }
+:deep(.listing-row.has-error td:first-child::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #f56c6c;
+}
+:deep(.listing-row.has-warning td:first-child::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #e6a23c;
+}
 
 /* ASIN 链接 */
 .asin-link {
