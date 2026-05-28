@@ -118,9 +118,9 @@
             <span style="color:#555;font-size:13px;">{{ scope.row.weight_kg }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="category_name" label="分类" width="120" align="center" show-overflow-tooltip>
+        <el-table-column prop="category_id" label="分类" width="120" align="center" show-overflow-tooltip>
           <template #default="scope">
-            <el-tag v-if="scope.row.category_name" size="small" effect="plain" type="info">{{ scope.row.category_name }}</el-tag>
+            <el-tag v-if="getCategoryName(scope.row.category_id)" size="small" effect="plain" type="info">{{ getCategoryName(scope.row.category_id) }}</el-tag>
             <span v-else style="color:#bbb;">-</span>
           </template>
         </el-table-column>
@@ -747,6 +747,12 @@ export default {
       }
     }
 
+    const getCategoryName = (categoryId) => {
+      if (categoryId == null || categoryId === '') return ''
+      const cat = categoryList.value.find(c => c.id === categoryId)
+      return cat ? (cat.category_cn || cat.category) : ''
+    }
+
     const handlePictureCardPreview = (uploadFile) => {
       previewImageUrl.value = uploadFile.url || uploadFile.thumbUrl
       previewVisible.value = true
@@ -804,6 +810,7 @@ export default {
       handleEdit,
       handleDelete,
       handleSubmit,
+      getCategoryName,
       handlePictureCardPreview,
       handlePageChange,
       handleSizeChange
