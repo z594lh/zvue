@@ -90,7 +90,12 @@
 
       <!-- 结果区域 -->
       <div v-if="result" class="result-card">
-        <h3 class="section-title">计算结果</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <h3 class="section-title" style="margin:0;">计算结果</h3>
+          <el-button type="primary" plain size="small" @click="viewCalcTree">
+            <el-icon><View /></el-icon> 查看计算过程
+          </el-button>
+        </div>
 
         <div class="result-highlight">
           <div class="result-item primary">
@@ -141,25 +146,87 @@
         </el-descriptions>
       </div>
     </div>
+
+    <!-- 计算过程弹窗 -->
+    <el-dialog
+      v-model="logsDialogVisible"
+      :title="`计算过程 - ${currentLogSku}`"
+      width="1100px"
+      :destroy-on-close="false"
+      align-center
+    >
+      <div style="max-height:60vh;overflow-y:auto;padding-right:8px;">
+        <el-empty v-if="!treeData.length" description="暂无计算过程数据" />
+        <el-tree
+          v-else
+          :key="treeKey"
+          :data="treeData"
+          :props="{ children: 'children' }"
+          node-key="id"
+          :indent="28"
+          :default-expanded-keys="expandedKeys"
+          style="background:transparent;"
+        >
+          <template #default="{ data }">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;width:100%;white-space:nowrap;overflow:hidden;">
+              <el-tag v-if="data.is_leaf" size="small" type="success" effect="light" style="flex-shrink:0;">叶子</el-tag>
+              <el-tag v-else size="small" type="warning" effect="light" style="flex-shrink:0;">中间</el-tag>
+              <span style="font-weight:600;color:#1a1a2e;flex-shrink:0;min-width:120px;overflow:hidden;text-overflow:ellipsis;" :title="getNodeLabel(data)">
+                {{ getNodeLabel(data) }}
+              </span>
+              <span v-if="data.variable_value != null" style="font-family:monospace;font-size:13px;color:#333;background:#f5f7fa;padding:2px 10px;border-radius:4px;flex-shrink:0;">
+                {{ data.variable_value }}
+              </span>
+              <span v-if="data.formula" style="font-size:12px;color:#409eff;background:#f0f5ff;padding:2px 10px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">
+                {{ translateFormula(data.formula) }}
+              </span>
+              <el-popover
+                v-if="data.is_leaf && data.source_table"
+                placement="top"
+                trigger="hover"
+                :width="420"
+              >
+                <template #reference>
+                  <span style="font-size:12px;color:#67c23a;background:#f0f9eb;padding:2px 10px;border-radius:4px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;max-width:300px;cursor:pointer;">
+                    来源：{{ data.source_table }}.{{ data.source_field }} = {{ data.source_value }}
+                  </span>
+                </template>
+                <pre style="margin:0;font-family:monospace;font-size:12px;line-height:1.6;background:#f8f9fa;padding:10px;border-radius:4px;white-space:pre-wrap;word-break:break-all;color:#333;">{{ buildSourceSql(data) }}</pre>
+              </el-popover>
+            </div>
+          </template>
+        </el-tree>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh } from '@element-plus/icons-vue'
+import { Search, Refresh, View } from '@element-plus/icons-vue'
 import { calculatePricing, getProducts } from '@/services/api.js'
 
 export default {
   name: 'PricingView',
   components: {
     Search,
-    Refresh
+    Refresh,
+    View
   },
   setup() {
     const loading = ref(false)
     const formRef = ref(null)
     const result = ref(null)
+
+    // 计算过程弹窗
+    const logsDialogVisible = ref(false)
+    const logsLoading = ref(false)
+    const currentLogSku = ref('')
+    const treeData = ref([])
+    const varLabelMap = ref({})
+    const expandedKeys = ref([])
+    const treeKey = ref(0)
 
     const formData = reactive({
       seller_sku: '',
@@ -221,6 +288,80 @@ export default {
       return (Number(val) * 100).toFixed(2) + '%'
     }
 
+    const getNodeLabel = (data) => {
+      const candidates = [data.variable_label, data.variableLabel, data.label, data.varLabel]
+      for (const c of candidates) {
+        if (c != null && String(c).trim() !== '') return String(c).trim()
+      }
+      return data.variable_name || '-'
+    }
+
+    // 为节点注入唯一 id（后端 calc_tree 无 id 字段）
+    const injectIds = (nodes, prefix = '') => {
+      nodes.forEach((node, index) => {
+        node.id = prefix ? `${prefix}-${index}` : `root-${index}`
+        if (node.children && node.children.length > 0) {
+          injectIds(node.children, node.id)
+        }
+      })
+    }
+
+    const buildLabelMap = (nodes) => {
+      const map = {}
+      const walk = (list) => {
+        list.forEach(node => {
+          if (node.variable_name) {
+            const label = getNodeLabel(node)
+            if (label && label !== node.variable_name) {
+              map[node.variable_name] = label
+            }
+          }
+          if (node.children && node.children.length > 0) {
+            walk(node.children)
+          }
+        })
+      }
+      walk(nodes)
+      return map
+    }
+
+    const translateFormula = (formula) => {
+      if (!formula || typeof formula !== 'string') return formula
+      const map = varLabelMap.value
+      const names = Object.keys(map).sort((a, b) => b.length - a.length)
+      let result = formula
+      names.forEach(name => {
+        const regex = new RegExp(`\\b${name}\\b`, 'g')
+        result = result.replace(regex, map[name])
+      })
+      return result
+    }
+
+    const buildSourceSql = (data) => {
+      if (!data.source_table || !data.source_field) return ''
+      let sql = `select ${data.source_field}\nfrom ${data.source_table}`
+      if (data.source_condition) {
+        sql += `\n${data.source_condition}`
+      }
+      return sql
+    }
+
+    const viewCalcTree = () => {
+      currentLogSku.value = result.value?.seller_sku || ''
+      const calcTree = result.value?.calc_tree
+      if (calcTree) {
+        const cloned = JSON.parse(JSON.stringify(calcTree))
+        injectIds([cloned])
+        treeData.value = [cloned]
+      } else {
+        treeData.value = []
+      }
+      varLabelMap.value = buildLabelMap(treeData.value)
+      expandedKeys.value = treeData.value.map(node => node.id)
+      treeKey.value++
+      logsDialogVisible.value = true
+    }
+
     const productList = ref([])
 
     const fetchProducts = async () => {
@@ -248,7 +389,18 @@ export default {
       handleCalculate,
       resetForm,
       formatNumber,
-      formatPercent
+      formatPercent,
+      logsDialogVisible,
+      logsLoading,
+      currentLogSku,
+      treeData,
+      varLabelMap,
+      expandedKeys,
+      treeKey,
+      getNodeLabel,
+      translateFormula,
+      buildSourceSql,
+      viewCalcTree
     }
   }
 }
