@@ -183,7 +183,7 @@
               <el-popover
                 v-if="data.is_leaf && data.source_table"
                 placement="top"
-                trigger="hover"
+                trigger="click"
                 :width="420"
               >
                 <template #reference>
