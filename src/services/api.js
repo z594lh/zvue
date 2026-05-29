@@ -926,6 +926,15 @@ export const syncListingToProduct = (sku, shop_id) => {
   return api.post(`/amazon/listings/${sku}/sync-to-product`, { shop_id });
 };
 
+/**
+ * 同步单个 Listing（从 SP-API 拉取最新数据）
+ * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID
+ */
+export const syncAmazonListing = (sku, shop_id) => {
+  return api.post(`/amazon/listings/${sku}/sync`, { shop_id });
+};
+
 // ==================== 选品看板（备货看板）相关接口 ====================
 
 /**

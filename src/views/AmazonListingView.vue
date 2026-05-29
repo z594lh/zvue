@@ -294,9 +294,19 @@
 
         <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="scope">
-            <el-tooltip content="查看详情" placement="top">
+            <el-tooltip content="查看与修改" placement="top">
               <el-button type="primary" link @click="viewDetail(scope.row)">
-                <el-icon><View /></el-icon>
+                <el-icon><Edit /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="同步最新数据" placement="top">
+              <el-button
+                type="warning"
+                link
+                :loading="syncListingLoading === scope.row.sku"
+                @click="syncSingleListing(scope.row.sku)"
+              >
+                <el-icon><RefreshRight /></el-icon>
               </el-button>
             </el-tooltip>
             <el-tooltip content="同步到产品" placement="top">
@@ -306,7 +316,7 @@
                 :loading="syncToProductLoading === scope.row.sku"
                 @click="syncToProduct(scope.row.sku)"
               >
-                <el-icon><RefreshRight /></el-icon>
+                <el-icon><Connection /></el-icon>
               </el-button>
             </el-tooltip>
           </template>
@@ -338,6 +348,21 @@
     >
       <div v-loading="detailLoading">
         <div v-if="listingDetail" class="listing-detail">
+          <el-alert
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-bottom:16px;"
+          >
+            <template #title>
+              提示：可修改 标题、价格、描述、卖点 ，带有 <el-icon style="vertical-align:middle;"><Edit /></el-icon> 图标的均可修改，点击保存后即提交到 Amazon。
+            </template>
+          </el-alert>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <el-button type="warning" size="small" :loading="syncDetailLoading" @click="syncDetail">
+              <el-icon><RefreshRight /></el-icon> 同步最新数据
+            </el-button>
+          </div>
           <!-- 基础信息 -->
           <div class="detail-section">
             <h4>基础信息</h4>
@@ -370,12 +395,36 @@
               <el-descriptions-item label="父 SKU">{{ listingDetail.parent_sku || '-' }}</el-descriptions-item>
               <el-descriptions-item label="品牌">{{ listingDetail.brand || '-' }}</el-descriptions-item>
               <el-descriptions-item label="价格">
-                <span v-if="listingDetail.list_price !== undefined && listingDetail.list_price !== null">
-                  {{ listingDetail.list_price }} {{ listingDetail.list_price_currency || '' }}
-                </span>
-                <span v-else>-</span>
+                <template v-if="editingSection === 'price'">
+                  <el-input-number v-model="editForm.price" :min="0" :precision="2" style="width:150px;" />
+                  <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit" style="margin-left:8px;">保存</el-button>
+                  <el-button size="small" @click="cancelEdit" style="margin-left:8px;">取消</el-button>
+                </template>
+                <template v-else>
+                  <span v-if="listingDetail.list_price !== undefined && listingDetail.list_price !== null">
+                    {{ listingDetail.list_price }} {{ listingDetail.list_price_currency || '' }}
+                  </span>
+                  <span v-else>-</span>
+                  <el-button type="primary" size="small" style="margin-left:8px;" @click="startEdit('price')">
+                    <el-icon><Edit /></el-icon> 编辑
+                  </el-button>
+                </template>
               </el-descriptions-item>
-              <el-descriptions-item label="商品标题" :span="3">{{ listingDetail.item_name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="商品标题" :span="3">
+                <template v-if="editingSection === 'title'">
+                  <el-input v-model="editForm.title" type="textarea" :rows="2" style="flex:1;" />
+                  <div style="display:flex;gap:8px;margin-top:8px;">
+                    <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
+                    <el-button size="small" @click="cancelEdit">取消</el-button>
+                  </div>
+                </template>
+                <template v-else>
+                  <span>{{ listingDetail.item_name || '-' }}</span>
+                  <el-button type="primary" size="small" style="margin-left:8px;" @click="startEdit('title')">
+                    <el-icon><Edit /></el-icon> 编辑
+                  </el-button>
+                </template>
+              </el-descriptions-item>
               <el-descriptions-item label="同步时间">{{ formatDate(listingDetail.sync_time) }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(listingDetail.created_at) }}</el-descriptions-item>
               <el-descriptions-item label="更新时间">{{ formatDate(listingDetail.updated_at) }}</el-descriptions-item>
@@ -383,9 +432,24 @@
           </div>
 
           <!-- 商品描述 -->
-          <div v-if="listingDetail.product_description" class="detail-section">
-            <h4>商品描述</h4>
-            <div class="description-box">{{ listingDetail.product_description }}</div>
+          <div class="detail-section">
+            <div class="section-header">
+              <h4>商品描述</h4>
+              <el-button v-if="editingSection !== 'description'" type="primary" size="small" @click="startEdit('description')">
+                <el-icon><Edit /></el-icon> 编辑
+              </el-button>
+            </div>
+            <template v-if="editingSection === 'description'">
+              <el-input v-model="editForm.description" type="textarea" :rows="5" />
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
+                <el-button size="small" @click="cancelEdit">取消</el-button>
+              </div>
+            </template>
+            <template v-else-if="listingDetail.product_description">
+              <div class="description-box">{{ listingDetail.product_description }}</div>
+            </template>
+            <el-empty v-else description="暂无描述" :image-size="60" />
           </div>
 
           <!-- Issues -->
@@ -402,13 +466,33 @@
           </div>
 
           <!-- Bullet Points -->
-          <div v-if="listingDetail.bullets && listingDetail.bullets.length > 0" class="detail-section">
-            <h4>卖点 ({{ listingDetail.bullets.length }})</h4>
-            <el-table :data="listingDetail.bullets" stripe border size="small" style="width: 100%">
-              <el-table-column type="index" label="序号" width="60" align="center" />
-              <el-table-column prop="content" label="内容" min-width="300" show-overflow-tooltip />
-              <el-table-column prop="language_tag" label="语言" width="100" align="center" />
-            </el-table>
+          <div class="detail-section">
+            <div class="section-header">
+              <h4>卖点{{ listingDetail.bullets?.length ? ` (${listingDetail.bullets.length})` : '' }}</h4>
+              <el-button v-if="editingSection !== 'bullets'" type="primary" size="small" @click="startEdit('bullets')">
+                <el-icon><Edit /></el-icon> 编辑
+              </el-button>
+            </div>
+            <template v-if="editingSection === 'bullets'">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div v-for="(bullet, idx) in editForm.bullets" :key="idx" style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:13px;color:#888;min-width:20px;flex-shrink:0;">{{ idx + 1 }}.</span>
+                  <el-input v-model="editForm.bullets[idx]" :placeholder="`第 ${idx + 1} 点`" maxlength="500" show-word-limit />
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
+                <el-button size="small" @click="cancelEdit">取消</el-button>
+              </div>
+            </template>
+            <template v-else-if="listingDetail.bullets && listingDetail.bullets.length > 0">
+              <el-table :data="listingDetail.bullets" stripe border size="small" style="width: 100%">
+                <el-table-column type="index" label="序号" width="60" align="center" />
+                <el-table-column prop="content" label="内容" min-width="300" show-overflow-tooltip />
+                <el-table-column prop="language_tag" label="语言" width="100" align="center" />
+              </el-table>
+            </template>
+            <el-empty v-else description="暂无卖点" :image-size="60" />
           </div>
 
           <!-- 图片列表 -->
@@ -473,13 +557,15 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
-import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, View, Goods, Picture, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
   syncAmazonListings,
-  syncListingToProduct
+  syncListingToProduct,
+  patchAmazonListing,
+  syncAmazonListing
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -489,10 +575,11 @@ export default {
     Search,
     Refresh,
     RefreshRight,
-    View,
     Goods,
     Picture,
-    WarningFilled
+    WarningFilled,
+    Edit,
+    Connection
   },
   setup() {
     const loading = ref(false)
@@ -536,8 +623,20 @@ export default {
     const detailDialogVisible = ref(false)
     const detailLoading = ref(false)
     const syncToProductLoading = ref(null)
+    const syncListingLoading = ref(null)
+    const syncDetailLoading = ref(false)
     const currentListing = ref(null)
     const listingDetail = ref(null)
+
+    // 编辑状态
+    const editingSection = ref(null)
+    const editSaving = ref(false)
+    const editForm = reactive({
+      title: '',
+      price: 0,
+      description: '',
+      bullets: ['', '', '', '', '']
+    })
 
     // 获取 Listing 列表
     const fetchListings = async () => {
@@ -715,6 +814,156 @@ export default {
       }
     }
 
+    // 同步单个 Listing
+    const syncSingleListing = async (sku) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
+      syncListingLoading.value = sku
+      try {
+        await syncAmazonListing(sku, selectedShopId.value)
+        ElMessage.success(`Listing ${sku} 同步成功`)
+        await fetchListings()
+      } catch (error) {
+        console.error('同步 Listing 失败:', error)
+        ElMessage.error('同步失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        syncListingLoading.value = null
+      }
+    }
+
+    // ===== Listing 编辑方法 =====
+    const startEdit = (section) => {
+      const detail = listingDetail.value
+      if (!detail) return
+
+      if (section === 'title') {
+        editForm.title = typeof detail.item_name === 'string'
+          ? detail.item_name
+          : (detail.item_name?.[0]?.value || '')
+      } else if (section === 'price') {
+        editForm.price = detail.list_price || 0
+      } else if (section === 'description') {
+        editForm.description = typeof detail.product_description === 'string'
+          ? detail.product_description || ''
+          : (detail.product_description?.[0]?.value || '')
+      } else if (section === 'bullets') {
+        const existingBullets = detail.bullets || []
+        for (let i = 0; i < 5; i++) {
+          editForm.bullets[i] = existingBullets[i]?.content || ''
+        }
+      }
+      editingSection.value = section
+    }
+
+    const cancelEdit = () => {
+      editingSection.value = null
+    }
+
+    const saveEdit = async () => {
+      if (!listingDetail.value || !selectedShopId.value) return
+
+      const sku = listingDetail.value.sku
+      const shopId = selectedShopId.value
+      const productType = listingDetail.value.product_type || ''
+
+      let patchValue
+      let patchPath
+      let sectionLabel = ''
+
+      if (editingSection.value === 'title') {
+        patchPath = '/attributes/item_name'
+        patchValue = [{ value: editForm.title, language_tag: 'en_US' }]
+        sectionLabel = '标题'
+      } else if (editingSection.value === 'price') {
+        patchPath = '/attributes/list_price'
+        patchValue = [{ value: Number(editForm.price), currency: 'USD' }]
+        sectionLabel = '价格'
+      } else if (editingSection.value === 'description') {
+        patchPath = '/attributes/product_description'
+        patchValue = [{ value: editForm.description, language_tag: 'en_US' }]
+        sectionLabel = '描述'
+      } else if (editingSection.value === 'bullets') {
+        patchPath = '/attributes/bullet_point'
+        patchValue = editForm.bullets
+          .filter(b => b.trim() !== '')
+          .map(b => ({ value: b, language_tag: 'en_US' }))
+        sectionLabel = '五点描述'
+      } else {
+        return
+      }
+
+      try {
+        await ElMessageBox.confirm(
+          `确认修改 ${listingDetail.value.sku} 的${sectionLabel}并提交到 Amazon？`,
+          '确认修改',
+          { confirmButtonText: '确认提交', cancelButtonText: '取消', type: 'warning' }
+        )
+      } catch {
+        return
+      }
+
+      editSaving.value = true
+      try {
+        const response = await patchAmazonListing(sku, {
+          shop_id: shopId,
+          product_type: productType,
+          patches: [{ op: 'replace', path: patchPath, value: patchValue }]
+        })
+
+        if (response.data.status === 'success' && response.data.data?.status === 'ACCEPTED') {
+          if (editingSection.value === 'title') {
+            listingDetail.value.item_name = editForm.title
+          } else if (editingSection.value === 'price') {
+            listingDetail.value.list_price = Number(editForm.price)
+          } else if (editingSection.value === 'description') {
+            listingDetail.value.product_description = editForm.description
+          } else if (editingSection.value === 'bullets') {
+            listingDetail.value.bullets = editForm.bullets
+              .filter(b => b.trim() !== '')
+              .map((b, i) => ({ content: b, language_tag: 'en_US', sort_order: i + 1 }))
+          }
+          ElMessage.success('修改已提交，Amazon 处理中...')
+          editingSection.value = null
+        } else {
+          const issues = response.data.data?.issues
+          if (issues && issues.length > 0) {
+            ElMessage.warning(issues.map(i => i.message).join('; '))
+          } else {
+            ElMessage.error(response.data.message || '修改失败')
+          }
+        }
+      } catch (error) {
+        console.error('修改 Listing 失败:', error)
+        ElMessage.error('修改失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        editSaving.value = false
+      }
+    }
+
+    const syncDetail = async () => {
+      if (!listingDetail.value || !selectedShopId.value) return
+
+      syncDetailLoading.value = true
+      try {
+        await syncAmazonListing(listingDetail.value.sku, selectedShopId.value)
+        const response = await getAmazonListing(listingDetail.value.sku, selectedShopId.value)
+        if (response.data.status === 'success') {
+          listingDetail.value = response.data.data || null
+          ElMessage.success('同步成功')
+        } else {
+          ElMessage.error(response.data.message || '同步失败')
+        }
+      } catch (error) {
+        console.error('同步 Listing 详情失败:', error)
+        ElMessage.error('同步失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        syncDetailLoading.value = false
+      }
+    }
+
     // Issues 图标颜色
     const getIssuesIconColor = (issues) => {
       if (!issues || issues.length === 0) return ''
@@ -847,6 +1096,10 @@ export default {
       detailLoading,
       syncToProductLoading,
       syncToProduct,
+      syncListingLoading,
+      syncSingleListing,
+      syncDetailLoading,
+      syncDetail,
       currentListing,
       listingDetail,
       shopList,
@@ -870,7 +1123,13 @@ export default {
       getSingleStatusType,
       getSingleStatusText,
       getIssuesIconColor,
-      getRowClassName
+      getRowClassName,
+      editingSection,
+      editSaving,
+      editForm,
+      startEdit,
+      cancelEdit,
+      saveEdit
     }
   }
 }
@@ -1020,6 +1279,16 @@ export default {
   color: #1a1a2e;
   font-size: 16px;
   font-weight: 600;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.section-header h4 {
+  margin-bottom: 0 !important;
 }
 
 .description-box {
