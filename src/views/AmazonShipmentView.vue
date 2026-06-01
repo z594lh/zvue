@@ -210,7 +210,7 @@
               </el-button>
             </el-tooltip>
             <el-tooltip content="导出发票" placement="top">
-              <el-button type="warning" link @click="exportInvoice(scope.row)">
+              <el-button type="warning" link :loading="invoiceExportLoading" @click="exportInvoice(scope.row)">
                 <el-icon><Download /></el-icon>
               </el-button>
             </el-tooltip>
@@ -451,6 +451,37 @@
         <el-empty v-else description="暂无箱子数据" />
       </div>
     </el-dialog>
+
+    <!-- 导出发票货代选择对话框 -->
+    <el-dialog
+      v-model="invoiceDialogVisible"
+      title="选择货代"
+      width="420px"
+      :destroy-on-close="true"
+      align-center
+    >
+      <el-form label-width="80px">
+        <el-form-item label="货代" required>
+          <el-select
+            v-model="invoiceExportProviderId"
+            placeholder="请选择货代"
+            clearable
+            style="width:100%"
+          >
+            <el-option
+              v-for="provider in logisticsProviders"
+              :key="provider.id"
+              :label="provider.name"
+              :value="provider.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="invoiceDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmExportInvoice">确定导出</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -468,7 +499,8 @@ import {
   getAmazonWarehouses,
   getAmazonInboundPlanBoxes,
   syncAmazonInboundPlanBoxes,
-  exportAmazonShipmentInvoice
+  exportAmazonShipmentInvoice,
+  getLogisticsProviders
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -491,6 +523,7 @@ export default {
     const labelsLoading = ref(false)
     const shipments = ref([])
     const warehouses = ref([])
+    const logisticsProviders = ref([])
 
     const { shopList, fetchShopList, refreshShopList, getShopName, defaultShopId } = useShopCache()
     const selectedShopId = ref(null)
@@ -553,6 +586,17 @@ export default {
         }
       } catch (error) {
         console.error('获取仓库列表失败:', error)
+      }
+    }
+
+    const fetchLogisticsProviders = async () => {
+      try {
+        const response = await getLogisticsProviders({ status: 1, page_size: 9999 })
+        if (response.data.status === 'success') {
+          logisticsProviders.value = response.data.data?.list || []
+        }
+      } catch (error) {
+        console.error('获取货代列表失败:', error)
       }
     }
 
@@ -878,13 +922,32 @@ export default {
     }
 
     // 导出发票
-    const exportInvoice = async (shipment) => {
+    const invoiceExportShipment = ref(null)
+    const invoiceExportProviderId = ref(null)
+    const invoiceDialogVisible = ref(false)
+    const invoiceExportLoading = ref(false)
+
+    const exportInvoice = (shipment) => {
       if (!selectedShopId.value) {
         ElMessage.warning('请选择店铺')
         return
       }
+      invoiceExportShipment.value = shipment
+      invoiceExportProviderId.value = null
+      invoiceDialogVisible.value = true
+    }
+
+    const confirmExportInvoice = async () => {
+      if (!invoiceExportProviderId.value) {
+        ElMessage.warning('请选择货代')
+        return
+      }
+      const shipment = invoiceExportShipment.value
+      if (!shipment) return
+      invoiceDialogVisible.value = false
+      invoiceExportLoading.value = true
       try {
-        const response = await exportAmazonShipmentInvoice(shipment.shipment_confirmation_id, selectedShopId.value)
+        const response = await exportAmazonShipmentInvoice(shipment.shipment_confirmation_id, selectedShopId.value, invoiceExportProviderId.value)
         const blob = new Blob([response.data], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         })
@@ -900,6 +963,8 @@ export default {
       } catch (error) {
         console.error('导出发票失败:', error)
         ElMessage.error('导出发票失败')
+      } finally {
+        invoiceExportLoading.value = false
       }
     }
 
@@ -1003,6 +1068,7 @@ export default {
 
     onMounted(async () => {
       await fetchShopList()
+      fetchLogisticsProviders()
       if (shopList.value.length > 0) {
         selectedShopId.value = defaultShopId()
       }
@@ -1026,6 +1092,7 @@ export default {
       labelsLoading,
       shopList,
       selectedShopId,
+      logisticsProviders,
       fetchShipments,
       handleSearch,
       resetSearch,
@@ -1039,6 +1106,10 @@ export default {
       viewShipmentBoxes,
       printShipmentLabels,
       exportInvoice,
+      invoiceDialogVisible,
+      invoiceExportProviderId,
+      invoiceExportLoading,
+      confirmExportInvoice,
       formatDate,
       getStatusType,
       getStatusText,

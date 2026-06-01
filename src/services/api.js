@@ -322,9 +322,13 @@ export const getAmazonShipmentLabels = (shipment_id, shop_id, page_type = 'Packa
  * @param {string} shipment_id 货件ID
  * @param {number} shop_id 店铺ID（必填）
  */
-export const exportAmazonShipmentInvoice = (shipment_id, shop_id) => {
+export const exportAmazonShipmentInvoice = (shipment_id, shop_id, logistics_provider_id = null) => {
+  const params = { shop_id };
+  if (logistics_provider_id) {
+    params.provider_id = logistics_provider_id;
+  }
   return api.get(`/amazon/shipments/${shipment_id}/invoice/export`, {
-    params: { shop_id },
+    params,
     responseType: 'blob'
   });
 };
@@ -1453,6 +1457,38 @@ export const cancelLabelOrganizeTask = (taskId) => {
 export const retryLabelOrganizeTask = (taskId) => {
   return api.post(`/fba/organize-plan-labels/tasks/${taskId}/retry`);
 };
+
+// ==================== 物流发票导出 ====================
+
+export const createInvoiceOrganizeTask = (data) => {
+  return api.post('/amazon/invoices/organize', data)
+}
+
+export const getInvoiceOrganizeTasks = (params = {}) => {
+  return api.get('/amazon/invoices/organize/tasks', { params })
+}
+
+export const getInvoiceOrganizeTaskDetail = (taskId) => {
+  return api.get(`/amazon/invoices/organize/tasks/${taskId}`)
+}
+
+export const downloadInvoiceOrganizeResult = (taskId) => {
+  return api.get(`/amazon/invoices/organize/tasks/${taskId}/download`, {
+    responseType: 'blob'
+  })
+}
+
+export const deleteInvoiceOrganizeTask = (taskId) => {
+  return api.delete(`/amazon/invoices/organize/tasks/${taskId}`)
+}
+
+export const cancelInvoiceOrganizeTask = (taskId) => {
+  return api.post(`/amazon/invoices/organize/tasks/${taskId}/cancel`)
+}
+
+export const retryInvoiceOrganizeTask = (taskId) => {
+  return api.post(`/amazon/invoices/organize/tasks/${taskId}/retry`)
+}
 
 // ==================== 菜单管理接口 ====================
 
