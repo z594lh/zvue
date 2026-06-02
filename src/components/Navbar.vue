@@ -169,6 +169,7 @@ const fallbackNavGroups = [
     children: [
       { label: 'FBA标签', path: '/fba-label' },
       { label: '箱唛助手', path: '/label-organize' },
+      { label: '发票助手', path: '/invoice-export' },
       { label: 'PDF工具', path: '/pdf-tools' }
     ]
   },

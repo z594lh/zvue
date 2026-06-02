@@ -36,6 +36,11 @@
 
     <!-- ========== 经营报表 ========== -->
     <div v-show="activeTab === 'business'" class="tab-content">
+      <!-- data_status 提示 -->
+      <div class="status-hint">
+        <el-icon style="color:#909399;margin-right:6px;"><InfoFilled /></el-icon>
+        Finance 数据有 2-3 天延迟：当天/昨天为"预估"（仅含销售额），约 3 天后自动升级为"已结算"完整数据。
+      </div>
       <!-- 筛选栏 -->
       <div class="filter-bar">
         <el-radio-group v-model="businessFilter.type" @change="handleBusinessTypeChange">
@@ -144,6 +149,13 @@
               {{ scope.row.report_date || scope.row.report_week || scope.row.report_month || '-' }}
             </template>
           </el-table-column>
+          <el-table-column label="数据状态" width="110" align="center">
+            <template #default="scope">
+              <el-tag :type="scope.row.data_status === 'settled' ? 'success' : 'warning'" size="small">
+                {{ scope.row.data_status === 'settled' ? '已结算' : '预估 仅销售额' }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="total_sales" label="销售额" align="right" width="120">
             <template #default="scope">${{ formatNumber(scope.row.total_sales) }}</template>
           </el-table-column>
@@ -165,10 +177,14 @@
             </template>
           </el-table-column>
           <el-table-column prop="platform_fees" label="平台佣金" align="right" width="110">
-            <template #default="scope">${{ formatNumber(scope.row.platform_fees) }}</template>
+            <template #default="scope">
+              <span :class="{ 'text-muted': scope.row.data_status === 'settled' }">${{ formatNumber(scope.row.platform_fees) }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="fba_fees" label="FBA费" align="right" width="110">
-            <template #default="scope">${{ formatNumber(scope.row.fba_fees) }}</template>
+            <template #default="scope">
+              <span :class="{ 'text-muted': scope.row.data_status === 'settled' }">${{ formatNumber(scope.row.fba_fees) }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="ad_cost" label="广告费" align="right" width="110">
             <template #default="scope">${{ formatNumber(scope.row.ad_cost) }}</template>
@@ -527,7 +543,7 @@ import {
   DataLine, Money, Coin, ShoppingCart, Promotion, RefreshLeft, Ship,
   TrendCharts, PieChart, DataAnalysis, List, Search, Download,
   Refresh, Top, Bottom, Histogram, Box, OfficeBuilding, Truck,
-  Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown
+  Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown, InfoFilled
 } from '@element-plus/icons-vue'
 import {
   getShops,
@@ -544,7 +560,7 @@ export default {
     DataLine, Money, Coin, ShoppingCart, Promotion, RefreshLeft, Ship,
     TrendCharts, PieChart, DataAnalysis, List, Search, Download,
     Refresh, Top, Bottom, Histogram, Box, OfficeBuilding, Truck,
-    Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown
+  Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown, InfoFilled
   },
   setup() {
     const activeTab = ref('business')
@@ -861,7 +877,7 @@ export default {
       try {
         const res = await generateYesterdayReports()
         if (res.data.status === 'success') {
-          ElMessage.success(res.data.message || '报表生成完成')
+          ElMessage.success(res.data.message || '报表已生成，当前为预估数据（2-3 天后自动升级为已结算）')
           if (activeTab.value === 'logs') fetchLogs()
         }
       } catch (e) {
@@ -1570,6 +1586,19 @@ export default {
 .text-danger { color: #ef4444; font-weight: 600; }
 .text-error { color: #ef4444; }
 .text-muted { color: #9ca3af; }
+
+.status-hint {
+  display: flex;
+  align-items: flex-start;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
 
 /* 响应式 */
 @media (max-width: 1280px) {
