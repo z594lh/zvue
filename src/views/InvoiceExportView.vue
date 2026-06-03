@@ -46,7 +46,7 @@
                 <el-option
                   v-for="plan in inboundPlans"
                   :key="plan.inbound_plan_id"
-                  :label="(plan.name || plan.inbound_plan_id) + (plan.created_at ? ' | ' + formatDate(plan.created_at) : '')"
+                  :label="plan.inbound_plan_id + (plan.name ? ' - ' + plan.name : '')"
                   :value="plan.inbound_plan_id"
                 />
               </el-select>
@@ -102,7 +102,7 @@
             <el-option
               v-for="plan in inboundPlans"
               :key="plan.inbound_plan_id"
-              :label="(plan.name || plan.inbound_plan_id) + (plan.created_at ? ' | ' + formatDate(plan.created_at) : '')"
+              :label="plan.inbound_plan_id + (plan.name ? ' - ' + plan.name : '')"
               :value="plan.inbound_plan_id"
             />
           </el-select>
@@ -269,8 +269,8 @@ import {
   deleteInvoiceOrganizeTask,
   cancelInvoiceOrganizeTask,
   retryInvoiceOrganizeTask,
-  getAmazonInboundPlans,
-  getLogisticsProviders
+  getInboundPlanOptions,
+  getLogisticsProviderOptions
 } from '@/services/api.js'
 
 export default {
@@ -317,12 +317,9 @@ export default {
       }
       inboundPlansLoading.value = true
       try {
-        const response = await getAmazonInboundPlans({
-          shop_id: taskForm.shop_id,
-          page_size: 100
-        })
+        const response = await getInboundPlanOptions()
         if (response.data.status === 'success') {
-          inboundPlans.value = response.data.data?.list || []
+          inboundPlans.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取入库计划列表失败:', error)
@@ -334,9 +331,9 @@ export default {
     const fetchLogisticsProviders = async () => {
       logisticsProvidersLoading.value = true
       try {
-        const response = await getLogisticsProviders({ status: 1, page_size: 9999 })
+        const response = await getLogisticsProviderOptions()
         if (response.data.status === 'success') {
-          logisticsProviders.value = response.data.data?.list || []
+          logisticsProviders.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取货代列表失败:', error)

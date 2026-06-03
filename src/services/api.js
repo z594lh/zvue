@@ -283,18 +283,53 @@ export const getExpenseLogs = (id) => {
 };
 
 /**
- * 获取支出模块用户列表（创建人筛选用）
- */
-export const getExpenseUsers = () => {
-  return api.get('/expenses/users');
-};
-
-/**
  * 获取支出统计汇总
  * @param {Object} params {month, category, account_type, reimbursed, created_by}
  */
 export const getExpenseSummary = (params = {}) => {
   return api.get('/expenses/summary', { params });
+};
+
+// ==================== 下拉框选项接口 (/options) ====================
+
+export const getShopOptions = () => {
+  return api.get('/options/shops');
+};
+
+export const getSupplierOptions = () => {
+  return api.get('/options/suppliers');
+};
+
+export const getProductOptions = () => {
+  return api.get('/options/products');
+};
+
+export const getCategoryOptions = () => {
+  return api.get('/options/products/categories');
+};
+
+export const getLogisticsProviderOptions = () => {
+  return api.get('/options/logistics-providers');
+};
+
+export const getUserOptions = () => {
+  return api.get('/options/users');
+};
+
+export const getWarehouseOptions = (shop_id) => {
+  return api.get('/options/amazon/warehouses', { params: { shop_id } });
+};
+
+export const getShipmentOptions = () => {
+  return api.get('/options/amazon/shipments');
+};
+
+export const getInboundPlanOptions = () => {
+  return api.get('/options/amazon/inbound-plans');
+};
+
+export const getProductBoardFilterOptions = () => {
+  return api.get('/options/product-board/filters');
 };
 
 // ==================== FBA 标签打印相关接口 ====================
@@ -340,17 +375,6 @@ export const exportAmazonShipmentInvoice = (shipment_id, shop_id, logistics_prov
     responseType: 'blob'
   });
 };
-
-
-/**
- * 获取仓库列表
- * @param {number} shop_id 店铺ID（必填）
- */
-export const getAmazonWarehouses = (shop_id) => {
-  return api.get('/amazon/warehouses', { params: { shop_id } });
-};
-
-
 
 // ==================== 亚马逊入库计划货件相关接口（新接口）====================
 
@@ -411,7 +435,9 @@ export const syncAmazonInboundPlanBoxes = (plan_id, data = {}) => {
 };
 
 
-// ==================== 亚马逊订单管理相关接口 ====================
+// ==================== 亚马逊入库计划相关接口 ====================
+
+/**
 
 /**
  * 获取亚马逊订单列表
@@ -456,13 +482,6 @@ export const syncAmazonOrdersAll = (data = {}) => {
 };
 
 // ==================== 亚马逊库存管理相关接口 ====================
-
-/**
- * 获取店铺列表（用于店铺选择器，仅启用状态）
- */
-export const getShops = () => {
-  return api.get('/shops');
-};
 
 /**
  * 获取所有店铺列表（含禁用，管理后台用）
@@ -663,13 +682,6 @@ export const updateProduct = (id, data) => {
  */
 export const deleteProduct = (id) => {
   return api.delete(`/products/${id}`);
-};
-
-/**
- * 获取产品分类列表（下拉框用，不分页）
- */
-export const getProductCategories = () => {
-  return api.get('/products/categories');
 };
 
 // ==================== 类目管理相关接口 ====================
@@ -968,14 +980,7 @@ export const getProductBoardStats = () => {
  * 获取选品看板筛选选项
  * 返回 { amazon_statuses: [] }
  */
-export const getProductBoardFilters = () => {
-  return api.get('/product-board/filters');
-};
 
-/**
- * 获取选品看板产品跨批次趋势
- * @param {string} asins 逗号分隔的ASIN列表
- */
 export const getProductBoardTrend = (asins) => {
   return api.get('/product-board/trend', { params: { asins } });
 };
@@ -1225,12 +1230,6 @@ export const deleteLogisticsWaybill = (id) => {
 };
 
 /**
- * 获取可供绑定的 FBA 货件列表
- * @param {Object} params {status_list, keyword, exclude_waybill_id}
- */
-export const getAvailableShipments = (params = {}) => {
-  return api.get('/logistics-waybills/available-shipments', { params });
-};
 
 /**
  * 导入运单
@@ -1391,14 +1390,6 @@ export const setUserDirectPermissions = (id, data) => {
 };
 
 // ==================== 亚马逊入库计划相关接口 ====================
-
-/**
- * 获取入库计划列表
- * @param {Object} params {shop_id, status, created_after, created_before, page, page_size}
- */
-export const getAmazonInboundPlans = (params = {}) => {
-  return api.get('/amazon/inbound-plans', { params });
-};
 
 // ==================== 箱唛整理任务接口 ====================
 

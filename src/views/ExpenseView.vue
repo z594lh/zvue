@@ -353,7 +353,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getExpenseList, getExpenseSummary, createExpense, updateExpense, deleteExpense, toggleReimburseStatus, getExpenseLogs, getExpenseUsers } from '@/services/api.js'
+import { getExpenseList, getExpenseSummary, createExpense, updateExpense, deleteExpense, toggleReimburseStatus, getExpenseLogs, getUserOptions } from '@/services/api.js'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 
 const categories = [
@@ -650,7 +650,7 @@ export default {
     // 获取用户列表（创建人筛选用）
     const fetchUsers = async () => {
       try {
-        const res = await getExpenseUsers()
+        const res = await getUserOptions()
         if (res.data.status === 'success') {
           usersList.value = res.data.data || []
         }

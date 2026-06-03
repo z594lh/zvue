@@ -546,7 +546,7 @@ import {
   Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown, InfoFilled
 } from '@element-plus/icons-vue'
 import {
-  getShops,
+  getShopOptions,
   getBusinessReports, getBusinessSummary, getBusinessTrend,
   getSkuProfitList, getSkuProfitTop,
   getInventoryTurnover, getInventoryStats,
@@ -691,7 +691,7 @@ export default {
     // ============= 数据获取 =============
     const fetchShops = async () => {
       try {
-        const res = await getShops()
+        const res = await getShopOptions()
         if (res.data.status === 'success') {
           shopList.value = res.data.data || []
         }

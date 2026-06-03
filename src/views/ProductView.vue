@@ -417,7 +417,7 @@ import {
   createProductWithFiles,
   updateProductWithFiles,
   deleteProduct,
-  getProductCategories
+  getCategoryOptions
 } from '@/services/api.js'
 
 export default {
@@ -773,9 +773,9 @@ export default {
 
     const fetchCategories = async () => {
       try {
-        const response = await getProductCategories()
+        const response = await getCategoryOptions()
         if (response.data.status === 'success') {
-          categoryList.value = response.data.data?.list || []
+          categoryList.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取产品分类失败:', error)

@@ -564,13 +564,13 @@ import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, MapLocation, UploadFilled } from '@element-plus/icons-vue'
 import {
-  getLogisticsProviders,
+  getLogisticsProviderOptions,
   getLogisticsWaybills,
   createLogisticsWaybill,
   updateLogisticsWaybill,
   deleteLogisticsWaybill,
   batchUpdateLogisticsWaybillStatus,
-  getAvailableShipments,
+  getShipmentOptions,
   importLogisticsWaybills
 } from '@/services/api.js'
 
@@ -659,26 +659,20 @@ export default {
 
     const fetchProviderOptions = async () => {
       try {
-        const response = await getLogisticsProviders({ status: 1, page_size: 1000 })
+        const response = await getLogisticsProviderOptions()
         if (response.data.status === 'success') {
-          providerOptions.value = response.data.data?.list || []
+          providerOptions.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取货代列表失败:', error)
       }
     }
 
-    const fetchShipmentOptions = async (excludeWaybillId = null) => {
+    const fetchShipmentOptions = async () => {
       try {
-        const params = {
-          status_list: 'WORKING,SHIPPED'
-        }
-        if (excludeWaybillId) {
-          params.exclude_waybill_id = excludeWaybillId
-        }
-        const response = await getAvailableShipments(params)
+        const response = await getShipmentOptions()
         if (response.data.status === 'success') {
-          shipmentOptions.value = response.data.data?.list || []
+          shipmentOptions.value = response.data.data || []
         } else {
           shipmentOptions.value = []
         }
@@ -800,7 +794,7 @@ export default {
       formData.delivery_date = row.delivery_date || ''
       formData.tracking_url = row.tracking_url || ''
       formData.remark = row.remark || ''
-      await fetchShipmentOptions(row.id)
+      await fetchShipmentOptions()
       editLoading.value = false
     }
 

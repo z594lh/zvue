@@ -273,7 +273,7 @@ import {
   Document, InfoFilled
 } from '@element-plus/icons-vue'
 import {
-  getShops,
+  getShopOptions,
   getAdvertisingReports, getAdvertisingSummary, getAdvertisingTrend, generateAdvertisingReport
 } from '@/services/api.js'
 
@@ -340,7 +340,7 @@ export default {
 
     const fetchShops = async () => {
       try {
-        const res = await getShops()
+        const res = await getShopOptions()
         if (res.data.status === 'success') {
           shopList.value = res.data.data || []
         }

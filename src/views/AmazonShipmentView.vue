@@ -496,11 +496,11 @@ import {
   syncInboundShipments,
   syncInboundShipmentDetail,
   getAmazonShipmentLabels,
-  getAmazonWarehouses,
+  getWarehouseOptions,
   getAmazonInboundPlanBoxes,
   syncAmazonInboundPlanBoxes,
   exportAmazonShipmentInvoice,
-  getLogisticsProviders
+  getLogisticsProviderOptions
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -580,7 +580,7 @@ export default {
     const fetchWarehouses = async () => {
       if (!selectedShopId.value) return
       try {
-        const response = await getAmazonWarehouses(selectedShopId.value)
+        const response = await getWarehouseOptions(selectedShopId.value)
         if (response.data.status === 'success') {
           warehouses.value = response.data.data || []
         }
@@ -591,9 +591,9 @@ export default {
 
     const fetchLogisticsProviders = async () => {
       try {
-        const response = await getLogisticsProviders({ status: 1, page_size: 9999 })
+        const response = await getLogisticsProviderOptions()
         if (response.data.status === 'success') {
-          logisticsProviders.value = response.data.data?.list || []
+          logisticsProviders.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取货代列表失败:', error)

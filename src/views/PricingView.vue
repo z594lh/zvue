@@ -205,7 +205,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, View } from '@element-plus/icons-vue'
-import { calculatePricing, getProducts } from '@/services/api.js'
+import { calculatePricing, getProductOptions } from '@/services/api.js'
 
 export default {
   name: 'PricingView',
@@ -366,9 +366,9 @@ export default {
 
     const fetchProducts = async () => {
       try {
-        const response = await getProducts({ status: 1, page_size: 9999 })
+        const response = await getProductOptions()
         if (response.data.status === 'success') {
-          productList.value = response.data.data?.list || []
+          productList.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取产品列表失败:', error)

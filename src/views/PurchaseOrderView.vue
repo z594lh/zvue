@@ -263,7 +263,7 @@
                   <el-option
                     v-for="p in productOptions"
                     :key="p.seller_sku"
-                    :label="`${p.seller_sku}${p.declare_name_cn ? ' - ' + p.declare_name_cn : ''}`"
+                    :label="`${p.seller_sku}${p.product_name ? ' - ' + p.product_name : ''}`"
                     :value="p.seller_sku"
                   />
                 </el-select>
@@ -331,8 +331,8 @@ import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, DocumentChecked } from '@element-plus/icons-vue'
 import {
-  getSuppliers,
-  getProducts,
+  getSupplierOptions,
+  getProductOptions,
   getPurchaseOrder,
   getPurchaseOrders,
   createPurchaseOrder,
@@ -435,9 +435,9 @@ export default {
     // 获取供应商列表（用于下拉选择）
     const fetchSupplierOptions = async () => {
       try {
-        const response = await getSuppliers({ status: 1, page_size: 1000 })
+        const response = await getSupplierOptions()
         if (response.data.status === 'success') {
-          supplierOptions.value = response.data.data?.list || []
+          supplierOptions.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取供应商列表失败:', error)
@@ -447,9 +447,9 @@ export default {
     // 获取产品列表（用于下拉选择）
     const fetchProductOptions = async () => {
       try {
-        const response = await getProducts({ status: 1, page_size: 1000 })
+        const response = await getProductOptions()
         if (response.data.status === 'success') {
-          productOptions.value = response.data.data?.list || []
+          productOptions.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取产品列表失败:', error)

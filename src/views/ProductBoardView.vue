@@ -459,7 +459,7 @@ import {
 import { Chart } from 'chart.js/auto'
 import {
   getProductBoardList,
-  getProductBoardFilters, getProductBoardTrend, deleteProductBoardItem,
+  getProductBoardFilterOptions, getProductBoardTrend, deleteProductBoardItem,
   batchDeleteProductBoardItems, importProductBoard, exportProductBoard,
   toggleProductBoardListed
 } from '@/services/api.js'
@@ -576,7 +576,7 @@ export default {
 
     const fetchFilters = async () => {
       try {
-        const res = await getProductBoardFilters()
+        const res = await getProductBoardFilterOptions()
         if (res.data.status === 'success') amazonStatusList.value = res.data.data?.amazon_statuses || []
       } catch (e) { console.error(e) }
     }

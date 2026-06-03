@@ -149,7 +149,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Printer, View, DocumentCopy } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { generateFbaLabel, getProducts } from '@/services/api.js'
+import { generateFbaLabel, getProductOptions } from '@/services/api.js'
 
 export default {
   name: 'FbaLabelView',
@@ -186,7 +186,7 @@ export default {
       }
       const product = productList.value.find(item => item.seller_sku === sku)
       if (product) {
-        form.fnsku = product.fnsku || ''
+        form.fnsku = product.FNSKU || product.fnsku || ''
         form.sku = product.seller_sku || ''
         form.product_name = product.declare_name_en || product.product_name || ''
         form.extra_info = product.model || ''
@@ -195,9 +195,9 @@ export default {
 
     const fetchProducts = async () => {
       try {
-        const response = await getProducts({ status: 1, page_size: 9999 })
+        const response = await getProductOptions()
         if (response.data.status === 'success') {
-          productList.value = response.data.data?.list || []
+          productList.value = response.data.data || []
         }
       } catch (error) {
         console.error('获取产品列表失败:', error)

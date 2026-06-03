@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getShops } from '@/services/api.js'
+import { getShopOptions } from '@/services/api.js'
 
 // 模块级缓存，跨组件共享
 const shopList = ref([])
@@ -18,7 +18,7 @@ export function useShopCache() {
     if (loaded.value && !force) return
 
     try {
-      const response = await getShops()
+      const response = await getShopOptions()
       if (response.data.status === 'success') {
         const list = response.data.data || []
         shopList.value = list
