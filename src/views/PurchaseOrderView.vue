@@ -530,32 +530,20 @@ export default {
       formData.status = row.status ?? 0
       formData.remark = row.remark || ''
 
-      // 如果有 items，加载明细
-      if (row.items && row.items.length > 0) {
-        formData.items = row.items.map(item => ({
-          seller_sku: item.seller_sku || '',
-          quantity: item.quantity || 1,
-          unit_price: item.unit_price || 0,
-          total_price: item.total_price || 0,
-          remark: item.remark || ''
-        }))
-      } else {
-        // 尝试从详情接口获取
-        try {
-          const response = await getPurchaseOrder(row.id)
-          if (response.data.status === 'success') {
-            const detail = response.data.data || {}
-            formData.items = (detail.items || []).map(item => ({
-              seller_sku: item.seller_sku || '',
-              quantity: item.quantity || 1,
-              unit_price: item.unit_price || 0,
-              total_price: item.total_price || 0,
-              remark: item.remark || ''
-            }))
-          }
-        } catch (error) {
-          console.error('获取进货单详情失败:', error)
+      try {
+        const response = await getPurchaseOrder(row.id)
+        if (response.data.status === 'success') {
+          const detail = response.data.data || {}
+          formData.items = (detail.items || []).map(item => ({
+            seller_sku: item.seller_sku || '',
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || 0,
+            total_price: item.total_price || 0,
+            remark: item.remark || ''
+          }))
         }
+      } catch (error) {
+        console.error('获取进货单详情失败:', error)
       }
 
       dialogVisible.value = true
