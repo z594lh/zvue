@@ -10,22 +10,22 @@
 
     <!-- 统计卡片 -->
     <div class="stats-cards">
-      <div class="stat-card">
-        <div class="stat-label">{{ filterMonth ? filterMonth + ' 合计' : '全部总计' }}</div>
+      <div class="stat-card clickable" @click="applyFilter({})">
+        <div class="stat-label">全部总计</div>
         <div class="stat-value">¥{{ formatNumber(summary.total_amount) }}</div>
         <div class="stat-sub">共 {{ summary.total_count || 0 }} 条记录</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">公账{{ filterMonth ? ' · ' + filterMonth : '' }}</div>
+      <div class="stat-card clickable" @click="applyFilter({ account_type: 'company' })">
+        <div class="stat-label">公账</div>
         <div class="stat-value" style="color: #e74c3c;">¥{{ formatNumber(accountTypeStats.company?.amount || 0) }}</div>
         <div class="stat-sub">共 {{ accountTypeStats.company?.count || 0 }} 条</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">私账{{ filterMonth ? ' · ' + filterMonth : '' }}</div>
+      <div class="stat-card clickable" @click="applyFilter({ account_type: 'personal' })">
+        <div class="stat-label">私账</div>
         <div class="stat-value" style="color: #667eea;">¥{{ formatNumber(accountTypeStats.private?.amount || 0) }}</div>
         <div class="stat-sub">共 {{ accountTypeStats.private?.count || 0 }} 条</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card clickable" @click="applyFilter({ account_type: 'personal', reimbursed: 'false' })">
         <div class="stat-label">私账未报销</div>
         <div class="stat-value" style="color: #f39c12;">¥{{ formatNumber(unreimbursedSummary.total_amount) }}</div>
         <div class="stat-sub">共 {{ unreimbursedSummary.total_count || 0 }} 条</div>
@@ -36,7 +36,7 @@
     <div class="category-stats" v-if="!filterMonth && summary.by_month && summary.by_month.length > 0">
       <h3 class="section-title">月度趋势</h3>
       <div class="category-list">
-        <div v-for="item in summary.by_month" :key="item.month" class="category-item">
+        <div v-for="item in summary.by_month" :key="item.month" class="category-item clickable" @click="applyFilter({ month: item.month })">
           <div class="category-info">
             <span class="month-label">{{ item.month }}</span>
             <span class="category-count">{{ item.count }} 笔</span>
@@ -53,7 +53,7 @@
     <div class="category-stats" v-if="summary.by_category && summary.by_category.length > 0">
       <h3 class="section-title">分类统计{{ filterAccountType ? ' · ' + accountTypeLabel : '' }}{{ filterMonth ? ' · ' + filterMonth : '' }}</h3>
       <div class="category-list">
-        <div v-for="item in summary.by_category" :key="item.category" class="category-item">
+        <div v-for="item in summary.by_category" :key="item.category" class="category-item clickable" @click="applyFilter({ category: item.category })">
           <div class="category-info">
             <span class="category-tag" :style="{ background: getCategoryColor(item.category) }">
               {{ item.category }}
@@ -92,7 +92,7 @@
           <el-option label="公账" value="company" />
           <el-option label="私账" value="personal" />
         </el-select>
-        <el-select v-if="filterAccountType === 'personal'" v-model="filterReimbursed" placeholder="报销状态" clearable style="width: 120px">
+        <el-select v-model="filterReimbursed" placeholder="报销状态" clearable style="width: 120px">
           <el-option label="已报销" value="true" />
           <el-option label="未报销" value="false" />
         </el-select>
@@ -615,18 +615,11 @@ export default {
       return max > 0 ? Math.round((amount / max) * 100) : 0
     }
 
-    // 获取统计汇总
+    // 获取统计汇总（始终全局，不受筛选影响）
     const fetchSummary = async () => {
       try {
-        const params = {}
-        if (filterMonth.value) params.month = filterMonth.value
-        if (filterCategory.value) params.category = filterCategory.value
-        if (filterAccountType.value) params.account_type = filterAccountType.value
-        if (filterReimbursed.value) params.reimbursed = filterReimbursed.value
-        if (filterCreatedBy.value) params.created_by = filterCreatedBy.value
-
         const [summaryRes, unreimbursedRes] = await Promise.all([
-          getExpenseSummary(params),
+          getExpenseSummary(),
           getExpenseSummary({ account_type: 'personal', reimbursed: 'false' })
         ])
 
@@ -639,6 +632,14 @@ export default {
       } catch (err) {
         handleApiError(err)
       }
+    }
+
+    // 从统计卡片/趋势图点击跳转筛选
+    const applyFilter = (filters) => {
+      filterMonth.value = filters.month !== undefined ? filters.month : ''
+      filterCategory.value = filters.category || ''
+      filterAccountType.value = filters.account_type || ''
+      filterReimbursed.value = filters.reimbursed !== undefined ? filters.reimbursed : ''
     }
 
     // 获取用户列表（创建人筛选用）
@@ -926,7 +927,6 @@ export default {
     watch([filterMonth, filterCategory, filterAccountType, filterReimbursed, filterCreatedBy], () => {
       currentPage.value = 1
       fetchRecords()
-      fetchSummary()
     })
 
     onMounted(() => {
@@ -973,6 +973,7 @@ export default {
       logsLoading,
       getCategoryColor,
       formatNumber,
+      applyFilter,
       resetFilter,
       handleSizeChange,
       openAddDialog,
@@ -1040,6 +1041,16 @@ export default {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+.stat-card.clickable {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
 .stat-label {
   font-size: 14px;
   color: #999;
@@ -1083,6 +1094,18 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.category-item.clickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.category-item.clickable:hover {
+  background: #f5f7fa;
 }
 
 .category-info {
