@@ -39,7 +39,7 @@
           <el-option
             v-for="s in supplierOptions"
             :key="s.id"
-            :label="s.name"
+            :label="s.remark ? s.name + ' - ' + s.remark : s.name"
             :value="s.id"
           />
         </el-select>
@@ -97,24 +97,21 @@
             <span style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;">{{ scope.row.order_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="supplier_name" label="供应商" width="140">
+        <el-table-column prop="supplier_name" label="供应商" width="160" show-overflow-tooltip>
           <template #default="scope">
             <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.supplier_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="product_amount" label="商品金额" width="110" align="right">
+        <el-table-column label="SKU明细" min-width="300">
           <template #default="scope">
-            <span style="color:#555;">{{ formatAmount(scope.row.product_amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="shipping_amount" label="运费" width="100" align="right">
-          <template #default="scope">
-            <span style="color:#888;">{{ formatAmount(scope.row.shipping_amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="misc_amount" label="杂项" width="100" align="right">
-          <template #default="scope">
-            <span style="color:#888;">{{ formatAmount(scope.row.misc_amount) }}</span>
+            <div class="sku-items" v-if="scope.row.items && scope.row.items.length > 0">
+              <div v-for="(item, idx) in scope.row.items" :key="idx" class="sku-item">
+                <span class="sku-code">{{ item.seller_sku }}</span>
+                <span v-if="item.product_name" class="sku-name"> - {{ item.product_name }}</span>
+                <span class="sku-qty"> x{{ item.quantity }}</span>
+              </div>
+            </div>
+            <span v-else style="color:#ccc;">—</span>
           </template>
         </el-table-column>
         <el-table-column prop="total_amount" label="总金额" width="110" align="right">
@@ -187,7 +184,7 @@
                   <el-option
                     v-for="s in supplierOptions"
                     :key="s.id"
-                    :label="s.name"
+                    :label="s.remark ? s.name + ' - ' + s.remark : s.name"
                     :value="s.id"
                   />
                 </el-select>
@@ -840,6 +837,33 @@ export default {
 }
 
 .amount-total { color: #f59e0b; font-weight: 700; font-size: 14px; }
+
+:deep(.el-table__body .el-button + .el-button) {
+  margin-left: 0;
+}
+
+.sku-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.sku-item {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sku-code {
+  color: #1a1a2e;
+  font-family: monospace;
+  font-weight: 500;
+}
+.sku-name {
+  color: #666;
+}
+.sku-qty {
+  color: #909399;
+  font-family: monospace;
+}
 
 /* 分页 */
 .pagination-wrap {

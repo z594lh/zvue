@@ -35,4 +35,9 @@ body {
   top: 50% !important;
   transform: translate(-50%, -50%) !important;
 }
+
+/* 表格操作列按钮去掉默认左间距，避免挤到第二行 */
+.el-table .el-button + .el-button {
+  margin-left: 0;
+}
 </style>

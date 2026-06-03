@@ -125,9 +125,21 @@
             <span style="font-weight:500;color:#1a1a2e;">{{ scope.row.provider_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="shipment_id" label="亚马逊货件" width="150" show-overflow-tooltip>
+        <el-table-column prop="shipment_id" label="亚马逊货件" width="120" show-overflow-tooltip>
           <template #default="scope">
             <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.shipment_id }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="货件SKU" min-width="280">
+          <template #default="scope">
+            <div class="sku-items" v-if="scope.row.items && scope.row.items.length > 0">
+              <div v-for="(item, idx) in scope.row.items" :key="idx" class="sku-item">
+                <span class="sku-code">{{ item.seller_sku }}</span>
+                <span v-if="item.product_name" class="sku-name"> - {{ item.product_name }}</span>
+                <span class="sku-qty"> x{{ item.quantity }}</span>
+              </div>
+            </div>
+            <span v-else style="color:#ccc;">—</span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="90" align="center">
@@ -137,12 +149,12 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="transport_type" label="运输方式" width="90" align="center">
+        <el-table-column prop="transport_type" label="运输方式" width="80" align="center">
           <template #default="scope">
             <el-tag size="small" effect="plain">{{ getTransportTypeText(scope.row.transport_type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="destination_warehouse" label="目的仓库" width="120">
+        <el-table-column prop="destination_warehouse" label="目的仓库" width="100">
           <template #default="scope">
             <el-tag v-if="scope.row.destination_warehouse" size="small" effect="plain" type="info">{{ scope.row.destination_warehouse }}</el-tag>
             <span v-else style="color:#bbb;">-</span>
@@ -1111,7 +1123,29 @@ export default {
 }
 
 .qty-total { color: #1a1a2e; font-weight: 700; font-size: 14px; }
-.amount-total { color: #f59e0b; font-weight: 700; font-size: 14px; }
+
+.sku-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.sku-item {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sku-code {
+  color: #1a1a2e;
+  font-family: monospace;
+  font-weight: 500;
+}
+.sku-name {
+  color: #666;
+}
+.sku-qty {
+  color: #909399;
+  font-family: monospace;
+}
 
 /* 分页 */
 .pagination-wrap {
