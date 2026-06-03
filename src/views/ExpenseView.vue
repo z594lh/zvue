@@ -33,7 +33,7 @@
     </div>
 
     <!-- 月度趋势 -->
-    <div class="category-stats" v-if="!filterMonth && summary.by_month && summary.by_month.length > 0">
+    <div class="category-stats" v-if="summary.by_month && summary.by_month.length > 0">
       <h3 class="section-title">月度趋势</h3>
       <div class="category-list">
         <div v-for="item in summary.by_month" :key="item.month" class="category-item clickable" @click="applyFilter({ month: item.month })">
@@ -51,7 +51,7 @@
 
     <!-- 分类统计 -->
     <div class="category-stats" v-if="summary.by_category && summary.by_category.length > 0">
-      <h3 class="section-title">分类统计{{ filterAccountType ? ' · ' + accountTypeLabel : '' }}{{ filterMonth ? ' · ' + filterMonth : '' }}</h3>
+      <h3 class="section-title">分类统计</h3>
       <div class="category-list">
         <div v-for="item in summary.by_category" :key="item.category" class="category-item clickable" @click="applyFilter({ category: item.category })">
           <div class="category-info">
