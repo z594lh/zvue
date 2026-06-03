@@ -300,7 +300,7 @@
       :close-on-click-modal="false"
       align-center
     >
-      <el-form :model="formData" label-width="100px" :rules="formRules" ref="formRef">
+      <el-form :model="formData" label-width="100px" :rules="formRules" ref="formRef" v-loading="editLoading">
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="货代" prop="provider_id">
@@ -586,6 +586,7 @@ export default {
   setup() {
     const loading = ref(false)
     const submitLoading = ref(false)
+    const editLoading = ref(false)
     const dialogVisible = ref(false)
     const importDialogVisible = ref(false)
     const importLoading = ref(false)
@@ -773,6 +774,8 @@ export default {
     const handleEdit = async (row) => {
       isEdit.value = true
       resetForm()
+      editLoading.value = true
+      dialogVisible.value = true
       formData.id = row.id
       formData.waybill_no = row.waybill_no || ''
       formData.provider_id = row.provider_id
@@ -798,7 +801,7 @@ export default {
       formData.tracking_url = row.tracking_url || ''
       formData.remark = row.remark || ''
       await fetchShipmentOptions(row.id)
-      dialogVisible.value = true
+      editLoading.value = false
     }
 
     const handleDelete = (row) => {
@@ -1000,6 +1003,7 @@ export default {
     return {
       loading,
       submitLoading,
+      editLoading,
       dialogVisible,
       importDialogVisible,
       importLoading,

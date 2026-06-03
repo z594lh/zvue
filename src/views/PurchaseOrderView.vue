@@ -168,7 +168,7 @@
       :close-on-click-modal="false"
       align-center
     >
-      <el-form :model="formData" label-width="90px" :rules="formRules" ref="formRef">
+      <el-form :model="formData" label-width="90px" :rules="formRules" ref="formRef" v-loading="editLoading">
         <!-- 基本信息 -->
         <div class="form-section">
           <h4 class="form-section-title">基本信息</h4>
@@ -352,6 +352,7 @@ export default {
   setup() {
     const loading = ref(false)
     const submitLoading = ref(false)
+    const editLoading = ref(false)
     const dialogVisible = ref(false)
     const isEdit = ref(false)
     const formRef = ref(null)
@@ -522,6 +523,8 @@ export default {
     const handleEdit = async (row) => {
       isEdit.value = true
       resetForm()
+      editLoading.value = true
+      dialogVisible.value = true
       await fetchProductOptions()
       formData.id = row.id
       formData.supplier_id = row.supplier_id
@@ -544,9 +547,9 @@ export default {
         }
       } catch (error) {
         console.error('获取进货单详情失败:', error)
+      } finally {
+        editLoading.value = false
       }
-
-      dialogVisible.value = true
     }
 
     const handleDelete = (row) => {
@@ -705,6 +708,7 @@ export default {
     return {
       loading,
       submitLoading,
+      editLoading,
       dialogVisible,
       isEdit,
       formRef,
