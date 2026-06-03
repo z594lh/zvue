@@ -289,6 +289,14 @@ export const getExpenseUsers = () => {
   return api.get('/expenses/users');
 };
 
+/**
+ * 获取支出统计汇总
+ * @param {Object} params {month, category, account_type, reimbursed, created_by}
+ */
+export const getExpenseSummary = (params = {}) => {
+  return api.get('/expenses/summary', { params });
+};
+
 // ==================== FBA 标签打印相关接口 ====================
 
 /**

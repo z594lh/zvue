@@ -11,24 +11,49 @@
     <!-- 统计卡片 -->
     <div class="stats-cards">
       <div class="stat-card">
-        <div class="stat-label">公账本月</div>
-        <div class="stat-value" style="color: #e74c3c;">¥{{ formatNumber(companyMonthTotal) }}</div>
+        <div class="stat-label">{{ filterMonth ? filterMonth + ' 合计' : '全部总计' }}</div>
+        <div class="stat-value">¥{{ formatNumber(summary.total_amount) }}</div>
+        <div class="stat-sub">共 {{ summary.total_count || 0 }} 条记录</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">私账本月</div>
-        <div class="stat-value" style="color: #667eea;">¥{{ formatNumber(personalMonthTotal) }}</div>
+        <div class="stat-label">公账{{ filterMonth ? ' · ' + filterMonth : '' }}</div>
+        <div class="stat-value" style="color: #e74c3c;">¥{{ formatNumber(accountTypeStats.company?.amount || 0) }}</div>
+        <div class="stat-sub">共 {{ accountTypeStats.company?.count || 0 }} 条</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">私账{{ filterMonth ? ' · ' + filterMonth : '' }}</div>
+        <div class="stat-value" style="color: #667eea;">¥{{ formatNumber(accountTypeStats.private?.amount || 0) }}</div>
+        <div class="stat-sub">共 {{ accountTypeStats.private?.count || 0 }} 条</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">私账未报销</div>
-        <div class="stat-value" style="color: #f39c12;">¥{{ formatNumber(unreimbursedTotal) }}</div>
+        <div class="stat-value" style="color: #f39c12;">¥{{ formatNumber(unreimbursedSummary.total_amount) }}</div>
+        <div class="stat-sub">共 {{ unreimbursedSummary.total_count || 0 }} 条</div>
+      </div>
+    </div>
+
+    <!-- 月度趋势 -->
+    <div class="category-stats" v-if="!filterMonth && summary.by_month && summary.by_month.length > 0">
+      <h3 class="section-title">月度趋势</h3>
+      <div class="category-list">
+        <div v-for="item in summary.by_month" :key="item.month" class="category-item">
+          <div class="category-info">
+            <span class="month-label">{{ item.month }}</span>
+            <span class="category-count">{{ item.count }} 笔</span>
+          </div>
+          <div class="category-bar-wrapper">
+            <div class="category-bar" :style="{ width: monthBarPercent(item.amount) + '%', background: '#667eea' }"></div>
+          </div>
+          <div class="category-amount">¥{{ formatNumber(item.amount) }}</div>
+        </div>
       </div>
     </div>
 
     <!-- 分类统计 -->
-    <div class="category-stats" v-if="categoryStats.length > 0">
-      <h3 class="section-title">分类统计（本月{{ filterAccountType ? ' · ' + accountTypeLabel : '' }}）</h3>
+    <div class="category-stats" v-if="summary.by_category && summary.by_category.length > 0">
+      <h3 class="section-title">分类统计{{ filterAccountType ? ' · ' + accountTypeLabel : '' }}{{ filterMonth ? ' · ' + filterMonth : '' }}</h3>
       <div class="category-list">
-        <div v-for="item in categoryStats" :key="item.category" class="category-item">
+        <div v-for="item in summary.by_category" :key="item.category" class="category-item">
           <div class="category-info">
             <span class="category-tag" :style="{ background: getCategoryColor(item.category) }">
               {{ item.category }}
@@ -36,7 +61,7 @@
             <span class="category-count">{{ item.count }} 笔</span>
           </div>
           <div class="category-bar-wrapper">
-            <div class="category-bar" :style="{ width: item.percentage + '%', background: getCategoryColor(item.category) }"></div>
+            <div class="category-bar" :style="{ width: categoryBarPercent(item.amount) + '%', background: getCategoryColor(item.category) }"></div>
           </div>
           <div class="category-amount">¥{{ formatNumber(item.amount) }}</div>
         </div>
@@ -327,7 +352,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getExpenseList, createExpense, updateExpense, deleteExpense, toggleReimburseStatus, getExpenseLogs, getExpenseUsers } from '@/services/api.js'
+import { getExpenseList, getExpenseSummary, createExpense, updateExpense, deleteExpense, toggleReimburseStatus, getExpenseLogs, getExpenseUsers } from '@/services/api.js'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 
 const categories = [
@@ -384,6 +409,9 @@ export default {
     const expenseLogs = ref([])
     const currentLogExpenseId = ref(null)
     const logsLoading = ref(false)
+
+    const summary = ref({ total_amount: 0, total_count: 0, by_month: [], by_category: [], by_account_type: [] })
+    const unreimbursedSummary = ref({ total_amount: 0, total_count: 0 })
 
     const form = reactive({
       id: null,
@@ -567,61 +595,51 @@ export default {
       return records.value
     })
 
-    // 本月记录
-    const currentMonth = computed(() => {
-      const now = new Date()
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    })
-
-    const currentMonthRecords = computed(() => {
-      return records.value.filter(r => r.date && r.date.startsWith(currentMonth.value))
-    })
-
-    // 公账本月统计
-    const companyMonthTotal = computed(() => {
-      return currentMonthRecords.value
-        .filter(r => r.account_type === 'company')
-        .reduce((sum, r) => sum + Number(r.amount || 0), 0)
-    })
-
-    // 私账本月统计
-    const personalMonthTotal = computed(() => {
-      return currentMonthRecords.value
-        .filter(r => r.account_type === 'personal')
-        .reduce((sum, r) => sum + Number(r.amount || 0), 0)
-    })
-
-    // 私账未报销统计（不限本月，看全部未报销私账）
-    const unreimbursedTotal = computed(() => {
-      return records.value
-        .filter(r => r.account_type === 'personal' && !r.reimbursed)
-        .reduce((sum, r) => sum + Number(r.amount || 0), 0)
-    })
-
-    // 分类统计（当前筛选条件下）
-    const categoryStats = computed(() => {
-      let source = currentMonthRecords.value
-      if (filterAccountType.value) {
-        source = source.filter(r => r.account_type === filterAccountType.value)
-      }
-      const stats = {}
-      let total = 0
-      source.forEach(r => {
-        const amount = Number(r.amount || 0)
-        if (!stats[r.category]) {
-          stats[r.category] = { category: r.category, amount: 0, count: 0 }
-        }
-        stats[r.category].amount += amount
-        stats[r.category].count += 1
-        total += amount
+    // 账户类型统计（从 summary API 提取）
+    const accountTypeStats = computed(() => {
+      const result = { company: null, private: null }
+      summary.value.by_account_type?.forEach(item => {
+        if (item.account_type === 'company') result.company = item
+        else result.private = item
       })
-      return Object.values(stats)
-        .map(s => ({
-          ...s,
-          percentage: total > 0 ? Math.round((s.amount / total) * 100) : 0
-        }))
-        .sort((a, b) => b.amount - a.amount)
+      return result
     })
+
+    const monthBarPercent = (amount) => {
+      const max = summary.value.by_month.reduce((m, item) => Math.max(m, item.amount), 0)
+      return max > 0 ? Math.round((amount / max) * 100) : 0
+    }
+
+    const categoryBarPercent = (amount) => {
+      const max = summary.value.by_category.reduce((m, item) => Math.max(m, item.amount), 0)
+      return max > 0 ? Math.round((amount / max) * 100) : 0
+    }
+
+    // 获取统计汇总
+    const fetchSummary = async () => {
+      try {
+        const params = {}
+        if (filterMonth.value) params.month = filterMonth.value
+        if (filterCategory.value) params.category = filterCategory.value
+        if (filterAccountType.value) params.account_type = filterAccountType.value
+        if (filterReimbursed.value) params.reimbursed = filterReimbursed.value
+        if (filterCreatedBy.value) params.created_by = filterCreatedBy.value
+
+        const [summaryRes, unreimbursedRes] = await Promise.all([
+          getExpenseSummary(params),
+          getExpenseSummary({ account_type: 'personal', reimbursed: 'false' })
+        ])
+
+        if (summaryRes.data.status === 'success') {
+          summary.value = summaryRes.data.data
+        }
+        if (unreimbursedRes.data.status === 'success') {
+          unreimbursedSummary.value = unreimbursedRes.data.data
+        }
+      } catch (err) {
+        handleApiError(err)
+      }
+    }
 
     // 获取用户列表（创建人筛选用）
     const fetchUsers = async () => {
@@ -908,12 +926,14 @@ export default {
     watch([filterMonth, filterCategory, filterAccountType, filterReimbursed, filterCreatedBy], () => {
       currentPage.value = 1
       fetchRecords()
+      fetchSummary()
     })
 
     onMounted(() => {
       initFromQuery()
       fetchRecords()
       fetchUsers()
+      fetchSummary()
     })
 
     return {
@@ -939,10 +959,11 @@ export default {
       total,
       totalRecords,
       filteredRecords,
-      companyMonthTotal,
-      personalMonthTotal,
-      unreimbursedTotal,
-      categoryStats,
+      summary,
+      unreimbursedSummary,
+      accountTypeStats,
+      monthBarPercent,
+      categoryBarPercent,
       accountTypeLabel,
       invoicePreviewUrl,
       showInvoiceOverlay,
@@ -1030,6 +1051,12 @@ export default {
   font-weight: 700;
 }
 
+.stat-sub {
+  font-size: 13px;
+  color: #bbb;
+  margin-top: 6px;
+}
+
 /* 分类统计 */
 .category-stats {
   background: #fff;
@@ -1071,6 +1098,13 @@ export default {
   color: #fff;
   font-size: 12px;
   font-weight: 500;
+}
+
+.month-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  min-width: 70px;
 }
 
 .category-count {
