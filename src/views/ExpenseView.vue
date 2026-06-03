@@ -104,6 +104,7 @@
             :value="user.id"
           />
         </el-select>
+        <el-input v-model="filterSourceNo" placeholder="搜索单号" clearable style="width: 180px" @keyup.enter="fetchRecords" />
         <el-button @click="resetFilter">重置</el-button>
       </div>
     </div>
@@ -396,6 +397,7 @@ export default {
     const filterAccountType = ref('')
     const filterReimbursed = ref('')
     const filterCreatedBy = ref('')
+    const filterSourceNo = ref('')
     const usersList = ref([])
     const invoicePreviewUrl = ref('')
     const invoiceBase64 = ref('')
@@ -460,7 +462,8 @@ export default {
       category: { get: () => filterCategory.value, set: v => filterCategory.value = v },
       account_type: { get: () => filterAccountType.value, set: v => filterAccountType.value = v },
       reimbursed: { get: () => filterReimbursed.value, set: v => filterReimbursed.value = v },
-      created_by: { get: () => filterCreatedBy.value, set: v => filterCreatedBy.value = v, type: 'number' }
+      created_by: { get: () => filterCreatedBy.value, set: v => filterCreatedBy.value = v, type: 'number' },
+      source_no: { get: () => filterSourceNo.value, set: v => filterSourceNo.value = v }
     })
 
     // 统一后端数据字段名（兼容 camelCase / snake_case）
@@ -504,6 +507,7 @@ export default {
         if (filterAccountType.value) params.account_type = filterAccountType.value
         if (filterReimbursed.value) params.reimbursed = filterReimbursed.value
         if (filterCreatedBy.value) params.created_by = filterCreatedBy.value
+        if (filterSourceNo.value) params.source_no = filterSourceNo.value
 
         const res = await getExpenseList(params)
         if (res.data.status === 'success') {
@@ -533,6 +537,7 @@ export default {
         if (filterAccountType.value) params.account_type = filterAccountType.value
         if (filterReimbursed.value) params.reimbursed = filterReimbursed.value
         if (filterCreatedBy.value) params.created_by = filterCreatedBy.value
+        if (filterSourceNo.value) params.source_no = filterSourceNo.value
 
         const res = await getExpenseList(params)
         if (res.data.status !== 'success') {
@@ -661,6 +666,7 @@ export default {
       filterAccountType.value = ''
       filterReimbursed.value = ''
       filterCreatedBy.value = ''
+      filterSourceNo.value = ''
       currentPage.value = 1
       fetchRecords()
     }
@@ -924,7 +930,7 @@ export default {
     }
 
     // 筛选变化时自动刷新
-    watch([filterMonth, filterCategory, filterAccountType, filterReimbursed, filterCreatedBy], () => {
+    watch([filterMonth, filterCategory, filterAccountType, filterReimbursed, filterCreatedBy, filterSourceNo], () => {
       currentPage.value = 1
       fetchRecords()
     })
@@ -953,6 +959,7 @@ export default {
       filterAccountType,
       filterReimbursed,
       filterCreatedBy,
+      filterSourceNo,
       usersList,
       currentPage,
       pageSize,
