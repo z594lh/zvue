@@ -73,6 +73,19 @@
         :cell-style="{padding:'10px 0'}"
       >
         <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column label="主图" width="80" align="center">
+          <template #default="scope">
+            <el-image
+              v-if="scope.row.image_url"
+              :src="scope.row.image_url"
+              :preview-src-list="[scope.row.image_url]"
+              preview-teleported
+              fit="cover"
+              class="product-thumb-small"
+            />
+            <div v-else class="thumb-placeholder-small"><el-icon><Picture /></el-icon></div>
+          </template>
+        </el-table-column>
         <el-table-column prop="seller_sku" label="卖家SKU" min-width="140" show-overflow-tooltip>
           <template #default="scope">
             <span style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;">{{ scope.row.seller_sku }}</span>
@@ -411,7 +424,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Goods } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Goods, Picture } from '@element-plus/icons-vue'
 import {
   getProducts,
   createProductWithFiles,
@@ -426,7 +439,8 @@ export default {
     Search,
     Refresh,
     Plus,
-    Goods
+    Goods,
+    Picture
   },
   setup() {
     const loading = ref(false)
@@ -919,6 +933,27 @@ export default {
 :deep(.upload-gallery .el-upload-list__item) {
   width: 100px;
   height: 100px;
+}
+
+.product-thumb-small {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
+  cursor: pointer;
+}
+.thumb-placeholder-small {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  font-size: 18px;
+  margin: 0 auto;
 }
 
 /* ===== 响应式 ===== */
