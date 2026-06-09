@@ -738,7 +738,12 @@ export default {
           page_size: 20
         })
         if (response.data.status === 'success') {
-          ElMessage.success(response.data.message || 'Listing 同步完成')
+          const syncData = response.data.data || {}
+          if (syncData.deleted_listings > 0) {
+            ElMessage.warning(`本次同步标记了 ${syncData.deleted_listings} 条已删除的 Listing（在 Amazon 后台已被删除）`)
+          } else {
+            ElMessage.success(response.data.message || 'Listing 同步完成')
+          }
           await fetchListings()
         } else {
           ElMessage.error(response.data.message || '同步失败')
