@@ -396,18 +396,45 @@
               <el-descriptions-item label="品牌">{{ listingDetail.brand || '-' }}</el-descriptions-item>
               <el-descriptions-item label="价格">
                 <template v-if="editingSection === 'price'">
-                  <el-input-number v-model="editForm.price" :min="0" :precision="2" style="width:150px;" />
-                  <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit" style="margin-left:8px;">保存</el-button>
-                  <el-button size="small" @click="cancelEdit" style="margin-left:8px;">取消</el-button>
+                  <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span style="font-size:13px;color:#333;white-space:nowrap;min-width:60px;">标准售价:</span>
+                      <el-input-number v-model="editForm.standardPrice" :min="0" :precision="2" style="width:150px;" />
+                      <span style="font-size:12px;color:#888;white-space:nowrap;">{{ getPriceCurrency() }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span style="font-size:13px;color:#333;white-space:nowrap;min-width:60px;">促销价:</span>
+                      <el-input-number v-model="editForm.salePrice" :min="0" :precision="2" style="width:150px;" />
+                      <span style="font-size:12px;color:#888;white-space:nowrap;">{{ getPriceCurrency() }} (选填)</span>
+                    </div>
+                    <template v-if="editForm.salePrice > 0">
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:13px;color:#333;white-space:nowrap;min-width:60px;">促销时段:</span>
+                        <el-date-picker v-model="editForm.saleStartDate" type="datetime" placeholder="开始时间" value-format="YYYY-MM-DDTHH:mm:ss[Z]" style="width:190px;" />
+                        <el-date-picker v-model="editForm.saleEndDate" type="datetime" placeholder="结束时间" value-format="YYYY-MM-DDTHH:mm:ss[Z]" style="width:190px;" />
+                      </div>
+                    </template>
+                    <div style="display:flex;gap:8px;">
+                      <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
+                      <el-button size="small" @click="cancelEdit">取消</el-button>
+                    </div>
+                  </div>
                 </template>
                 <template v-else>
-                  <span v-if="listingDetail.list_price !== undefined && listingDetail.list_price !== null">
-                    {{ listingDetail.list_price }} {{ listingDetail.list_price_currency || '' }}
-                  </span>
-                  <span v-else>-</span>
-                  <el-button type="primary" size="small" style="margin-left:8px;" @click="startEdit('price')">
-                    <el-icon><Edit /></el-icon> 编辑
-                  </el-button>
+                  <div>
+                    <div v-if="getPriceDisplay().primary !== null">
+                      <span style="font-weight:600;color:#1a1a2e;font-size:15px;">
+                        {{ getPriceDisplay().primary }} {{ getPriceCurrency() }}
+                      </span>
+                    </div>
+                    <div v-if="getPriceDisplay().msrp !== null" style="font-size:12px;color:#999;text-decoration:line-through;margin-top:2px;">
+                      MSRP {{ getPriceDisplay().msrp }} {{ listingDetail.list_price_currency || getPriceCurrency() }}
+                    </div>
+                    <span v-if="getPriceDisplay().primary === null && getPriceDisplay().msrp === null" style="color:#bbb;">-</span>
+                    <el-button type="primary" size="small" style="margin-left:8px;" @click="startEdit('price')">
+                      <el-icon><Edit /></el-icon> 编辑
+                    </el-button>
+                  </div>
                 </template>
               </el-descriptions-item>
               <el-descriptions-item label="商品标题" :span="3">
@@ -633,7 +660,10 @@ export default {
     const editSaving = ref(false)
     const editForm = reactive({
       title: '',
-      price: 0,
+      standardPrice: 0,
+      salePrice: 0,
+      saleStartDate: null,
+      saleEndDate: null,
       description: '',
       bullets: ['', '', '', '', '']
     })
@@ -849,7 +879,12 @@ export default {
           ? detail.item_name
           : (detail.item_name?.[0]?.value || '')
       } else if (section === 'price') {
-        editForm.price = detail.list_price || 0
+        const offers = detail.offers || []
+        const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
+        editForm.standardPrice = primaryOffer?.our_price ?? detail.list_price ?? 0
+        editForm.salePrice = 0
+        editForm.saleStartDate = null
+        editForm.saleEndDate = null
       } else if (section === 'description') {
         editForm.description = typeof detail.product_description === 'string'
           ? detail.product_description || ''
@@ -883,9 +918,35 @@ export default {
         patchValue = [{ value: editForm.title, language_tag: 'en_US' }]
         sectionLabel = '标题'
       } else if (editingSection.value === 'price') {
-        patchPath = '/attributes/list_price'
-        patchValue = [{ value: Number(editForm.price), currency: 'USD' }]
+        patchPath = '/attributes/purchasable_offer'
         sectionLabel = '价格'
+        const currencyCode = getPriceCurrency()
+        const marketplaceId = listingDetail.value.marketplace_id || ''
+        const purchasableOffer = {
+          marketplace_id: marketplaceId,
+          currency: currencyCode,
+          our_price: [
+            {
+              schedule: [
+                { value_with_tax: Number(editForm.standardPrice) }
+              ]
+            }
+          ]
+        }
+        if (editForm.salePrice > 0 && editForm.saleStartDate && editForm.saleEndDate) {
+          purchasableOffer.discounted_price = [
+            {
+              schedule: [
+                {
+                  value_with_tax: Number(editForm.salePrice),
+                  start_at: editForm.saleStartDate,
+                  end_at: editForm.saleEndDate
+                }
+              ]
+            }
+          ]
+        }
+        patchValue = [purchasableOffer]
       } else if (editingSection.value === 'description') {
         patchPath = '/attributes/product_description'
         patchValue = [{ value: editForm.description, language_tag: 'en_US' }]
@@ -922,7 +983,19 @@ export default {
           if (editingSection.value === 'title') {
             listingDetail.value.item_name = editForm.title
           } else if (editingSection.value === 'price') {
-            listingDetail.value.list_price = Number(editForm.price)
+            if (!listingDetail.value.offers) listingDetail.value.offers = []
+            const primaryOffer = listingDetail.value.offers.find(o => o.audience === 'ALL')
+            if (primaryOffer) {
+              primaryOffer.our_price = Number(editForm.standardPrice)
+            } else {
+              listingDetail.value.offers.unshift({
+                currency: getPriceCurrency(),
+                audience: 'ALL',
+                our_price: Number(editForm.standardPrice),
+                start_at: null,
+                end_at: null
+              })
+            }
           } else if (editingSection.value === 'description') {
             listingDetail.value.product_description = editForm.description
           } else if (editingSection.value === 'bullets') {
@@ -1082,6 +1155,31 @@ export default {
       return domainMap[marketplaceId] || 'amazon.com'
     }
 
+    // 获取当前 listing 的币种
+    const getPriceCurrency = () => {
+      const detail = listingDetail.value
+      if (!detail) return 'USD'
+      const offers = detail.offers || []
+      if (offers.length > 0 && offers[0].currency) return offers[0].currency
+      return detail.list_price_currency || 'USD'
+    }
+
+    // 获取价格展示数据：primary=实际售价, msrp=划线价
+    const getPriceDisplay = () => {
+      const detail = listingDetail.value
+      const result = { primary: null, msrp: null }
+      if (!detail) return result
+      const offers = detail.offers || []
+      const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
+      if (primaryOffer && primaryOffer.our_price != null) {
+        result.primary = primaryOffer.our_price
+      }
+      if (detail.list_price != null && detail.list_price !== result.primary) {
+        result.msrp = detail.list_price
+      }
+      return result
+    }
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -1129,6 +1227,8 @@ export default {
       getSingleStatusText,
       getIssuesIconColor,
       getRowClassName,
+      getPriceCurrency,
+      getPriceDisplay,
       editingSection,
       editSaving,
       editForm,
