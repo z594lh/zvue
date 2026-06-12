@@ -358,7 +358,10 @@
               提示：可修改 标题、价格、描述、卖点 ，带有 <el-icon style="vertical-align:middle;"><Edit /></el-icon> 图标的均可修改，点击保存后即提交到 Amazon。
             </template>
           </el-alert>
-          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;gap:8px;">
+            <el-button size="small" @click="openLanguageDialog" :disabled="!listingDetail">
+              <el-icon><Switch /></el-icon> 输入语言切换
+            </el-button>
             <el-button type="warning" size="small" :loading="syncDetailLoading" @click="syncDetail">
               <el-icon><RefreshRight /></el-icon> 同步最新数据
             </el-button>
@@ -504,10 +507,20 @@
               <div style="display:flex;flex-direction:column;gap:12px;">
                 <div v-for="(bullet, idx) in editForm.bullets" :key="idx" style="display:flex;align-items:center;gap:8px;">
                   <span style="font-size:13px;color:#888;min-width:20px;flex-shrink:0;">{{ idx + 1 }}.</span>
-                  <el-input v-model="editForm.bullets[idx]" :placeholder="`第 ${idx + 1} 点`" maxlength="500" show-word-limit />
+                  <el-input v-model="bullet.content" :placeholder="`第 ${idx + 1} 点`" maxlength="500" show-word-limit style="flex:1;" />
+                  <el-select v-model="bullet.language_tag" style="width:100px;" size="small" placeholder="语言">
+                    <el-option label="en_US" value="en_US" />
+                    <el-option label="zh_CN" value="zh_CN" />
+                  </el-select>
+                  <el-button type="danger" size="small" circle plain @click="editForm.bullets.splice(idx, 1)" :disabled="editForm.bullets.length <= 1">
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
                 </div>
               </div>
               <div style="display:flex;gap:8px;margin-top:12px;">
+                <el-button size="small" @click="editForm.bullets.push({ content: '', language_tag: 'en_US' })">
+                  <el-icon><Plus /></el-icon> 添加卖点
+                </el-button>
                 <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
                 <el-button size="small" @click="cancelEdit">取消</el-button>
               </div>
@@ -520,6 +533,27 @@
               </el-table>
             </template>
             <el-empty v-else description="暂无卖点" :image-size="60" />
+          </div>
+
+          <!-- 搜索关键字 -->
+          <div class="detail-section">
+            <div class="section-header">
+              <h4>搜索关键字</h4>
+              <el-button v-if="editingSection !== 'search_terms'" type="primary" size="small" @click="startEdit('search_terms')">
+                <el-icon><Edit /></el-icon> 编辑
+              </el-button>
+            </div>
+            <template v-if="editingSection === 'search_terms'">
+              <el-input v-model="editForm.searchTerms" type="textarea" :rows="3" placeholder="请输入搜索关键字" />
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
+                <el-button size="small" @click="cancelEdit">取消</el-button>
+              </div>
+            </template>
+            <template v-else-if="getGenericKeyword()">
+              <div class="description-box">{{ getGenericKeyword() }}</div>
+            </template>
+            <el-empty v-else description="暂无搜索关键字" :image-size="60" />
           </div>
 
           <!-- 图片列表 -->
@@ -575,8 +609,38 @@
             />
           </div>
         </div>
+        <div v-if="listingDetail" class="detail-sticky-close">
+          <el-button type="primary" @click="detailDialogVisible = false">关闭</el-button>
+        </div>
         <el-empty v-else description="暂无详情数据" />
       </div>
+    </el-dialog>
+
+    <!-- 切换语言弹框 -->
+    <el-dialog
+      v-model="languageDialogVisible"
+      title="切换语言"
+      width="400px"
+      align-center
+    >
+      <div style="text-align:center;padding:16px 0;">
+        <p style="margin-bottom:16px;color:#555;">
+          将 SKU <b>{{ currentListing?.sku }}</b> 的全部语言标签切换为：
+        </p>
+        <el-radio-group v-model="languageDialogSelected" size="default">
+          <el-radio-button value="en_US">en_US</el-radio-button>
+          <el-radio-button value="zh_CN">zh_CN</el-radio-button>
+        </el-radio-group>
+        <p style="margin-top:12px;font-size:12px;color:#999;">
+          含标题、品牌、描述、卖点、材质等全部字段
+        </p>
+      </div>
+      <template #footer>
+        <el-button @click="languageDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="listingLanguageLoading" @click="confirmLanguageChange">
+          确认切换
+        </el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -585,13 +649,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
   syncAmazonListings,
   syncListingToProduct,
   patchAmazonListing,
+  patchAmazonListingLanguage,
   syncAmazonListing
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
@@ -606,7 +671,10 @@ export default {
     Picture,
     WarningFilled,
     Edit,
-    Connection
+    Connection,
+    Delete,
+    Plus,
+    Switch
   },
   setup() {
     const loading = ref(false)
@@ -658,6 +726,10 @@ export default {
     // 编辑状态
     const editingSection = ref(null)
     const editSaving = ref(false)
+    const listingLanguageTag = ref('en_US')
+    const listingLanguageLoading = ref(false)
+    const languageDialogVisible = ref(false)
+    const languageDialogSelected = ref('en_US')
     const editForm = reactive({
       title: '',
       standardPrice: 0,
@@ -665,7 +737,8 @@ export default {
       saleStartDate: null,
       saleEndDate: null,
       description: '',
-      bullets: ['', '', '', '', '']
+      bullets: [{ content: '', language_tag: 'en_US' }],
+      searchTerms: ''
     })
 
     // 获取 Listing 列表
@@ -810,11 +883,13 @@ export default {
       detailDialogVisible.value = true
       detailLoading.value = true
       listingDetail.value = null
+      editingSection.value = null
 
       try {
         const response = await getAmazonListing(row.sku, selectedShopId.value)
         if (response.data.status === 'success') {
           listingDetail.value = response.data.data || null
+          updateListingLanguageTag()
         } else {
           ElMessage.error(response.data.message || '获取 Listing 详情失败')
         }
@@ -891,9 +966,16 @@ export default {
           : (detail.product_description?.[0]?.value || '')
       } else if (section === 'bullets') {
         const existingBullets = detail.bullets || []
-        for (let i = 0; i < 5; i++) {
-          editForm.bullets[i] = existingBullets[i]?.content || ''
+        const count = Math.max(existingBullets.length, 5)
+        editForm.bullets = existingBullets.slice(0, count).map(b => ({
+          content: b?.content || '',
+          language_tag: b?.language_tag || 'en_US'
+        }))
+        while (editForm.bullets.length < count) {
+          editForm.bullets.push({ content: '', language_tag: 'en_US' })
         }
+      } else if (section === 'search_terms') {
+        editForm.searchTerms = getGenericKeyword()
       }
       editingSection.value = section
     }
@@ -954,9 +1036,13 @@ export default {
       } else if (editingSection.value === 'bullets') {
         patchPath = '/attributes/bullet_point'
         patchValue = editForm.bullets
-          .filter(b => b.trim() !== '')
-          .map(b => ({ value: b, language_tag: 'en_US' }))
+          .filter(b => b.content.trim() !== '')
+          .map(b => ({ value: b.content, language_tag: b.language_tag }))
         sectionLabel = '五点描述'
+      } else if (editingSection.value === 'search_terms') {
+        patchPath = '/attributes/generic_keyword'
+        patchValue = [{ value: editForm.searchTerms, language_tag: 'en_US' }]
+        sectionLabel = '搜索关键字'
       } else {
         return
       }
@@ -1000,8 +1086,10 @@ export default {
             listingDetail.value.product_description = editForm.description
           } else if (editingSection.value === 'bullets') {
             listingDetail.value.bullets = editForm.bullets
-              .filter(b => b.trim() !== '')
-              .map((b, i) => ({ content: b, language_tag: 'en_US', sort_order: i + 1 }))
+              .filter(b => b.content.trim() !== '')
+              .map((b, i) => ({ content: b.content, language_tag: b.language_tag, sort_order: i + 1 }))
+          } else if (editingSection.value === 'search_terms') {
+            listingDetail.value.generic_keyword = editForm.searchTerms
           }
           ElMessage.success('修改已提交，Amazon 处理中...')
           editingSection.value = null
@@ -1030,6 +1118,7 @@ export default {
         const response = await getAmazonListing(listingDetail.value.sku, selectedShopId.value)
         if (response.data.status === 'success') {
           listingDetail.value = response.data.data || null
+          updateListingLanguageTag()
           ElMessage.success('同步成功')
         } else {
           ElMessage.error(response.data.message || '同步失败')
@@ -1039,6 +1128,52 @@ export default {
         ElMessage.error('同步失败: ' + (error.response?.data?.message || error.message))
       } finally {
         syncDetailLoading.value = false
+      }
+    }
+
+    const updateListingLanguageTag = () => {
+      const detail = listingDetail.value
+      if (detail?.bullets?.length > 0) {
+        listingLanguageTag.value = detail.bullets[0].language_tag || 'en_US'
+      }
+      return listingLanguageTag.value
+    }
+
+    const openLanguageDialog = () => {
+      if (!listingDetail.value) return
+      listingLanguageTag.value = updateListingLanguageTag()
+      languageDialogSelected.value = listingLanguageTag.value
+      languageDialogVisible.value = true
+    }
+
+    const confirmLanguageChange = async () => {
+      if (!listingDetail.value || !selectedShopId.value) return
+
+      const sku = listingDetail.value.sku
+      const val = languageDialogSelected.value
+
+      listingLanguageLoading.value = true
+      try {
+        const response = await patchAmazonListingLanguage(sku, {
+          shop_id: selectedShopId.value,
+          language_tag: val
+        })
+        if (response.data.status === 'success') {
+          ElMessage.success(`已更新 ${response.data.data?.updated_nodes || 0} 个节点`)
+          const resp = await getAmazonListing(sku, selectedShopId.value)
+          if (resp.data.status === 'success') {
+            listingDetail.value = resp.data.data || null
+            updateListingLanguageTag()
+          }
+        } else {
+          ElMessage.error(response.data.message || '切换失败')
+        }
+      } catch (error) {
+        console.error('切换语言失败:', error)
+        ElMessage.error('切换失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        listingLanguageLoading.value = false
+        languageDialogVisible.value = false
       }
     }
 
@@ -1180,6 +1315,26 @@ export default {
       return result
     }
 
+    const getGenericKeyword = () => {
+      const detail = listingDetail.value
+      if (!detail) return ''
+      if (detail.generic_keyword) {
+        return typeof detail.generic_keyword === 'string'
+          ? detail.generic_keyword
+          : (detail.generic_keyword[0]?.value || '')
+      }
+      try {
+        const attrs = JSON.parse(detail.attributes_json || '{}')
+        const gk = attrs.generic_keyword
+        if (gk) {
+          return typeof gk === 'string' ? gk : (gk[0]?.value || '')
+        }
+      } catch {
+        /* ignore parse error */
+      }
+      return ''
+    }
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -1229,12 +1384,18 @@ export default {
       getRowClassName,
       getPriceCurrency,
       getPriceDisplay,
+      getGenericKeyword,
       editingSection,
       editSaving,
       editForm,
       startEdit,
       cancelEdit,
-      saveEdit
+      saveEdit,
+      listingLanguageLoading,
+      languageDialogVisible,
+      languageDialogSelected,
+      openLanguageDialog,
+      confirmLanguageChange
     }
   }
 }
@@ -1455,5 +1616,29 @@ export default {
   .listing-detail .detail-section h4 {
     font-size: 14px;
   }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+:deep(.el-dialog) {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+:deep(.el-dialog__body) {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.detail-sticky-close {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 0;
+  border-top: 1px solid #eee;
+  margin-top: 12px;
 }
 </style>

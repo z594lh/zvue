@@ -914,6 +914,10 @@ export const patchAmazonListing = (sku, data) => {
   return api.patch(`/amazon/listings/${sku}`, data);
 };
 
+export const patchAmazonListingLanguage = (sku, data) => {
+  return api.patch(`/amazon/listings/${sku}/language`, data);
+};
+
 /**
  * 删除 Listing
  * @param {string} sku 卖家 SKU
