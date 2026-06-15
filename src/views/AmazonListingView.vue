@@ -229,9 +229,14 @@
 
         <el-table-column label="价格" width="110" align="right">
           <template #default="scope">
-            <span v-if="scope.row.list_price !== undefined && scope.row.list_price !== null" style="font-weight:600;color:#1a1a2e;">
-              {{ scope.row.list_price }} {{ scope.row.list_price_currency || '' }}
-            </span>
+            <template v-if="scope.row.our_price !== undefined && scope.row.our_price !== null">
+              <span style="font-weight:600;color:#1a1a2e;">
+                {{ scope.row.our_price }} {{ scope.row.currency || '' }}
+              </span>
+              <span v-if="scope.row.discounted_price !== undefined && scope.row.discounted_price !== null && scope.row.discounted_price !== scope.row.our_price" style="font-size:12px;color:#999;text-decoration:line-through;margin-left:4px;">
+                {{ scope.row.discounted_price }}
+              </span>
+            </template>
             <span v-else style="color:#bbb;">-</span>
           </template>
         </el-table-column>
@@ -431,7 +436,7 @@
                       </span>
                     </div>
                     <div v-if="getPriceDisplay().msrp !== null" style="font-size:12px;color:#999;text-decoration:line-through;margin-top:2px;">
-                      MSRP {{ getPriceDisplay().msrp }} {{ listingDetail.list_price_currency || getPriceCurrency() }}
+                      MSRP {{ getPriceDisplay().msrp }} {{ listingDetail.currency || getPriceCurrency() }}
                     </div>
                     <span v-if="getPriceDisplay().primary === null && getPriceDisplay().msrp === null" style="color:#bbb;">-</span>
                     <el-button type="primary" size="small" style="margin-left:8px;" @click="startEdit('price')">
@@ -956,7 +961,7 @@ export default {
       } else if (section === 'price') {
         const offers = detail.offers || []
         const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
-        editForm.standardPrice = primaryOffer?.our_price ?? detail.list_price ?? 0
+        editForm.standardPrice = primaryOffer?.our_price ?? detail.our_price ?? 0
         editForm.salePrice = 0
         editForm.saleStartDate = null
         editForm.saleEndDate = null
@@ -1294,9 +1299,10 @@ export default {
     const getPriceCurrency = () => {
       const detail = listingDetail.value
       if (!detail) return 'USD'
+      if (detail.currency) return detail.currency
       const offers = detail.offers || []
       if (offers.length > 0 && offers[0].currency) return offers[0].currency
-      return detail.list_price_currency || 'USD'
+      return detail.currency || 'USD'
     }
 
     // 获取价格展示数据：primary=实际售价, msrp=划线价
@@ -1304,13 +1310,17 @@ export default {
       const detail = listingDetail.value
       const result = { primary: null, msrp: null }
       if (!detail) return result
-      const offers = detail.offers || []
-      const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
-      if (primaryOffer && primaryOffer.our_price != null) {
-        result.primary = primaryOffer.our_price
+      if (detail.our_price != null) {
+        result.primary = detail.our_price
+      } else {
+        const offers = detail.offers || []
+        const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
+        if (primaryOffer && primaryOffer.our_price != null) {
+          result.primary = primaryOffer.our_price
+        }
       }
-      if (detail.list_price != null && detail.list_price !== result.primary) {
-        result.msrp = detail.list_price
+      if (detail.discounted_price != null && detail.discounted_price !== result.primary) {
+        result.msrp = detail.discounted_price
       }
       return result
     }
