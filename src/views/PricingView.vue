@@ -8,7 +8,21 @@
     <div class="main-content">
       <!-- 输入区域 -->
       <div class="input-card">
-        <h3 class="section-title">参数设置</h3>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+          <h3 class="section-title" style="margin:0;">参数设置</h3>
+          <el-select
+            v-model="formData.shop_id"
+            placeholder="选择店铺"
+            style="width: 200px"
+          >
+            <el-option
+              v-for="shop in shopList"
+              :key="shop.id"
+              :label="shop.shop_name"
+              :value="shop.id"
+            />
+          </el-select>
+        </div>
         <el-form :model="formData" label-width="140px" :rules="formRules" ref="formRef">
           <el-row :gutter="20">
             <el-col :span="12">
@@ -206,6 +220,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, View } from '@element-plus/icons-vue'
 import { calculatePricing, getProductOptions } from '@/services/api.js'
+import { useShopCache } from '@/composables/useShopCache'
 
 export default {
   name: 'PricingView',
@@ -228,8 +243,11 @@ export default {
     const expandedKeys = ref([])
     const treeKey = ref(0)
 
+    const { shopList, fetchShopList, defaultShopId } = useShopCache()
+
     const formData = reactive({
       seller_sku: '',
+      shop_id: null,
       target_profit_rate: 0.25,
       ad_rate: 0.20,
       refund_rate: 0.03
@@ -243,13 +261,18 @@ export default {
     const handleCalculate = async () => {
       const valid = await formRef.value?.validate().catch(() => false)
       if (!valid) return
+      if (!formData.shop_id) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
 
       loading.value = true
       result.value = null
       try {
         const payload = {
           seller_sku: formData.seller_sku,
-          target_profit_rate: formData.target_profit_rate
+          target_profit_rate: formData.target_profit_rate,
+          shop_id: formData.shop_id
         }
         if (formData.ad_rate !== null && formData.ad_rate !== undefined) payload.ad_rate = formData.ad_rate
         if (formData.refund_rate !== null && formData.refund_rate !== undefined) payload.refund_rate = formData.refund_rate
@@ -271,6 +294,7 @@ export default {
 
     const resetForm = () => {
       formData.seller_sku = ''
+      formData.shop_id = null
       formData.target_profit_rate = 0.25
       formData.ad_rate = 0.20
       formData.refund_rate = 0.03
@@ -377,6 +401,9 @@ export default {
 
     onMounted(() => {
       fetchProducts()
+      fetchShopList().then(() => {
+        formData.shop_id = defaultShopId()
+      })
     })
 
     return {
@@ -386,6 +413,7 @@ export default {
       formRules,
       result,
       productList,
+      shopList,
       handleCalculate,
       resetForm,
       formatNumber,
