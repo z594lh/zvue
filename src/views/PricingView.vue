@@ -1,164 +1,407 @@
 <template>
   <div class="pricing-page">
     <div class="page-header">
-      <h1 class="page-title">SKU 售价反算</h1>
-      <p class="page-subtitle">根据目标利润率，反推亚马逊售价</p>
+      <h1 class="page-title">SKU 售价计算</h1>
+      <p class="page-subtitle">正向反算售价与反向推估利润率</p>
     </div>
 
     <div class="main-content">
-      <!-- 输入区域 -->
-      <div class="input-card">
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-          <h3 class="section-title" style="margin:0;">参数设置</h3>
-          <el-select
-            v-model="formData.shop_id"
-            placeholder="选择店铺"
-            style="width: 200px"
-          >
-            <el-option
-              v-for="shop in shopList"
-              :key="shop.id"
-              :label="shop.shop_name"
-              :value="shop.id"
-            />
-          </el-select>
-        </div>
-        <el-form :model="formData" label-width="140px" :rules="formRules" ref="formRef">
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="Seller SKU" prop="seller_sku">
-                <el-select
-                  v-model="formData.seller_sku"
-                  placeholder="选择 SKU"
-                  clearable
-                  filterable
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="item in productList"
-                    :key="item.seller_sku"
-                    :label="item.seller_sku + (item.product_name ? ' - ' + item.product_name : '')"
-                    :value="item.seller_sku"
-                  />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="目标利润率" prop="target_profit_rate">
-                <el-input-number
-                  v-model="formData.target_profit_rate"
-                  :min="0"
-                  :max="1"
-                  :precision="2"
-                  :step="0.05"
-                  style="width: 100%"
+      <el-tabs v-model="activeTab" type="border-card" @tab-change="handleTabChange">
+        <!-- ==================== 正向计算 ==================== -->
+        <el-tab-pane label="正向计算" name="forward">
+          <div class="input-card">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+              <h3 class="section-title" style="margin:0;">参数设置</h3>
+              <el-select
+                v-model="formForward.shop_id"
+                placeholder="选择店铺"
+                style="width: 200px"
+              >
+                <el-option
+                  v-for="shop in shopList"
+                  :key="shop.id"
+                  :label="shop.shop_name"
+                  :value="shop.id"
                 />
-                <span class="input-hint">如 0.25 = 25%</span>
-              </el-form-item>
-            </el-col>
-          </el-row>
+              </el-select>
+            </div>
+            <el-form :model="formForward" label-width="140px" :rules="forwardRules" ref="formForwardRef">
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="Seller SKU" prop="seller_sku">
+                    <el-select
+                      v-model="formForward.seller_sku"
+                      placeholder="选择 SKU"
+                      clearable
+                      filterable
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="item in productList"
+                        :key="item.seller_sku"
+                        :label="item.seller_sku + (item.product_name ? ' - ' + item.product_name : '')"
+                        :value="item.seller_sku"
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="目标利润率" prop="target_profit_rate">
+                    <el-input-number
+                      v-model="formForward.target_profit_rate"
+                      :min="0"
+                      :max="1"
+                      :precision="2"
+                      :step="0.05"
+                      style="width: 100%"
+                    />
+                    <span class="input-hint">如 0.25 = 25%</span>
+                  </el-form-item>
+                </el-col>
+              </el-row>
 
-          <el-divider>可选参数（留空使用默认值）</el-divider>
+              <el-divider>可选参数（留空使用默认值）</el-divider>
 
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="广告费率 (ACoS)">
-                <el-input-number
-                  v-model="formData.ad_rate"
-                  :min="0"
-                  :max="1"
-                  :precision="2"
-                  :step="0.05"
-                  style="width: 100%"
-                />
-                <span class="input-hint">默认 0.20</span>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="退货率">
-                <el-input-number
-                  v-model="formData.refund_rate"
-                  :min="0"
-                  :max="1"
-                  :precision="2"
-                  :step="0.01"
-                  style="width: 100%"
-                />
-                <span class="input-hint">默认 0.03</span>
-              </el-form-item>
-            </el-col>
-          </el-row>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="广告费率 (ACoS)">
+                    <el-input-number
+                      v-model="formForward.ad_rate"
+                      :min="0"
+                      :max="1"
+                      :precision="2"
+                      :step="0.05"
+                      style="width: 100%"
+                    />
+                    <span class="input-hint">默认 0.20</span>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="退货率">
+                    <el-input-number
+                      v-model="formForward.refund_rate"
+                      :min="0"
+                      :max="1"
+                      :precision="2"
+                      :step="0.01"
+                      style="width: 100%"
+                    />
+                    <span class="input-hint">默认 0.03</span>
+                  </el-form-item>
+                </el-col>
+              </el-row>
 
-          <div class="form-actions">
-            <el-button type="primary" size="large" @click="handleCalculate" :loading="loading">
-              <el-icon><Search /></el-icon>
-              计算售价
-            </el-button>
-            <el-button size="large" @click="resetForm">
-              <el-icon><Refresh /></el-icon>
-              重置
-            </el-button>
-          </div>
-        </el-form>
-      </div>
-
-      <!-- 结果区域 -->
-      <div v-if="result" class="result-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-          <h3 class="section-title" style="margin:0;">计算结果</h3>
-          <el-button type="primary" plain size="small" @click="viewCalcTree">
-            <el-icon><View /></el-icon> 查看计算过程
-          </el-button>
-        </div>
-
-        <div class="result-highlight">
-          <div class="result-item primary">
-            <div class="result-label">建议售价</div>
-            <div class="result-value">${{ formatNumber(result.suggested_price) }}</div>
-          </div>
-          <div class="result-item">
-            <div class="result-label">预计利润</div>
-            <div class="result-value" style="color: #67c23a;">${{ formatNumber(result.profit_amount) }}</div>
-          </div>
-          <div class="result-item">
-            <div class="result-label">利润率</div>
-            <div class="result-value" style="color: #409eff;">{{ formatPercent(result.actual_profit_rate) }}</div>
-          </div>
-        </div>
-
-        <el-descriptions :column="2" border class="detail-descriptions">
-          <el-descriptions-item label="SKU">{{ result.seller_sku }}</el-descriptions-item>
-          <el-descriptions-item label="产品名称">{{ result.product_name || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="ASIN">{{ result.asin || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="重量 (kg)">{{ result.weight_kg || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="采购成本">{{ result.purchase_cost ? (result.purchase_cost.value + ' ' + result.purchase_cost.currency + ' ≈ $' + formatNumber(result.purchase_cost.usd)) : '-' }}</el-descriptions-item>
-          <el-descriptions-item label="FBA 配送费">${{ formatNumber(result.cost_breakdown?.fba_fee_usd) }}</el-descriptions-item>
-          <el-descriptions-item label="佣金">${{ formatNumber(result.cost_breakdown?.commission_usd) }}</el-descriptions-item>
-          <el-descriptions-item label="广告费">${{ formatNumber(result.cost_breakdown?.ad_cost_usd) }}</el-descriptions-item>
-          <el-descriptions-item label="退货损失">${{ formatNumber(result.cost_breakdown?.refund_cost_usd) }}</el-descriptions-item>
-          <el-descriptions-item label="头程运费">
-            <template v-if="result.freight_cost && result.freight_cost.detail">
-              <div class="freight-detail">
-                <div class="freight-amount">${{ formatNumber(result.cost_breakdown?.freight_cost_usd) }}</div>
-                <div class="freight-meta">
-                  <span>货件：{{ result.freight_cost.detail.shipment_id || '-' }}</span>
-                  <span>数量：{{ result.freight_cost.detail.quantity_shipped }} 件</span>
-                </div>
-                <div class="freight-meta">
-                  <span>SKU重量：{{ result.freight_cost.detail.sku_weight_kg }} kg</span>
-                  <span>货件总重：{{ result.freight_cost.detail.shipment_total_weight_kg }} kg</span>
-                </div>
-                <div class="freight-meta">
-                  <span>运单总费用：¥{{ formatNumber(result.freight_cost.detail.waybill_total_cost_cny) }}</span>
-                </div>
-                <div class="freight-formula">分摊公式：{{ result.freight_cost.detail.allocation_formula }}</div>
+              <div class="form-actions">
+                <el-button type="primary" size="large" @click="handleForwardCalculate" :loading="loadingForward">
+                  <el-icon><Search /></el-icon>
+                  计算售价
+                </el-button>
+                <el-button size="large" @click="resetForwardForm">
+                  <el-icon><Refresh /></el-icon>
+                  重置
+                </el-button>
               </div>
-            </template>
-            <template v-else>${{ formatNumber(result.cost_breakdown?.freight_cost_usd) }}</template>
-          </el-descriptions-item>
-          <el-descriptions-item label="总成本">${{ formatNumber(result.cost_breakdown?.total_cost_usd) }}</el-descriptions-item>
-        </el-descriptions>
-      </div>
+            </el-form>
+          </div>
+
+          <div v-if="resultForward" class="result-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+              <h3 class="section-title" style="margin:0;">计算结果</h3>
+              <el-button type="primary" plain size="small" @click="viewCalcTree('forward')">
+                <el-icon><View /></el-icon> 查看计算过程
+              </el-button>
+            </div>
+
+            <div class="result-highlight">
+              <div class="result-item primary">
+                <div class="result-label">建议售价</div>
+                <div class="result-value">${{ formatNumber(resultForward.suggested_price) }}</div>
+              </div>
+              <div class="result-item">
+                <div class="result-label">预计利润</div>
+                <div class="result-value" :style="{ color: (resultForward.profit_amount >= 0 ? '#67c23a' : '#f56c6c') }">${{ formatNumber(resultForward.profit_amount) }}</div>
+              </div>
+              <div class="result-item">
+                <div class="result-label">实际利润率</div>
+                <div class="result-value" style="color: #409eff;">{{ formatPercent(resultForward.actual_profit_rate) }}</div>
+              </div>
+            </div>
+
+            <el-descriptions :column="2" border class="detail-descriptions">
+              <el-descriptions-item label="SKU">{{ resultForward.seller_sku }}</el-descriptions-item>
+              <el-descriptions-item label="产品名称">{{ resultForward.product_name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="ASIN">{{ resultForward.asin || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="重量 (kg)">{{ resultForward.weight_kg || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="佣金费率">
+                {{ formatPercent(resultForward.commission?.rate) }}
+                <span class="source-hint">{{ resultForward.commission?.source }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="FBA 配送费">
+                ${{ formatNumber(resultForward.fba_fee?.fee_usd) }}
+                <span class="source-hint">{{ resultForward.fba_fee?.tier ? 'Size tier: ' + resultForward.fba_fee.tier : '' }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="采购成本">{{ resultForward.purchase_cost ? (resultForward.purchase_cost.value + ' ' + resultForward.purchase_cost.currency + ' ≈ $' + formatNumber(resultForward.purchase_cost.usd)) : '-' }}</el-descriptions-item>
+              <el-descriptions-item label="汇率">{{ formatNumber(resultForward.inputs?.exchange_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="目标利润率">{{ formatPercent(resultForward.inputs?.target_profit_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="广告费率">{{ formatPercent(resultForward.inputs?.ad_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="退货率">{{ formatPercent(resultForward.inputs?.refund_rate) }}</el-descriptions-item>
+            </el-descriptions>
+
+            <el-divider>成本拆解</el-divider>
+
+            <div class="cost-breakdown-grid">
+              <div class="cost-group-card">
+                <div class="cost-group-header">固定成本 <span class="cost-group-note">(不随售价变动)</span></div>
+                <div class="cost-items">
+                  <div class="cost-item">采购成本 <span>${{ formatNumber(resultForward.cost_breakdown?.purchase_cost_usd) }}</span></div>
+                  <div class="cost-item">头程运费 <span>${{ formatNumber(resultForward.cost_breakdown?.freight_cost_usd) }}</span></div>
+                  <div class="cost-item">FBA配送费 <span>${{ formatNumber(resultForward.cost_breakdown?.fba_fee_usd) }}</span></div>
+                </div>
+                <div class="cost-group-total">= ${{ formatNumber(fixedCostUsd(resultForward.cost_breakdown)) }}</div>
+              </div>
+              <div class="cost-operator">+</div>
+              <div class="cost-group-card">
+                <div class="cost-group-header">变动成本 <span class="cost-group-note">(随售价浮动)</span></div>
+                <div class="formula-line">= 售价 × (佣金率 + 广告率 + 退货率)</div>
+                <div class="cost-items">
+                  <div class="cost-item">佣金 <span>${{ formatNumber(resultForward.cost_breakdown?.commission_usd) }}</span></div>
+                  <div class="cost-item">广告费 <span>${{ formatNumber(resultForward.cost_breakdown?.ad_cost_usd) }}</span></div>
+                  <div class="cost-item">退货损失 <span>${{ formatNumber(resultForward.cost_breakdown?.refund_cost_usd) }}</span></div>
+                </div>
+                <div class="cost-group-total">= ${{ formatNumber(resultForward.cost_breakdown?.variable_cost_usd) }}</div>
+              </div>
+              <div class="cost-operator">=</div>
+              <div class="cost-group-card cost-card-total">
+                <div class="cost-group-header">总成本</div>
+                <div class="cost-group-total cost-total-value">${{ formatNumber(resultForward.cost_breakdown?.total_cost_usd) }}</div>
+              </div>
+            </div>
+
+            <div v-if="resultForward.freight_cost && resultForward.freight_cost.detail" style="margin-top:16px;">
+              <el-divider>头程运费明细</el-divider>
+              <div class="freight-detail">
+                <div class="freight-meta">
+                  <span>运单号：{{ resultForward.freight_cost.detail.waybill_no || '-' }}</span>
+                  <span>货件：{{ resultForward.freight_cost.detail.shipment_id || '-' }}</span>
+                </div>
+                <div class="freight-meta">
+                  <span>货代：{{ resultForward.freight_cost.detail.provider_name || '-' }}</span>
+                </div>
+                <div class="freight-meta">
+                  <span>SKU重量：{{ resultForward.freight_cost.detail.sku_weight_kg }} kg</span>
+                  <span>货件总重：{{ resultForward.freight_cost.detail.shipment_total_weight_kg }} kg</span>
+                </div>
+                <div class="freight-meta">
+                  <span>运单总费用：¥{{ formatNumber(resultForward.freight_cost.detail.waybill_total_cost_cny) }}</span>
+                  <span>运费：¥{{ formatNumber(resultForward.freight_cost.detail.freight_cost_cny) }}</span>
+                  <span>关税：¥{{ formatNumber(resultForward.freight_cost.detail.tax_cost_cny) }}</span>
+                  <span>杂费：¥{{ formatNumber(resultForward.freight_cost.detail.misc_cost_cny) }}</span>
+                </div>
+                <div class="freight-formula">
+                  分摊 = 运单总费用 × (SKU重量 / 货件总重) = ¥{{ formatNumber(resultForward.freight_cost.detail.waybill_total_cost_cny) }} × ({{ resultForward.freight_cost.detail.sku_weight_kg }} / {{ resultForward.freight_cost.detail.shipment_total_weight_kg }}) = ¥{{ formatNumber(resultForward.freight_cost.cny) }} = ${{ formatNumber(resultForward.freight_cost.usd) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <!-- ==================== 反向计算 ==================== -->
+        <el-tab-pane label="反向计算" name="reverse">
+          <div class="input-card">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+              <h3 class="section-title" style="margin:0;">参数设置</h3>
+              <el-select
+                v-model="formReverse.shop_id"
+                placeholder="选择店铺"
+                style="width: 200px"
+              >
+                <el-option
+                  v-for="shop in shopList"
+                  :key="shop.id"
+                  :label="shop.shop_name"
+                  :value="shop.id"
+                />
+              </el-select>
+            </div>
+            <el-form :model="formReverse" label-width="140px" :rules="reverseRules" ref="formReverseRef">
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="Seller SKU" prop="seller_sku">
+                    <el-select
+                      v-model="formReverse.seller_sku"
+                      placeholder="选择 SKU"
+                      clearable
+                      filterable
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="item in productList"
+                        :key="item.seller_sku"
+                        :label="item.seller_sku + (item.product_name ? ' - ' + item.product_name : '')"
+                        :value="item.seller_sku"
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="实际售价 (USD)" prop="selling_price">
+                    <el-input-number
+                      v-model="formReverse.selling_price"
+                      :min="0.01"
+                      :precision="2"
+                      :step="1"
+                      style="width: 100%"
+                      placeholder="输入实际售价"
+                    />
+                    <span class="input-hint">如 29.99</span>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <el-divider>可选参数（留空使用默认值）</el-divider>
+
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="广告费率 (ACoS)">
+                    <el-input-number
+                      v-model="formReverse.ad_rate"
+                      :min="0"
+                      :max="1"
+                      :precision="2"
+                      :step="0.05"
+                      style="width: 100%"
+                    />
+                    <span class="input-hint">默认 0.20</span>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="退货率">
+                    <el-input-number
+                      v-model="formReverse.refund_rate"
+                      :min="0"
+                      :max="1"
+                      :precision="2"
+                      :step="0.01"
+                      style="width: 100%"
+                    />
+                    <span class="input-hint">默认 0.03</span>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <div class="form-actions">
+                <el-button type="primary" size="large" @click="handleReverseCalculate" :loading="loadingReverse">
+                  <el-icon><Search /></el-icon>
+                  反推利润率
+                </el-button>
+                <el-button size="large" @click="resetReverseForm">
+                  <el-icon><Refresh /></el-icon>
+                  重置
+                </el-button>
+              </div>
+            </el-form>
+          </div>
+
+          <div v-if="resultReverse" class="result-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+              <h3 class="section-title" style="margin:0;">计算结果</h3>
+              <el-button type="primary" plain size="small" @click="viewCalcTree('reverse')">
+                <el-icon><View /></el-icon> 查看计算过程
+              </el-button>
+            </div>
+
+            <div class="result-highlight">
+              <div class="result-item" :class="profitRateClass">
+                <div class="result-label">实际利润率</div>
+                <div class="result-value">{{ formatPercent(resultReverse.profit_rate) }}</div>
+              </div>
+              <div class="result-item">
+                <div class="result-label">利润金额</div>
+                <div class="result-value" :style="{ color: (resultReverse.profit_amount >= 0 ? '#67c23a' : '#f56c6c') }">${{ formatNumber(resultReverse.profit_amount) }}</div>
+              </div>
+              <div class="result-item">
+                <div class="result-label">实际售价</div>
+                <div class="result-value" style="color: #409eff;">${{ formatNumber(resultReverse.inputs?.selling_price) }}</div>
+              </div>
+            </div>
+
+            <el-descriptions :column="2" border class="detail-descriptions">
+              <el-descriptions-item label="SKU">{{ resultReverse.seller_sku }}</el-descriptions-item>
+              <el-descriptions-item label="产品名称">{{ resultReverse.product_name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="ASIN">{{ resultReverse.asin || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="重量 (kg)">{{ resultReverse.weight_kg || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="佣金费率">
+                {{ formatPercent(resultReverse.commission?.rate) }}
+                <span class="source-hint">{{ resultReverse.commission?.source }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="FBA 配送费">
+                ${{ formatNumber(resultReverse.fba_fee?.fee_usd) }}
+                <span class="source-hint">{{ resultReverse.fba_fee?.tier ? 'Size tier: ' + resultReverse.fba_fee.tier : '' }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="采购成本">{{ resultReverse.purchase_cost ? (resultReverse.purchase_cost.value + ' ' + resultReverse.purchase_cost.currency + ' ≈ $' + formatNumber(resultReverse.purchase_cost.usd)) : '-' }}</el-descriptions-item>
+              <el-descriptions-item label="汇率">{{ formatNumber(resultReverse.inputs?.exchange_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="广告费率">{{ formatPercent(resultReverse.inputs?.ad_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="退货率">{{ formatPercent(resultReverse.inputs?.refund_rate) }}</el-descriptions-item>
+            </el-descriptions>
+
+            <el-divider>成本拆解</el-divider>
+
+            <div class="cost-breakdown-grid">
+              <div class="cost-group-card">
+                <div class="cost-group-header">固定成本 <span class="cost-group-note">(不随售价变动)</span></div>
+                <div class="cost-items">
+                  <div class="cost-item">采购成本 <span>${{ formatNumber(resultReverse.cost_breakdown?.purchase_cost_usd) }}</span></div>
+                  <div class="cost-item">头程运费 <span>${{ formatNumber(resultReverse.cost_breakdown?.freight_cost_usd) }}</span></div>
+                  <div class="cost-item">FBA配送费 <span>${{ formatNumber(resultReverse.cost_breakdown?.fba_fee_usd) }}</span></div>
+                </div>
+                <div class="cost-group-total">= ${{ formatNumber(fixedCostUsd(resultReverse.cost_breakdown)) }}</div>
+              </div>
+              <div class="cost-operator">+</div>
+              <div class="cost-group-card">
+                <div class="cost-group-header">变动成本 <span class="cost-group-note">(随售价浮动)</span></div>
+                <div class="formula-line">= 售价 × (佣金率 + 广告率 + 退货率)</div>
+                <div class="cost-items">
+                  <div class="cost-item">佣金 <span>${{ formatNumber(resultReverse.cost_breakdown?.commission_usd) }}</span></div>
+                  <div class="cost-item">广告费 <span>${{ formatNumber(resultReverse.cost_breakdown?.ad_cost_usd) }}</span></div>
+                  <div class="cost-item">退货损失 <span>${{ formatNumber(resultReverse.cost_breakdown?.refund_cost_usd) }}</span></div>
+                </div>
+                <div class="cost-group-total">= ${{ formatNumber(resultReverse.cost_breakdown?.variable_cost_usd) }}</div>
+              </div>
+              <div class="cost-operator">=</div>
+              <div class="cost-group-card cost-card-total">
+                <div class="cost-group-header">总成本</div>
+                <div class="cost-group-total cost-total-value">${{ formatNumber(resultReverse.cost_breakdown?.total_cost_usd) }}</div>
+              </div>
+            </div>
+
+            <div v-if="resultReverse.freight_cost && resultReverse.freight_cost.detail" style="margin-top:16px;">
+              <el-divider>头程运费明细</el-divider>
+              <div class="freight-detail">
+                <div class="freight-meta">
+                  <span>运单号：{{ resultReverse.freight_cost.detail.waybill_no || '-' }}</span>
+                  <span>货件：{{ resultReverse.freight_cost.detail.shipment_id || '-' }}</span>
+                </div>
+                <div class="freight-meta">
+                  <span>货代：{{ resultReverse.freight_cost.detail.provider_name || '-' }}</span>
+                </div>
+                <div class="freight-meta">
+                  <span>SKU重量：{{ resultReverse.freight_cost.detail.sku_weight_kg }} kg</span>
+                  <span>货件总重：{{ resultReverse.freight_cost.detail.shipment_total_weight_kg }} kg</span>
+                </div>
+                <div class="freight-meta">
+                  <span>运单总费用：¥{{ formatNumber(resultReverse.freight_cost.detail.waybill_total_cost_cny) }}</span>
+                  <span>运费：¥{{ formatNumber(resultReverse.freight_cost.detail.freight_cost_cny) }}</span>
+                  <span>关税：¥{{ formatNumber(resultReverse.freight_cost.detail.tax_cost_cny) }}</span>
+                  <span>杂费：¥{{ formatNumber(resultReverse.freight_cost.detail.misc_cost_cny) }}</span>
+                </div>
+                <div class="freight-formula">
+                  分摊 = 运单总费用 × (SKU重量 / 货件总重) = ¥{{ formatNumber(resultReverse.freight_cost.detail.waybill_total_cost_cny) }} × ({{ resultReverse.freight_cost.detail.sku_weight_kg }} / {{ resultReverse.freight_cost.detail.shipment_total_weight_kg }}) = ¥{{ formatNumber(resultReverse.freight_cost.cny) }} = ${{ formatNumber(resultReverse.freight_cost.usd) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
     </div>
 
     <!-- 计算过程弹窗 -->
@@ -216,10 +459,10 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, View } from '@element-plus/icons-vue'
-import { calculatePricing, getProductOptions } from '@/services/api.js'
+import { calculatePricing, calculateProfitRate, getProductOptions } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
 export default {
@@ -230,22 +473,14 @@ export default {
     View
   },
   setup() {
-    const loading = ref(false)
-    const formRef = ref(null)
-    const result = ref(null)
+    const activeTab = ref('forward')
 
-    // 计算过程弹窗
-    const logsDialogVisible = ref(false)
-    const logsLoading = ref(false)
-    const currentLogSku = ref('')
-    const treeData = ref([])
-    const varLabelMap = ref({})
-    const expandedKeys = ref([])
-    const treeKey = ref(0)
+    // --- 正向计算 ---
+    const loadingForward = ref(false)
+    const formForwardRef = ref(null)
+    const resultForward = ref(null)
 
-    const { shopList, fetchShopList, defaultShopId } = useShopCache()
-
-    const formData = reactive({
+    const formForward = reactive({
       seller_sku: '',
       shop_id: null,
       target_profit_rate: 0.25,
@@ -253,33 +488,33 @@ export default {
       refund_rate: 0.03
     })
 
-    const formRules = {
-      seller_sku: [{ required: true, message: '请输入 SKU', trigger: 'blur' }],
+    const forwardRules = {
+      seller_sku: [{ required: true, message: '请选择 SKU', trigger: 'change' }],
       target_profit_rate: [{ required: true, message: '请输入目标利润率', trigger: 'change' }]
     }
 
-    const handleCalculate = async () => {
-      const valid = await formRef.value?.validate().catch(() => false)
+    const handleForwardCalculate = async () => {
+      const valid = await formForwardRef.value?.validate().catch(() => false)
       if (!valid) return
-      if (!formData.shop_id) {
+      if (!formForward.shop_id) {
         ElMessage.warning('请选择店铺')
         return
       }
 
-      loading.value = true
-      result.value = null
+      loadingForward.value = true
+      resultForward.value = null
       try {
         const payload = {
-          seller_sku: formData.seller_sku,
-          target_profit_rate: formData.target_profit_rate,
-          shop_id: formData.shop_id
+          seller_sku: formForward.seller_sku,
+          target_profit_rate: formForward.target_profit_rate,
+          shop_id: formForward.shop_id
         }
-        if (formData.ad_rate !== null && formData.ad_rate !== undefined) payload.ad_rate = formData.ad_rate
-        if (formData.refund_rate !== null && formData.refund_rate !== undefined) payload.refund_rate = formData.refund_rate
+        if (formForward.ad_rate !== null && formForward.ad_rate !== undefined) payload.ad_rate = formForward.ad_rate
+        if (formForward.refund_rate !== null && formForward.refund_rate !== undefined) payload.refund_rate = formForward.refund_rate
 
         const response = await calculatePricing(payload)
         if (response.data.status === 'success') {
-          result.value = response.data.data
+          resultForward.value = response.data.data
           ElMessage.success('计算完成')
         } else {
           ElMessage.error(response.data.message || '计算失败')
@@ -288,19 +523,93 @@ export default {
         console.error('计算售价失败:', error)
         ElMessage.error('计算失败: ' + (error.response?.data?.message || error.message))
       } finally {
-        loading.value = false
+        loadingForward.value = false
       }
     }
 
-    const resetForm = () => {
-      formData.seller_sku = ''
-      formData.shop_id = null
-      formData.target_profit_rate = 0.25
-      formData.ad_rate = 0.20
-      formData.refund_rate = 0.03
-      result.value = null
-      formRef.value?.resetFields?.()
+    const resetForwardForm = () => {
+      formForward.seller_sku = ''
+      formForward.shop_id = null
+      formForward.target_profit_rate = 0.25
+      formForward.ad_rate = 0.20
+      formForward.refund_rate = 0.03
+      resultForward.value = null
+      formForwardRef.value?.resetFields?.()
     }
+
+    // --- 反向计算 ---
+    const loadingReverse = ref(false)
+    const formReverseRef = ref(null)
+    const resultReverse = ref(null)
+
+    const formReverse = reactive({
+      seller_sku: '',
+      shop_id: null,
+      selling_price: null,
+      ad_rate: 0.20,
+      refund_rate: 0.03
+    })
+
+    const reverseRules = {
+      seller_sku: [{ required: true, message: '请选择 SKU', trigger: 'change' }],
+      selling_price: [{ required: true, message: '请输入实际售价', trigger: 'change' }]
+    }
+
+    const profitRateClass = computed(() => {
+      if (!resultReverse.value) return ''
+      const rate = resultReverse.value.profit_rate
+      if (rate > 0) return 'positive'
+      if (rate < 0) return 'negative'
+      return 'zero'
+    })
+
+    const handleReverseCalculate = async () => {
+      const valid = await formReverseRef.value?.validate().catch(() => false)
+      if (!valid) return
+      if (!formReverse.shop_id) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+
+      loadingReverse.value = true
+      resultReverse.value = null
+      try {
+        const payload = {
+          seller_sku: formReverse.seller_sku,
+          selling_price: formReverse.selling_price,
+          shop_id: formReverse.shop_id
+        }
+        if (formReverse.ad_rate !== null && formReverse.ad_rate !== undefined) payload.ad_rate = formReverse.ad_rate
+        if (formReverse.refund_rate !== null && formReverse.refund_rate !== undefined) payload.refund_rate = formReverse.refund_rate
+
+        const response = await calculateProfitRate(payload)
+        if (response.data.status === 'success') {
+          resultReverse.value = response.data.data
+          ElMessage.success('计算完成')
+        } else {
+          ElMessage.error(response.data.message || '计算失败')
+        }
+      } catch (error) {
+        console.error('反推利润率失败:', error)
+        ElMessage.error('计算失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        loadingReverse.value = false
+      }
+    }
+
+    const resetReverseForm = () => {
+      formReverse.seller_sku = ''
+      formReverse.shop_id = null
+      formReverse.selling_price = null
+      formReverse.ad_rate = 0.20
+      formReverse.refund_rate = 0.03
+      resultReverse.value = null
+      formReverseRef.value?.resetFields?.()
+    }
+
+    // --- 公用 ---
+    const { shopList, fetchShopList, defaultShopId } = useShopCache()
+    const productList = ref([])
 
     const formatNumber = (val) => {
       if (val == null) return '-'
@@ -312,6 +621,22 @@ export default {
       return (Number(val) * 100).toFixed(2) + '%'
     }
 
+    const fixedCostUsd = (breakdown) => {
+      if (!breakdown) return null
+      if (breakdown.fixed_cost_usd != null) return breakdown.fixed_cost_usd
+      return (breakdown.purchase_cost_usd || 0) + (breakdown.freight_cost_usd || 0) + (breakdown.fba_fee_usd || 0)
+    }
+
+    // --- 计算过程弹窗 ---
+    const logsDialogVisible = ref(false)
+    const logsLoading = ref(false)
+    const currentLogSku = ref('')
+    const treeData = ref([])
+    const varLabelMap = ref({})
+    const expandedKeys = ref([])
+    const treeKey = ref(0)
+    const currentResultMode = ref('forward')
+
     const getNodeLabel = (data) => {
       const candidates = [data.variable_label, data.variableLabel, data.label, data.varLabel]
       for (const c of candidates) {
@@ -320,7 +645,6 @@ export default {
       return data.variable_name || '-'
     }
 
-    // 为节点注入唯一 id（后端 calc_tree 无 id 字段）
     const injectIds = (nodes, prefix = '') => {
       nodes.forEach((node, index) => {
         node.id = prefix ? `${prefix}-${index}` : `root-${index}`
@@ -370,9 +694,11 @@ export default {
       return sql
     }
 
-    const viewCalcTree = () => {
-      currentLogSku.value = result.value?.seller_sku || ''
-      const calcTree = result.value?.calc_tree
+    const viewCalcTree = (mode) => {
+      currentResultMode.value = mode
+      const result = mode === 'forward' ? resultForward.value : resultReverse.value
+      currentLogSku.value = result?.seller_sku || ''
+      const calcTree = result?.calc_tree
       if (calcTree) {
         const cloned = JSON.parse(JSON.stringify(calcTree))
         injectIds([cloned])
@@ -386,7 +712,9 @@ export default {
       logsDialogVisible.value = true
     }
 
-    const productList = ref([])
+    const handleTabChange = () => {
+      // 切换 tab 时不自动计算
+    }
 
     const fetchProducts = async () => {
       try {
@@ -402,22 +730,34 @@ export default {
     onMounted(() => {
       fetchProducts()
       fetchShopList().then(() => {
-        formData.shop_id = defaultShopId()
+        const defaultId = defaultShopId()
+        formForward.shop_id = defaultId
+        formReverse.shop_id = defaultId
       })
     })
 
     return {
-      loading,
-      formRef,
-      formData,
-      formRules,
-      result,
-      productList,
+      activeTab,
+      loadingForward,
+      formForwardRef,
+      formForward,
+      forwardRules,
+      resultForward,
+      handleForwardCalculate,
+      resetForwardForm,
+      loadingReverse,
+      formReverseRef,
+      formReverse,
+      reverseRules,
+      resultReverse,
+      profitRateClass,
+      handleReverseCalculate,
+      resetReverseForm,
       shopList,
-      handleCalculate,
-      resetForm,
+      productList,
       formatNumber,
       formatPercent,
+      fixedCostUsd,
       logsDialogVisible,
       logsLoading,
       currentLogSku,
@@ -428,7 +768,8 @@ export default {
       getNodeLabel,
       translateFormula,
       buildSourceSql,
-      viewCalcTree
+      viewCalcTree,
+      handleTabChange
     }
   }
 }
@@ -473,6 +814,14 @@ export default {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+.input-card {
+  margin-top: 16px;
+}
+
+.result-card {
+  margin-top: 20px;
+}
+
 .section-title {
   font-size: 18px;
   font-weight: 600;
@@ -485,6 +834,114 @@ export default {
   color: #999;
   margin-top: 4px;
   display: block;
+}
+
+.source-hint {
+  font-size: 11px;
+  color: #909399;
+  margin-left: 8px;
+}
+
+/* 成本拆解三列布局 */
+.cost-breakdown-grid {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 8px;
+}
+
+.cost-group-card {
+  flex: 1;
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.cost-group-card.cost-card-total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.cost-group-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.cost-card-total .cost-group-header {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.cost-group-note {
+  font-size: 12px;
+  color: #909399;
+  font-weight: normal;
+}
+
+.cost-card-total .cost-group-note {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.formula-line {
+  font-size: 11px;
+  color: #909399;
+  margin-bottom: 8px;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.cost-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.cost-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #666;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.cost-item span {
+  font-family: monospace;
+  font-weight: 600;
+  color: #333;
+}
+
+.cost-group-total {
+  text-align: right;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: monospace;
+  color: #333;
+  padding-top: 6px;
+  border-top: 1px dashed #ddd;
+}
+
+.cost-card-total .cost-group-total {
+  color: #fff;
+  border-top-color: rgba(255, 255, 255, 0.3);
+  font-size: 22px;
+}
+
+.cost-operator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  flex-shrink: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #909399;
 }
 
 .form-actions {
@@ -520,6 +977,36 @@ export default {
   color: #fff;
 }
 
+.result-item.positive {
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+  color: #fff;
+}
+
+.result-item.positive .result-label,
+.result-item.positive .result-value {
+  color: #fff;
+}
+
+.result-item.negative {
+  background: linear-gradient(135deg, #f56c6c 0%, #e64242 100%);
+  color: #fff;
+}
+
+.result-item.negative .result-label,
+.result-item.negative .result-value {
+  color: #fff;
+}
+
+.result-item.zero {
+  background: #909399;
+  color: #fff;
+}
+
+.result-item.zero .result-label,
+.result-item.zero .result-value {
+  color: #fff;
+}
+
 .result-label {
   font-size: 14px;
   color: #666;
@@ -552,6 +1039,7 @@ export default {
   gap: 16px;
   font-size: 13px;
   color: #666;
+  flex-wrap: wrap;
 }
 
 .freight-formula {
@@ -581,6 +1069,16 @@ export default {
 
   .result-highlight {
     grid-template-columns: 1fr;
+  }
+
+  .cost-breakdown-grid {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cost-operator {
+    width: 100%;
+    height: 30px;
   }
 }
 </style>

@@ -790,6 +790,14 @@ export const calculatePricing = (data) => {
   return api.post('/pricing/calculate', data);
 };
 
+/**
+ * 售价反推利润率
+ * @param {Object} data {seller_sku, selling_price, ad_rate, refund_rate, shop_id}
+ */
+export const calculateProfitRate = (data) => {
+  return api.post('/pricing/profit-rate', data);
+};
+
 // ==================== 货代管理相关接口 ====================
 
 /**
