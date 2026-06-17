@@ -158,8 +158,8 @@ export default {
       })
     }
 
-    // 路由变化时新增页签
-    watch(() => route.path, () => {
+    // 路由变化时新增/更新页签（fullPath 含 query，确保页签记住最新参数）
+    watch(() => route.fullPath, () => {
       addTab(route)
       scrollActiveIntoView()
     }, { immediate: true })

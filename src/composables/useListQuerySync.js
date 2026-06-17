@@ -59,14 +59,18 @@ export function useListQuerySync(fieldMap) {
   }
 
   /**
-   * 注册 keep-alive 激活回调：从其他页面跳转到此页面（可能带不同 query 参数）时，
-   * 自动从 URL 恢复表单状态并重新请求数据。
-   * 仅在缓存组件被激活时触发，首次挂载由 onMounted 处理。
+   * 注册 keep-alive 激活回调：仅当 URL query 参数与上次激活时不同，才恢复表单并重新请求。
+   * 同类参数切换页签不会触发刷新，保持 keep-alive 的静态缓存效果。
    */
   const watchQuery = (onChange) => {
+    let lastQueryStr = JSON.stringify(route.query)
     onActivated(() => {
-      initFromQuery()
-      onChange()
+      const currentStr = JSON.stringify(route.query)
+      if (currentStr !== lastQueryStr) {
+        lastQueryStr = currentStr
+        initFromQuery()
+        onChange()
+      }
     })
   }
 
