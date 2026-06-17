@@ -78,7 +78,6 @@
         v-loading="loading"
         style="width: 100%"
         height="calc(100vh - 260px)"
-        :default-sort="{ prop: 'sync_time', order: 'descending' }"
         row-class-name="inventory-row"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
