@@ -35,147 +35,176 @@ const routes = [
   {
     path: '/',
     name: 'Home',
-    component: HomeView
+    component: HomeView,
+    meta: { title: '首页', componentName: 'app' }
   },
   {
     path: '/login',
     name: 'Login',
-    component: LoginView
+    component: LoginView,
+    meta: { title: '登录', componentName: 'LoginView' }
   },
   {
     path: '/json',
     name: 'JsonTools',
-    component: JsonTools
+    component: JsonTools,
+    meta: { title: 'JSON工具', componentName: 'app' }
   },
   {
     path: '/ai-image',
     name: 'AiImage',
-    component: AiImageView
+    component: AiImageView,
+    meta: { title: 'AI图片', componentName: 'AiImageView' }
   },
   {
     path: '/gallery',
     name: 'ImageGallery',
-    component: ImageGallery
+    component: ImageGallery,
+    meta: { title: '图片库', componentName: 'ImageGalleryView' }
   },
   {
     path: '/expense',
     name: 'Expense',
-    component: ExpenseView
+    component: ExpenseView,
+    meta: { title: '支出记账', componentName: 'ExpenseView' }
   },
   {
     path: '/pricing',
     name: 'Pricing',
-    component: PricingView
+    component: PricingView,
+    meta: { title: '计算售价', componentName: 'PricingView' }
   },
   {
     path: '/fba-label',
     name: 'FbaLabel',
-    component: FbaLabelView
+    component: FbaLabelView,
+    meta: { title: 'FBA标签', componentName: 'FbaLabelView' }
   },
   {
     path: '/label-organize',
     name: 'LabelOrganize',
-    component: LabelOrganizeView
+    component: LabelOrganizeView,
+    meta: { title: '箱唛助手', componentName: 'LabelOrganizeView' }
   },
   {
     path: '/invoice-export',
     name: 'InvoiceExport',
-    component: InvoiceExportView
+    component: InvoiceExportView,
+    meta: { title: '发票导出', componentName: 'InvoiceExportView' }
   },
   {
     path: '/pdf-tools',
     name: 'PdfTools',
-    component: PdfToolsView
+    component: PdfToolsView,
+    meta: { title: 'PDF工具', componentName: 'PdfToolsView' }
   },
   {
     path: '/amazon-shipments',
     name: 'AmazonShipments',
-    component: AmazonShipmentView
+    component: AmazonShipmentView,
+    meta: { title: '货件列表', componentName: 'AmazonShipmentView' }
   },
   {
     path: '/amazon-inventory',
     name: 'AmazonInventory',
-    component: AmazonInventoryView
+    component: AmazonInventoryView,
+    meta: { title: '库存列表', componentName: 'AmazonInventoryView' }
   },
   {
     path: '/amazon-orders',
     name: 'AmazonOrders',
-    component: AmazonOrderView
+    component: AmazonOrderView,
+    meta: { title: '订单列表', componentName: 'AmazonOrderView' }
   },
   {
     path: '/amazon-listings',
     name: 'AmazonListings',
-    component: AmazonListingView
+    component: AmazonListingView,
+    meta: { title: 'Listing列表', componentName: 'AmazonListingView' }
   },
   {
     path: '/suppliers',
     name: 'Suppliers',
-    component: SupplierView
+    component: SupplierView,
+    meta: { title: '供应商管理', componentName: 'SupplierView' }
   },
   {
     path: '/purchase-orders',
     name: 'PurchaseOrders',
-    component: PurchaseOrderView
+    component: PurchaseOrderView,
+    meta: { title: '进货单管理', componentName: 'PurchaseOrderView' }
   },
   {
     path: '/products',
     name: 'Products',
-    component: ProductView
+    component: ProductView,
+    meta: { title: '产品维护', componentName: 'ProductView' }
   },
   {
     path: '/categories',
     name: 'Categories',
-    component: CategoryView
+    component: CategoryView,
+    meta: { title: '类目维护', componentName: 'CategoryView' }
   },
   {
     path: '/logistics-providers',
     name: 'LogisticsProviders',
-    component: LogisticsProviderView
+    component: LogisticsProviderView,
+    meta: { title: '货代管理', componentName: 'LogisticsProviderView' }
   },
   {
     path: '/logistics-waybills',
     name: 'LogisticsWaybills',
-    component: LogisticsWaybillView
+    component: LogisticsWaybillView,
+    meta: { title: '货代运单管理', componentName: 'LogisticsWaybillView' }
   },
   {
     path: '/shops',
     name: 'Shops',
-    component: ShopView
+    component: ShopView,
+    meta: { title: '店铺管理', componentName: 'ShopView' }
   },
   {
     path: '/product-board',
     name: 'ProductBoard',
-    component: ProductBoardView
+    component: ProductBoardView,
+    meta: { title: '备货看板', componentName: 'ProductBoardView' }
   },
   {
     path: '/reports',
     name: 'Reports',
-    component: ReportView
+    component: ReportView,
+    meta: { title: '店铺报表', componentName: 'ReportView' }
   },
   {
     path: '/reports/advertising',
     name: 'AdvertisingReports',
-    component: AdvertisingReportView
+    component: AdvertisingReportView,
+    meta: { title: '广告报表', componentName: 'AdvertisingReportView' }
   },
   {
     path: '/system/cron-tasks',
     name: 'CronTasks',
-    component: CronTasksView
+    component: CronTasksView,
+    meta: { title: '计划任务', componentName: 'CronTasksView' }
   },
   {
     path: '/system/permissions',
     name: 'SystemPermissions',
-    component: SystemPermissionsView
+    component: SystemPermissionsView,
+    meta: { title: '权限管理', componentName: 'SystemPermissionsView' }
   },
   {
     path: '/profile',
     name: 'Profile',
-    component: ProfileView
+    component: ProfileView,
+    meta: { title: '个人中心', componentName: 'ProfileView' }
   },
   {
     path: '/403',
     name: 'Forbidden',
-    component: ForbiddenView
+    component: ForbiddenView,
+    meta: { title: '无权限', componentName: 'ForbiddenView' }
   }
 ]
 

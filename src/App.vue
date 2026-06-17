@@ -1,17 +1,41 @@
 <template>
   <div id="app">
-    <NavBar v-if="!['/', '/json', '/login'].includes($route.path)" />
-    <router-view />
+    <NavBar v-if="showTabBar" />
+    <TabBar v-if="showTabBar" />
+    <router-view v-slot="{ Component, route }">
+      <keep-alive :include="cachedViews">
+        <component :is="Component" :key="getTabKey(route.path)" />
+      </keep-alive>
+    </router-view>
   </div>
 </template>
 
 <script>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import NavBar from '@/components/Navbar.vue'
+import TabBar from '@/components/TabBar.vue'
+import { useTabs } from '@/composables/useTabs.js'
 
 export default {
   name: 'App',
   components: {
-    NavBar
+    NavBar,
+    TabBar
+  },
+  setup() {
+    const route = useRoute()
+    const { cachedViews, excludedPaths, getTabKey } = useTabs()
+
+    const showTabBar = computed(() => {
+      return !excludedPaths.includes(route.path)
+    })
+
+    return {
+      showTabBar,
+      cachedViews,
+      getTabKey
+    }
   }
 }
 </script>

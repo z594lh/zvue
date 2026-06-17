@@ -179,6 +179,9 @@
   </div>
 </template>
 
+<script>
+export default { name: 'CronTasksView' }
+</script>
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { Timer, Refresh, Search } from '@element-plus/icons-vue'
