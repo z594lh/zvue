@@ -91,13 +91,24 @@
 
         <el-table-column prop="seller_sku" label="卖家SKU" width="150" fixed="left">
           <template #default="scope">
-            <span style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;">{{ scope.row.seller_sku }}</span>
+            <span
+              style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;cursor:pointer;"
+              class="sku-link"
+              @click="gotoListing(scope.row.seller_sku)"
+              title="点击跳转Listing列表筛选此SKU"
+            >{{ scope.row.seller_sku }}</span>
           </template>
         </el-table-column>
 
         <el-table-column prop="asin" label="ASIN" width="130">
           <template #default="scope">
-            <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
+            <a
+              v-if="scope.row.asin && scope.row.marketplace_id"
+              :href="`https://${getMarketplaceDomain(scope.row.marketplace_id)}/dp/${scope.row.asin}`"
+              target="_blank"
+              class="asin-link"
+            >{{ scope.row.asin }}</a>
+            <span v-else style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
           </template>
         </el-table-column>
 
@@ -309,6 +320,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, RefreshRight, Box } from '@element-plus/icons-vue'
@@ -324,6 +336,7 @@ export default {
     Box
   },
   setup() {
+    const router = useRouter()
     const loading = ref(false)
     const syncLoading = ref(false)
     const inventoryList = ref([])
@@ -345,7 +358,7 @@ export default {
       total: 0
     })
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       seller_sku: { get: () => searchForm.seller_sku, set: v => searchForm.seller_sku = v },
@@ -508,6 +521,41 @@ export default {
       return dateString.replace('T', ' ')
     }
 
+    // marketplace_id 对应亚马逊域名
+    const getMarketplaceDomain = (marketplaceId) => {
+      const domainMap = {
+        'ATVPDKIKX0DER': 'amazon.com',
+        'A2EUQ1WTGCTBG2': 'amazon.ca',
+        'A1AM78C64UM0Y8': 'amazon.com.mx',
+        'A2Q3Y263D00KWC': 'amazon.com.br',
+        'A2VIGQ35RCS4UG': 'amazon.ae',
+        'A1PA6795UKMFR9': 'amazon.de',
+        'A1RKKUPIHCS9HS': 'amazon.es',
+        'A13V1IB3VIYZZH': 'amazon.fr',
+        'APJ6JRA9NG5U4': 'amazon.it',
+        'A1F83G8C2ARO7P': 'amazon.co.uk',
+        'A21TJRUUN4KGV': 'amazon.in',
+        'A17E79C6D8DWNP': 'amazon.sa',
+        'A33AVAJ2PDY3EV': 'amazon.com.tr',
+        'A19VAU5U5O7RUS': 'amazon.sg',
+        'A39IBJ37TRP1C6': 'amazon.co.jp',
+        'A3H6HPSLHAK3XG': 'amazon.com.au',
+        'A1805IZSGTT6HS': 'amazon.eg',
+        'A2NODRKZP88ZB9': 'amazon.se',
+        'A1C3SOZRARQ6R3': 'amazon.pl',
+        'A1ZFFQZ3HTUKT9': 'amazon.be'
+      }
+      return domainMap[marketplaceId] || 'amazon.com'
+    }
+
+    // 跳转到 Listing 列表并筛选对应 SKU
+    const gotoListing = (sku) => {
+      if (!sku) return
+      router.push({ path: '/amazon-listings', query: { sku } })
+    }
+
+    watchQuery(() => fetchInventory())
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -539,7 +587,9 @@ export default {
       parseResearchingBreakdown,
       formatResearchingName,
       getShopName,
-      formatDate
+      formatDate,
+      getMarketplaceDomain,
+      gotoListing
     }
   }
 }
@@ -638,6 +688,23 @@ export default {
 .detail-tag {
   margin-right: 6px;
   margin-bottom: 4px;
+}
+
+.asin-link {
+  font-family: monospace;
+  font-size: 12px;
+  color: #667eea;
+  text-decoration: none;
+}
+.asin-link:hover {
+  text-decoration: underline;
+}
+
+/* SKU 链接悬停效果 */
+.sku-link:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
 }
 
 /* ===== 响应式 ===== */

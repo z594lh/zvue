@@ -455,7 +455,7 @@ export default {
     }
 
     // 分页/筛选状态与 URL query 双向同步
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => currentPage.value, set: v => currentPage.value = v, type: 'number', default: 1 },
       page_size: { get: () => pageSize.value, set: v => pageSize.value = v, type: 'number', default: 20 },
       month: { get: () => filterMonth.value, set: v => filterMonth.value = v },
@@ -934,6 +934,8 @@ export default {
       currentPage.value = 1
       fetchRecords()
     })
+
+    watchQuery(() => fetchRecords())
 
     onMounted(() => {
       initFromQuery()

@@ -603,7 +603,7 @@ export default {
     const importFile = ref(null)
     const uploadRef = ref(null)
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       waybill_no: { get: () => searchForm.waybill_no, set: v => searchForm.waybill_no = v },
@@ -986,6 +986,8 @@ export default {
       const map = { 0: '待发货', 1: '运输中', 2: '已到港', 3: '已清关', 4: '已入仓', 5: '已完成' }
       return map[status] || status
     }
+
+    watchQuery(() => fetchList())
 
     onMounted(() => {
       initFromQuery()

@@ -254,7 +254,7 @@ export default {
       status: ''
     })
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v },
@@ -474,6 +474,8 @@ export default {
         batchLoading.value = false
       }
     }
+
+    watchQuery(() => fetchList())
 
     onMounted(() => {
       initFromQuery()

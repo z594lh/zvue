@@ -421,7 +421,7 @@ export default {
       total: 0
     })
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       order_status: { get: () => searchForm.order_status, set: v => searchForm.order_status = v },
@@ -685,6 +685,8 @@ export default {
         order.is_iba
       )
     }
+
+    watchQuery(() => fetchOrders())
 
     onMounted(async () => {
       await fetchShopList()

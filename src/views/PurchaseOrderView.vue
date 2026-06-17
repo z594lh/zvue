@@ -364,7 +364,7 @@ export default {
     const supplierOptions = ref([])
     const productOptions = ref([])
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v },
@@ -698,6 +698,8 @@ export default {
       const map = { 0: '待下单', 1: '已下单', 2: '已完成' }
       return map[status] || status
     }
+
+    watchQuery(() => fetchList())
 
     onMounted(() => {
       initFromQuery()

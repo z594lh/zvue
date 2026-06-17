@@ -149,12 +149,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="sku" label="SKU" width="160" show-overflow-tooltip fixed="left">
+        <el-table-column prop="sku" label="SKU" width="175" show-overflow-tooltip fixed="left">
           <template #default="scope">
             <div style="display:flex;align-items:center;gap:4px;">
-              <el-button type="primary" text size="small" @click="viewDetail(scope.row)">
-                {{ scope.row.sku }}
-              </el-button>
+              <span style="font-family:monospace;font-size:13px;font-weight:500;color:#1a1a2e;">{{ scope.row.sku }}</span>
+              <el-tooltip content="复制" placement="top">
+                <el-icon style="cursor:pointer;color:#909399;flex-shrink:0;" @click="copyText(scope.row.sku)"><DocumentCopy /></el-icon>
+              </el-tooltip>
               <el-popover
                 v-if="scope.row.issues && scope.row.issues.length > 0"
                 placement="right"
@@ -654,7 +655,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch, DocumentCopy } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
@@ -679,7 +680,8 @@ export default {
     Connection,
     Delete,
     Plus,
-    Switch
+    Switch,
+    DocumentCopy
   },
   setup() {
     const loading = ref(false)
@@ -707,7 +709,7 @@ export default {
       total: 0
     })
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       sku: { get: () => searchForm.sku, set: v => searchForm.sku = v },
@@ -1345,6 +1347,24 @@ export default {
       return ''
     }
 
+    const copyText = async (text) => {
+      if (!text) return
+      try {
+        await navigator.clipboard.writeText(text)
+        ElMessage.success('已复制到剪贴板')
+      } catch (err) {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+        ElMessage.success('已复制到剪贴板')
+      }
+    }
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -1353,6 +1373,8 @@ export default {
       initFromQuery()
       fetchListings()
     })
+
+    watchQuery(() => fetchListings())
 
     return {
       loading,
@@ -1386,6 +1408,7 @@ export default {
       getShopName,
       formatDate,
       formatJson,
+      copyText,
       getMarketplaceDomain,
       getStatusList,
       getSingleStatusType,

@@ -462,7 +462,7 @@ export default {
       category_id: ''
     })
 
-    const { initFromQuery, syncQuery } = useListQuerySync({
+    const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
       page: { get: () => pagination.page, set: v => pagination.page = v, type: 'number', default: 1 },
       page_size: { get: () => pagination.page_size, set: v => pagination.page_size = v, type: 'number', default: 20 },
       keyword: { get: () => searchForm.keyword, set: v => searchForm.keyword = v },
@@ -795,6 +795,8 @@ export default {
         console.error('获取产品分类失败:', error)
       }
     }
+
+    watchQuery(() => fetchList())
 
     onMounted(() => {
       initFromQuery()

@@ -1,3 +1,4 @@
+import { onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 /**
@@ -10,13 +11,12 @@ import { useRoute, useRouter } from 'vue-router'
  *   - default: 默认值，等于默认值时不写入 URL
  *
  * @example
- * const { initFromQuery, syncQuery } = useListQuerySync({
+ * const { initFromQuery, syncQuery, watchQuery } = useListQuerySync({
  *   page:       { get: () => page.value,       set: v => page.value = v,       type: 'number', default: 1 },
  *   page_size:  { get: () => pageSize.value,   set: v => pageSize.value = v,   type: 'number', default: 20 },
- *   month:      { get: () => month.value,      set: v => month.value = v },
- *   category:   { get: () => category.value,   set: v => category.value = v },
- *   keyword:    { get: () => searchForm.keyword, set: v => searchForm.keyword = v }
+ *   sku:        { get: () => searchForm.sku,    set: v => searchForm.sku = v }
  * })
+ * watchQuery(() => fetchData())  // 外部跳转进入页面时自动重新加载
  */
 export function useListQuerySync(fieldMap) {
   const route = useRoute()
@@ -58,5 +58,17 @@ export function useListQuerySync(fieldMap) {
     }
   }
 
-  return { initFromQuery, syncQuery }
+  /**
+   * 注册 keep-alive 激活回调：从其他页面跳转到此页面（可能带不同 query 参数）时，
+   * 自动从 URL 恢复表单状态并重新请求数据。
+   * 仅在缓存组件被激活时触发，首次挂载由 onMounted 处理。
+   */
+  const watchQuery = (onChange) => {
+    onActivated(() => {
+      initFromQuery()
+      onChange()
+    })
+  }
+
+  return { initFromQuery, syncQuery, watchQuery }
 }
