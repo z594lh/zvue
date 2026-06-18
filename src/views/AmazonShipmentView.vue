@@ -130,16 +130,18 @@
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
       >
-        <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
+        <el-table-column label="店铺名称" width="120" show-overflow-tooltip fixed="left">
           <template #default>
             <el-tag size="small" effect="plain" type="info">{{ getShopName(selectedShopId) || '-' }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="inbound_plan_id" label="入库计划ID" width="260" fixed="left">
+        <el-table-column prop="inbound_plan_id" label="入库计划ID" width="220" fixed="left">
           <template #default="scope">
             <div style="display:flex;align-items:center;gap:4px;">
-              <span style="font-family:monospace;font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ scope.row.inbound_plan_id }}</span>
+              <el-tooltip :content="scope.row.inbound_plan_id" placement="top" :disabled="!scope.row.inbound_plan_id || scope.row.inbound_plan_id.length <= 24">
+                <span style="font-family:monospace;font-size:13px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ scope.row.inbound_plan_id }}</span>
+              </el-tooltip>
               <el-tooltip content="复制" placement="top">
                 <el-icon style="cursor:pointer;color:#909399;flex-shrink:0;" @click="copyText(scope.row.inbound_plan_id)"><DocumentCopy /></el-icon>
               </el-tooltip>
@@ -153,13 +155,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="shipment_confirmation_id" label="货件编号" width="140">
+        <el-table-column prop="shipment_confirmation_id" label="货件编号" width="120">
           <template #default="scope">
             <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.shipment_confirmation_id }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="amazon_reference_id" label="亚马逊参考号" width="130">
+        <el-table-column prop="amazon_reference_id" label="亚马逊参考号" width="120">
           <template #default="scope">
             <span style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.amazon_reference_id }}</span>
           </template>
@@ -186,9 +188,16 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="plan_created_at" label="创建时间" width="170" align="center">
+        <el-table-column label="SKU明细" min-width="300">
           <template #default="scope">
-            <span style="font-size:12px;color:#888;font-family:monospace;">{{ formatDate(scope.row.plan_created_at) }}</span>
+            <div class="sku-items" v-if="scope.row.skus && scope.row.skus.length > 0">
+              <div v-for="(item, idx) in scope.row.skus" :key="idx" class="sku-item">
+                <span class="sku-code">{{ item.sku }}</span>
+                <span v-if="item.name_cn" class="sku-name"> - {{ item.name_cn }}</span>
+                <span class="sku-qty"> * {{ item.quantity }}</span>
+              </div>
+            </div>
+            <span v-else style="color:#ccc;">—</span>
           </template>
         </el-table-column>
 
@@ -1205,6 +1214,29 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.shipment-row:hover) { background-color: #fafbff !important; }
+
+.sku-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.sku-item {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sku-code {
+  color: #1a1a2e;
+  font-family: monospace;
+  font-weight: 500;
+}
+.sku-name {
+  color: #666;
+}
+.sku-qty {
+  color: #909399;
+  font-family: monospace;
+}
 
 /* 分页 */
 .pagination-wrap {
