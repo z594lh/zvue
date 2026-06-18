@@ -71,7 +71,7 @@
         :data="productList"
         v-loading="loading"
         style="width:100%"
-        height="calc(100vh - 260px)"
+        height="calc(100vh - 296px)"
         @select="handleSelect"
         @select-all="handleSelectAll"
         ref="tableRef"

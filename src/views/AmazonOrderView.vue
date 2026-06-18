@@ -101,7 +101,7 @@
         :data="orders"
         v-loading="loading"
         style="width: 100%"
-        height="calc(100vh - 260px)"
+        height="calc(100vh - 296px)"
         :default-sort="{ prop: 'purchase_date', order: 'descending' }"
         row-class-name="order-row"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"

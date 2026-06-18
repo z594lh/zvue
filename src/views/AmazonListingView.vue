@@ -124,7 +124,7 @@
         :data="listings"
         v-loading="loading"
         style="width: 100%"
-        height="calc(100vh - 260px)"
+        height="calc(100vh - 340px)"
         :row-class-name="getRowClassName"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
@@ -1500,6 +1500,23 @@ export default {
   overflow: hidden;
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
+:deep(.el-scrollbar__wrap) {
+  overflow-x: auto !important;
+}
+:deep(.el-table__body-wrapper) {
+  overflow-x: auto !important;
+}
+:deep(.el-table__body-wrapper::-webkit-scrollbar) {
+  height: 8px;
+}
+:deep(.el-table__body-wrapper::-webkit-scrollbar-thumb) {
+  background: #c0c4cc;
+  border-radius: 4px;
+}
+:deep(.el-table__body-wrapper::-webkit-scrollbar-track) {
+  background: transparent;
+  border-radius: 4px;
+}
 :deep(.listing-row:hover) { background-color: #fafbff !important; }
 :deep(.listing-row.has-error) { background-color: #fff8f8 !important; }
 :deep(.listing-row.has-warning) { background-color: #fffbf5 !important; }
