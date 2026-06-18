@@ -12,8 +12,8 @@
         @contextmenu.prevent="openContextMenu($event, tab)"
         @mouseup.middle.prevent="removeTab(tab.path)"
       >
-        <span class="tab-title">{{ tab.title }}</span>
-        <span class="tab-refresh" @click.stop="refreshTab(tab.path)" title="刷新">↻</span>
+        <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
+        <span class="tab-refresh" :class="{ invisible: activePath !== tab.path }" @click.stop="refreshTab(tab.path)" title="刷新">↻</span>
         <span class="tab-close" @click.stop="removeTab(tab.path)" title="关闭">&#x2715;</span>
       </div>
     </div>
@@ -26,7 +26,6 @@
         class="tab-context-menu"
         :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
       >
-        <div class="context-item" @click="handleRefresh">刷新</div>
         <div class="context-item" @click="handleClose">关闭</div>
         <div class="context-divider"></div>
         <div class="context-item" @click="handleCloseOther">关闭其他</div>
@@ -110,11 +109,6 @@ export default {
 
     function closeContextMenu() {
       contextMenu.value.visible = false
-    }
-
-    function handleRefresh() {
-      if (contextMenu.value.tab) refreshTab(contextMenu.value.tab.path)
-      closeContextMenu()
     }
 
     function handleClose() {
@@ -207,7 +201,6 @@ export default {
       scrollTabs,
       onWheel,
       openContextMenu,
-      handleRefresh,
       handleClose,
       handleCloseOther,
       handleCloseRight,
@@ -274,8 +267,8 @@ export default {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 12px;
+  gap: 8px;
+  padding: 0 16px;
   height: 32px;
   border-radius: 4px 4px 0 0;
   cursor: pointer;
@@ -311,7 +304,8 @@ export default {
 }
 
 .tab-title {
-  max-width: 120px;
+  width: 110px;
+  flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -347,6 +341,10 @@ export default {
 .tab-refresh {
   font-size: 16px;
   line-height: 1;
+}
+
+.tab-refresh.invisible {
+  visibility: hidden;
 }
 
 .tab-close {
@@ -392,11 +390,12 @@ export default {
 
 @media (max-width: 768px) {
   .tab-title {
-    max-width: 80px;
+    width: 70px;
   }
 
   .tab-item {
     padding: 0 8px;
+    gap: 4px;
   }
 }
 </style>
