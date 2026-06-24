@@ -27,6 +27,7 @@ import AdvertisingReportView from '../views/AdvertisingReportView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ForbiddenView from '../views/ForbiddenView.vue'
 import SystemPermissionsView from '../views/SystemPermissionsView.vue'
+import CompanyView from '../views/CompanyView.vue'
 import { isAuthenticated, getUserPermissions, findPermissionCodeByPath } from '@/services/api.js'
 
 const CronTasksView = () => import('../views/CronTasksView.vue')
@@ -35,8 +36,20 @@ const routes = [
   {
     path: '/',
     name: 'Home',
+    component: CompanyView,
+    meta: { title: '公司主页', componentName: 'CompanyView' }
+  },
+  {
+    path: '/fanyi',
+    name: 'Fanyi',
     component: HomeView,
-    meta: { title: '首页', componentName: 'app' }
+    meta: { title: '翻译', componentName: 'app' }
+  },
+  {
+    path: '/company',
+    name: 'Company',
+    component: CompanyView,
+    meta: { title: '公司主页', componentName: 'CompanyView' }
   },
   {
     path: '/login',
@@ -214,7 +227,7 @@ const router = createRouter({
 })
 
 // 全局前置守卫
-const publicPaths = ['/', '/json', '/login', '/403']
+const publicPaths = ['/', '/json', '/login', '/403', '/company', '/fanyi']
 
 router.beforeEach((to, from, next) => {
   // 1. 未登录检查

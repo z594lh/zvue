@@ -6,7 +6,7 @@ const tabs = ref([])
 const cachedViews = ref([])
 const refreshKeys = ref({})
 
-const excludedPaths = ['/', '/login', '/403', '/json']
+const excludedPaths = ['/', '/login', '/403', '/json', '/company', '/fanyi']
 
 export function useTabs() {
   const router = useRouter()

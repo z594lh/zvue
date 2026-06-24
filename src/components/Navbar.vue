@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar">
     <div class="nav-brand">
-      <router-link to="/" class="brand-link">ZywTools</router-link>
+      <router-link to="/" class="brand-link">勤发跨境ERP</router-link>
     </div>
 
     <!-- 移动端汉堡菜单按钮 -->
