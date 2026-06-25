@@ -113,7 +113,7 @@
           <el-input v-model="formData.seller_id" placeholder="如：A1B2C3D4E5F6G7" />
         </el-form-item>
 
-        <el-form-item label="Refresh Token" prop="refresh_token">
+        <el-form-item label="SP-API Refresh Token" prop="sp_refresh_token">
           <template #label>
             <el-tooltip placement="top">
               <template #content>
@@ -121,11 +121,11 @@
                   在亚马逊开发者控制台或授权应用中获取，<br>用于调用 SP-API 接口，<br>格式为一串很长的字符串，<br>建议通过【应用 & 服务 > 管理您的应用】授权后复制
                 </div>
               </template>
-              <span>Refresh Token <el-icon style="vertical-align: middle"><QuestionFilled /></el-icon></span>
+              <span>SP-API Refresh Token <el-icon style="vertical-align: middle"><QuestionFilled /></el-icon></span>
             </el-tooltip>
           </template>
           <el-input
-            v-model="formData.refresh_token"
+            v-model="formData.sp_refresh_token"
             type="textarea"
             :rows="3"
             :placeholder="isEdit ? '如需更换 Token 请在此处填写，留空则保持原值不变' : '亚马逊 SP-API Refresh Token（很长的字符串）'"
@@ -134,6 +134,43 @@
             <el-icon><InfoFilled /></el-icon>
             出于安全考虑，系统不会回显已有的 Refresh Token。如需更新请手动填写，留空则保留原值。
           </div>
+        </el-form-item>
+
+        <!-- 广告 API 授权（仅编辑已有店铺时可用） -->
+        <el-form-item v-if="isEdit" label="广告 API">
+          <div class="ads-box">
+            <div v-if="!formData.ads_refresh_token" class="ads-status">
+              <span class="ads-dot ads-dot--off"></span>
+              <span class="ads-text">未授权</span>
+              <el-button type="primary" size="small" :loading="adsAuthLoading" @click="handleAuthorizeAds">
+                授权广告 API
+              </el-button>
+            </div>
+            <div v-else class="ads-status ads-status--on">
+              <div class="ads-row">
+                <span class="ads-dot ads-dot--on"></span>
+                <span class="ads-text">已授权</span>
+              </div>
+              <div class="ads-row ads-row--detail">
+                <span class="ads-label">Refresh Token：</span>
+                <span class="ads-value">{{ maskToken(formData.ads_refresh_token) }}</span>
+              </div>
+              <div class="ads-row ads-row--detail">
+                <span class="ads-label">Profile ID：</span>
+                <span class="ads-value">{{ formData.ads_profile_id || '未设置' }}</span>
+              </div>
+              <div class="ads-row">
+                <el-button size="small" :loading="adsAuthLoading" @click="handleAuthorizeAds">重新授权</el-button>
+                <el-button size="small" :loading="adsProfilesLoading" @click="openAdsProfiles">查看账户列表</el-button>
+                <el-button size="small" :loading="adsCheckLoading" @click="handleCheckAdsStatus">刷新状态</el-button>
+              </div>
+            </div>
+          </div>
+        </el-form-item>
+
+        <el-form-item v-if="isEdit && formData.credential_group_id" label="凭证组 ID">
+          <span class="ads-value">{{ formData.credential_group_id }}</span>
+          <span class="form-tip">（只读，供排查使用）</span>
         </el-form-item>
 
         <el-form-item label="Marketplace ID" prop="marketplace_id">
@@ -199,19 +236,81 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 广告 API 授权链接对话框 -->
+    <el-dialog v-model="adsAuthVisible" title="广告 API 授权" width="560px">
+      <div class="ads-auth-dialog">
+        <p class="ads-auth-tip">
+          请复制以下链接，粘贴到 <strong>紫鸟浏览器</strong>（已登录 Amazon 卖家账号）中打开，
+          完成授权后关闭页面返回系统，点击下方「我已授权，检查状态」即可。
+        </p>
+        <el-input
+          v-model="adsAuthUrl"
+          type="textarea"
+          :rows="4"
+          readonly
+        />
+        <div class="ads-auth-actions">
+          <el-button type="primary" :icon="CopyDocument" @click="copyAuthUrl">复制链接</el-button>
+          <span class="form-tip">链接 30 分钟内有效</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="adsAuthVisible = false">关闭</el-button>
+        <el-button type="success" :loading="adsCheckLoading" @click="handleCheckAdsStatus">
+          我已授权，检查状态
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 广告账户列表对话框 -->
+    <el-dialog v-model="adsProfilesVisible" title="选择广告账户 (Profile)" width="640px">
+      <el-table
+        :data="adsProfiles"
+        v-loading="adsProfilesLoading"
+        highlight-current-row
+        @current-change="row => { if (row) selectedProfileId = String(row.profileId) }"
+      >
+        <el-table-column width="50">
+          <template #default="scope">
+            <el-radio v-model="selectedProfileId" :label="String(scope.row.profileId)">
+              <span></span>
+            </el-radio>
+          </template>
+        </el-table-column>
+        <el-table-column prop="profileId" label="Profile ID" min-width="140" />
+        <el-table-column prop="countryCode" label="国家" width="80" align="center" />
+        <el-table-column label="账户名称" min-width="160" show-overflow-tooltip>
+          <template #default="scope">{{ scope.row.accountInfo?.name || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="类型" width="90" align="center">
+          <template #default="scope">{{ scope.row.accountInfo?.type || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="adsProfilesVisible = false">取消</el-button>
+        <el-button type="primary" :loading="adsProfileSaving" :disabled="!selectedProfileId" @click="handleSaveProfile">
+          保存所选 Profile
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, QuestionFilled, InfoFilled } from '@element-plus/icons-vue'
+import { Plus, QuestionFilled, InfoFilled, CopyDocument } from '@element-plus/icons-vue'
 import {
   getAllShops,
+  getShop,
   createShop,
   updateShop,
   deleteShop,
-  setDefaultShop
+  setDefaultShop,
+  getAdsAuthorizeUrl,
+  getAdsProfiles,
+  setAdsProfile
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -235,11 +334,25 @@ export default {
     const formData = reactive({
       shop_name: '',
       seller_id: '',
-      refresh_token: '',
+      sp_refresh_token: '',
       marketplace_id: '',
       region: '',
-      is_default: 0
+      is_default: 0,
+      credential_group_id: null,
+      ads_refresh_token: '',
+      ads_profile_id: ''
     })
+
+    // 广告 API 授权相关状态
+    const adsAuthVisible = ref(false)
+    const adsAuthUrl = ref('')
+    const adsAuthLoading = ref(false)
+    const adsCheckLoading = ref(false)
+    const adsProfilesVisible = ref(false)
+    const adsProfiles = ref([])
+    const adsProfilesLoading = ref(false)
+    const selectedProfileId = ref('')
+    const adsProfileSaving = ref(false)
 
     const marketplaceOptions = {
       na: [
@@ -287,7 +400,7 @@ export default {
     const formRules = {
       shop_name: [{ required: true, message: '请输入店铺名称', trigger: 'blur' }],
       seller_id: [{ required: true, message: '请输入 Seller ID', trigger: 'blur' }],
-      refresh_token: [{ required: true, message: '请输入 Refresh Token', trigger: 'blur' }],
+      sp_refresh_token: [{ required: true, message: '请输入 SP-API Refresh Token', trigger: 'blur' }],
       marketplace_id: [{ required: true, message: '请选择 Marketplace ID', trigger: 'change' }],
       region: [{ required: true, message: '请选择区域', trigger: 'change' }]
     }
@@ -311,31 +424,54 @@ export default {
     }
 
     // 打开对话框
-    const openDialog = (row = null) => {
+    const openDialog = async (row = null) => {
       isEdit.value = !!row
       if (row) {
         currentId.value = row.id
         formData.shop_name = row.shop_name || ''
         formData.seller_id = row.seller_id || ''
-        formData.refresh_token = row.refresh_token || ''
+        formData.sp_refresh_token = ''
         formData.marketplace_id = row.marketplace_id || ''
         formData.region = row.region || ''
         formData.is_default = row.is_default || 0
+        formData.credential_group_id = row.credential_group_id || null
+        formData.ads_refresh_token = ''
+        formData.ads_profile_id = ''
+        dialogVisible.value = true
+        await loadShopDetail(row.id)
       } else {
         currentId.value = null
         resetForm()
+        dialogVisible.value = true
       }
-      dialogVisible.value = true
+    }
+
+    // 拉取店铺详情，回填凭证组与广告授权字段
+    const loadShopDetail = async (id) => {
+      try {
+        const response = await getShop(id)
+        if (response.data.status === 'success' && response.data.data) {
+          const detail = response.data.data
+          formData.credential_group_id = detail.credential_group_id ?? formData.credential_group_id
+          formData.ads_refresh_token = detail.ads_refresh_token || ''
+          formData.ads_profile_id = detail.ads_profile_id || ''
+        }
+      } catch (error) {
+        console.error('获取店铺详情失败:', error)
+      }
     }
 
     // 重置表单
     const resetForm = () => {
       formData.shop_name = ''
       formData.seller_id = ''
-      formData.refresh_token = ''
+      formData.sp_refresh_token = ''
       formData.marketplace_id = ''
       formData.region = ''
       formData.is_default = 0
+      formData.credential_group_id = null
+      formData.ads_refresh_token = ''
+      formData.ads_profile_id = ''
       if (formRef.value) {
         formRef.value.resetFields()
       }
@@ -357,9 +493,13 @@ export default {
             is_default: formData.is_default
           }
 
-          // 编辑模式下，refresh_token 留空则不传给后端，避免覆盖原值
-          if (!isEdit.value || formData.refresh_token) {
-            payload.refresh_token = formData.refresh_token
+          if (formData.credential_group_id) {
+            payload.credential_group_id = formData.credential_group_id
+          }
+
+          // 编辑模式下，sp_refresh_token 留空则不传给后端，避免覆盖原值
+          if (!isEdit.value || formData.sp_refresh_token) {
+            payload.sp_refresh_token = formData.sp_refresh_token
           }
 
           let response
@@ -432,6 +572,118 @@ export default {
       }
     }
 
+    // 脱敏显示 token
+    const maskToken = (token) => {
+      if (!token) return ''
+      if (token.length <= 8) return '●●●●'
+      return `${token.slice(0, 4)}●●●●${token.slice(-4)}`
+    }
+
+    // 获取广告 API 授权链接
+    const handleAuthorizeAds = async () => {
+      if (!currentId.value) return
+      adsAuthLoading.value = true
+      try {
+        const response = await getAdsAuthorizeUrl(currentId.value)
+        if (response.data.status === 'success' && response.data.data) {
+          adsAuthUrl.value = response.data.data.authorize_url || ''
+          adsAuthVisible.value = true
+        } else {
+          ElMessage.error(response.data.message || '获取授权链接失败')
+        }
+      } catch (error) {
+        console.error('获取授权链接失败:', error)
+        ElMessage.error('获取授权链接失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        adsAuthLoading.value = false
+      }
+    }
+
+    // 复制授权链接
+    const copyAuthUrl = async () => {
+      if (!adsAuthUrl.value) return
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(adsAuthUrl.value)
+        } else {
+          const textarea = document.createElement('textarea')
+          textarea.value = adsAuthUrl.value
+          textarea.style.position = 'fixed'
+          textarea.style.opacity = '0'
+          document.body.appendChild(textarea)
+          textarea.select()
+          document.execCommand('copy')
+          document.body.removeChild(textarea)
+        }
+        ElMessage.success('链接已复制，请粘贴到紫鸟浏览器中打开')
+      } catch (error) {
+        console.error('复制失败:', error)
+        ElMessage.error('复制失败，请手动选择复制')
+      }
+    }
+
+    // 检查授权状态（重新拉取店铺详情）
+    const handleCheckAdsStatus = async () => {
+      if (!currentId.value) return
+      adsCheckLoading.value = true
+      try {
+        await loadShopDetail(currentId.value)
+        if (formData.ads_refresh_token) {
+          ElMessage.success('授权成功，已获取广告 Refresh Token')
+          adsAuthVisible.value = false
+        } else {
+          ElMessage.warning('尚未检测到授权，请确认已在紫鸟浏览器中完成授权后再试')
+        }
+      } finally {
+        adsCheckLoading.value = false
+      }
+    }
+
+    // 打开广告账户列表
+    const openAdsProfiles = async () => {
+      if (!currentId.value) return
+      adsProfilesLoading.value = true
+      try {
+        const response = await getAdsProfiles(currentId.value)
+        if (response.data.status === 'success') {
+          adsProfiles.value = response.data.data || []
+          selectedProfileId.value = formData.ads_profile_id || ''
+          adsProfilesVisible.value = true
+        } else {
+          ElMessage.error(response.data.message || '获取广告账户列表失败')
+        }
+      } catch (error) {
+        console.error('获取广告账户列表失败:', error)
+        ElMessage.error('获取广告账户列表失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        adsProfilesLoading.value = false
+      }
+    }
+
+    // 保存选中的 profile
+    const handleSaveProfile = async () => {
+      if (!currentId.value || !selectedProfileId.value) return
+      adsProfileSaving.value = true
+      try {
+        const response = await setAdsProfile({
+          shop_id: currentId.value,
+          profile_id: selectedProfileId.value
+        })
+        if (response.data.status === 'success') {
+          ElMessage.success('Profile 已保存')
+          formData.ads_profile_id = selectedProfileId.value
+          adsProfilesVisible.value = false
+        } else {
+          ElMessage.error(response.data.message || '保存失败')
+        }
+      } catch (error) {
+        console.error('保存 Profile 失败:', error)
+        ElMessage.error('保存 Profile 失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        adsProfileSaving.value = false
+      }
+    }
+
     // 区域标签样式
     const getRegionType = (region) => {
       const map = { na: 'primary', eu: 'success', fe: 'warning' }
@@ -466,7 +718,23 @@ export default {
       handleSetDefault,
       handleDelete,
       getRegionType,
-      formatDate
+      formatDate,
+      CopyDocument,
+      adsAuthVisible,
+      adsAuthUrl,
+      adsAuthLoading,
+      adsCheckLoading,
+      adsProfilesVisible,
+      adsProfiles,
+      adsProfilesLoading,
+      selectedProfileId,
+      adsProfileSaving,
+      maskToken,
+      handleAuthorizeAds,
+      copyAuthUrl,
+      handleCheckAdsStatus,
+      openAdsProfiles,
+      handleSaveProfile
     }
   }
 }
@@ -531,6 +799,79 @@ export default {
   margin-left: 8px;
   font-size: 12px;
   color: #999;
+}
+
+.ads-box {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.ads-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ads-status--on {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ads-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ads-row--detail {
+  font-size: 13px;
+}
+
+.ads-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ads-dot--off {
+  background: #c0c4cc;
+}
+
+.ads-dot--on {
+  background: #67c23a;
+}
+
+.ads-text {
+  font-size: 13px;
+  color: #606266;
+}
+
+.ads-label {
+  color: #909399;
+}
+
+.ads-value {
+  color: #303133;
+  word-break: break-all;
+}
+
+.ads-auth-dialog .ads-auth-tip {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #606266;
+}
+
+.ads-auth-actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* 响应式 */

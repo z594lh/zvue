@@ -500,7 +500,7 @@ export const getShop = (id) => {
 
 /**
  * 创建店铺
- * @param {Object} data {shop_name, seller_id, refresh_token, marketplace_id, region, is_default}
+ * @param {Object} data {shop_name, seller_id, sp_refresh_token, marketplace_id, region, credential_group_id, ads_refresh_token, ads_profile_id, is_default}
  */
 export const createShop = (data) => {
   return api.post('/shops', data);
@@ -529,6 +529,32 @@ export const deleteShop = (id) => {
  */
 export const setDefaultShop = (id) => {
   return api.post(`/shops/${id}/set-default`);
+};
+
+// ==================== 亚马逊广告 API 授权相关接口 ====================
+
+/**
+ * 获取广告 API 授权链接（需复制到紫鸟浏览器中打开）
+ * @param {number} shopId 店铺ID
+ */
+export const getAdsAuthorizeUrl = (shopId) => {
+  return api.get('/amazon/ads/authorize-url', { params: { shop_id: shopId } });
+};
+
+/**
+ * 获取店铺下的广告账户 profile 列表（需已完成授权）
+ * @param {number} shopId 店铺ID
+ */
+export const getAdsProfiles = (shopId) => {
+  return api.get('/amazon/ads/profiles', { params: { shop_id: shopId } });
+};
+
+/**
+ * 手动设置 ads_profile_id
+ * @param {Object} data {shop_id, profile_id}
+ */
+export const setAdsProfile = (data) => {
+  return api.post('/amazon/ads/profile', data);
 };
 
 /**
@@ -1150,10 +1176,31 @@ export const getGenerationLogs = (params = {}) => {
 
 /**
  * 导入广告费明细
+ * @deprecated 数据已改为自动同步 (amazon_ads_raw_reports)，手动导入写入旧表不再流入报表。
+ *             请使用 syncAmazonAdsReports 进行手动同步。
  * @param {Object} data {records}
  */
 export const importAdSpend = (data = {}) => {
   return api.post('/reports/ad-spend/import', data);
+};
+
+// ==================== 广告数据同步接口 ====================
+
+/**
+ * 手动同步广告数据（单店铺）
+ * 同步阻塞调用，每次约需 1-6 分钟，建议前端设置 10 分钟超时
+ * @param {Object} data {shop_id, date}  date 可选，默认昨天
+ */
+export const syncAmazonAdsReports = (data = {}) => {
+  return api.post('/amazon/ads/reports/sync', data, { timeout: 600000 });
+};
+
+/**
+ * 查询广告数据同步状态
+ * @param {Object} params {shop_id, date}
+ */
+export const getAmazonAdsReportsStatus = (params = {}) => {
+  return api.get('/amazon/ads/reports/status', { params });
 };
 
 /**
@@ -1196,6 +1243,70 @@ export const getAdvertisingTrend = (params = {}) => {
  */
 export const generateAdvertisingReport = (data = {}) => {
   return api.post('/reports/advertising/generate', data);
+};
+
+// ==================== 广告筛选下拉框接口 ====================
+
+/**
+ * 广告活动下拉（数据来自 amazon_ads_raw_reports 去重）
+ * @param {Object} params {shop_id}
+ */
+export const getAdvertisingCampaignOptions = (params = {}) => {
+  return api.get('/options/advertising/campaigns', { params });
+};
+
+/**
+ * 广告组下拉（按活动联动，数据来自 amazon_ads_raw_reports 去重）
+ * @param {Object} params {shop_id, campaign_id}
+ */
+export const getAdvertisingAdGroupOptions = (params = {}) => {
+  return api.get('/options/advertising/ad-groups', { params });
+};
+
+/**
+ * 推广ASIN下拉（按活动联动，数据来自 amazon_ads_raw_reports 去重）
+ * @param {Object} params {shop_id, campaign_id}
+ */
+export const getAdvertisingAsinOptions = (params = {}) => {
+  return api.get('/options/advertising/asins', { params });
+};
+
+// ==================== 广告原始数据详情接口（对标 Amazon 后台页签）====================
+
+/**
+ * 客户搜索词详情（对标 Amazon 后台 → 搜索词 页签）
+ * @param {Object} params {start_date, end_date, campaign_id, ad_group_id, shop_id,
+ *                         sort_by, sort_dir, page, page_size, keyword}
+ */
+export const getAdvertisingSearchTerms = (params = {}) => {
+  return api.get('/reports/advertising/search-terms', { params });
+};
+
+/**
+ * 关键词定向详情（对标 Amazon 后台 → 定向 页签）
+ * @param {Object} params {start_date, end_date, campaign_id, ad_group_id, shop_id,
+ *                         sort_by, sort_dir, page, page_size, keyword}
+ */
+export const getAdvertisingTargeting = (params = {}) => {
+  return api.get('/reports/advertising/targeting', { params });
+};
+
+/**
+ * 广告活动详情（对标 Amazon 后台 → 广告活动 列表）
+ * @param {Object} params {start_date, end_date, campaign_id, ad_group_id, shop_id,
+ *                         sort_by, sort_dir, page, page_size, keyword}
+ */
+export const getAdvertisingCampaigns = (params = {}) => {
+  return api.get('/reports/advertising/campaigns', { params });
+};
+
+/**
+ * 推广商品详情（对标 Amazon 后台 → 推广的商品 页签）
+ * @param {Object} params {start_date, end_date, campaign_id, ad_group_id, shop_id,
+ *                         sort_by, sort_dir, page, page_size, asin, keyword}
+ */
+export const getAdvertisingProducts = (params = {}) => {
+  return api.get('/reports/advertising/products', { params });
 };
 
 // ==================== 货代运单管理相关接口 ====================
