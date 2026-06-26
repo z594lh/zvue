@@ -152,7 +152,7 @@
           <el-table-column label="数据状态" width="110" align="center">
             <template #default="scope">
               <el-tag :type="scope.row.data_status === 'settled' ? 'success' : 'warning'" size="small">
-                {{ scope.row.data_status === 'settled' ? '已结算' : '预估 仅销售额' }}
+                {{ scope.row.data_status === 'settled' ? '已结算' : '预估' }}
               </el-tag>
             </template>
           </el-table-column>
