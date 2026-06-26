@@ -292,6 +292,89 @@
       </div>
 
       <el-tabs v-model="detailTab" @tab-change="handleDetailTabChange">
+        <!-- ===== 广告活动 ===== -->
+        <el-tab-pane label="广告活动" name="campaigns">
+          <div class="detail-toolbar">
+            <el-input v-model="detailSearch.keyword" placeholder="搜索活动名称..." clearable style="width:220px" @clear="fetchDetail" @keyup.enter="fetchDetail">
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
+            <span class="detail-sort-hint" v-if="detailSort.sort_by">
+              排序：<strong>{{ detailSort.sort_by }}</strong>
+              <el-icon><SortUp v-if="detailSort.sort_dir === 'asc'" /><SortDown v-else /></el-icon>
+              <el-button size="small" link @click="detailSort.sort_by='';detailSort.sort_dir='desc';fetchDetail()">清除</el-button>
+            </span>
+            <el-button type="primary" size="small" @click="fetchDetail">查询</el-button>
+          </div>
+
+          <div v-if="detailSummary" class="detail-summary">
+            <span class="ds-item">共 <strong>{{ detailSummary.total_rows }}</strong> 行</span>
+            <span class="ds-item">曝光 <strong>{{ formatNumber(detailSummary.total_impressions, 0) }}</strong></span>
+            <span class="ds-item">点击 <strong>{{ formatNumber(detailSummary.total_clicks, 0) }}</strong></span>
+            <span class="ds-item">花费 <strong>${{ formatNumber(detailSummary.total_cost) }}</strong></span>
+            <span class="ds-item">CTR <strong>{{ formatPct(detailSummary.ctr) }}</strong></span>
+            <span class="ds-item">CPC <strong>${{ formatNumber(detailSummary.cpc) }}</strong></span>
+          </div>
+
+          <el-table :data="detailList" v-loading="detailLoading" stripe style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}" @sort-change="handleDetailSortChange">
+            <el-table-column prop="report_date" label="日期" width="105" sortable="custom" />
+            <el-table-column prop="campaign_name" label="广告活动" min-width="180" show-overflow-tooltip sortable="custom" />
+            <el-table-column prop="campaign_status_label" label="状态" width="90" align="center">
+              <template #default="scope">
+                <el-tag v-if="scope.row.campaign_status === 'ENABLED'" type="success" size="small">{{ scope.row.campaign_status_label || '启用' }}</el-tag>
+                <el-tag v-else-if="scope.row.campaign_status === 'PAUSED'" type="warning" size="small">{{ scope.row.campaign_status_label || '暂停' }}</el-tag>
+                <el-tag v-else-if="scope.row.campaign_status === 'ARCHIVED'" type="info" size="small">{{ scope.row.campaign_status_label || '归档' }}</el-tag>
+                <span v-else>{{ scope.row.campaign_status_label || scope.row.campaign_status }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="预算" align="right" width="120">
+              <template #default="scope">
+                <span v-if="scope.row.campaign_budget">${{ formatNumber(scope.row.campaign_budget) }}</span>
+                <span v-else>-</span>
+                <span v-if="scope.row.campaign_budget_type_label" style="color:#909399;font-size:11px;margin-left:4px;">{{ scope.row.campaign_budget_type_label }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="impressions" label="曝光" align="right" width="90" sortable="custom">
+              <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
+            </el-table-column>
+            <el-table-column prop="clicks" label="点击" align="right" width="85" sortable="custom">
+              <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
+            </el-table-column>
+            <el-table-column prop="cost" label="花费" align="right" width="90" sortable="custom">
+              <template #default="scope">${{ formatNumber(scope.row.cost) }}</template>
+            </el-table-column>
+            <el-table-column prop="purchases_7d" label="订单(7d)" align="right" width="100" sortable="custom" />
+            <el-table-column prop="purchases_14d" label="订单(14d)" align="right" width="100" sortable="custom" />
+            <el-table-column prop="purchases_30d" label="订单(30d)" align="right" width="100" sortable="custom" />
+            <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="110" sortable="custom">
+              <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
+            </el-table-column>
+            <el-table-column prop="sales_14d" label="销售(14d)" align="right" width="110" sortable="custom">
+              <template #default="scope">${{ formatNumber(scope.row.sales_14d) }}</template>
+            </el-table-column>
+            <el-table-column prop="sales_30d" label="销售(30d)" align="right" width="110" sortable="custom">
+              <template #default="scope">${{ formatNumber(scope.row.sales_30d) }}</template>
+            </el-table-column>
+            <el-table-column prop="ctr" label="CTR" align="right" width="90" sortable="custom">
+              <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
+            </el-table-column>
+            <el-table-column prop="cpc" label="CPC" align="right" width="90" sortable="custom">
+              <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
+            </el-table-column>
+            <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110" sortable="custom">
+              <template #default="scope">
+                <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110" sortable="custom">
+              <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            v-model:current-page="detailPage" v-model:page-size="detailPageSize"
+            :total="detailTotal" :page-sizes="[10, 20, 50]"
+            layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
+        </el-tab-pane>
+
         <!-- ===== 搜索词 ===== -->
         <el-tab-pane label="搜索词" name="search-terms">
           <div class="detail-toolbar">
@@ -421,89 +504,6 @@
             layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
         </el-tab-pane>
 
-        <!-- ===== 广告活动 ===== -->
-        <el-tab-pane label="广告活动" name="campaigns">
-          <div class="detail-toolbar">
-            <el-input v-model="detailSearch.keyword" placeholder="搜索活动名称..." clearable style="width:220px" @clear="fetchDetail" @keyup.enter="fetchDetail">
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-            <span class="detail-sort-hint" v-if="detailSort.sort_by">
-              排序：<strong>{{ detailSort.sort_by }}</strong>
-              <el-icon><SortUp v-if="detailSort.sort_dir === 'asc'" /><SortDown v-else /></el-icon>
-              <el-button size="small" link @click="detailSort.sort_by='';detailSort.sort_dir='desc';fetchDetail()">清除</el-button>
-            </span>
-            <el-button type="primary" size="small" @click="fetchDetail">查询</el-button>
-          </div>
-
-          <div v-if="detailSummary" class="detail-summary">
-            <span class="ds-item">共 <strong>{{ detailSummary.total_rows }}</strong> 行</span>
-            <span class="ds-item">曝光 <strong>{{ formatNumber(detailSummary.total_impressions, 0) }}</strong></span>
-            <span class="ds-item">点击 <strong>{{ formatNumber(detailSummary.total_clicks, 0) }}</strong></span>
-            <span class="ds-item">花费 <strong>${{ formatNumber(detailSummary.total_cost) }}</strong></span>
-            <span class="ds-item">CTR <strong>{{ formatPct(detailSummary.ctr) }}</strong></span>
-            <span class="ds-item">CPC <strong>${{ formatNumber(detailSummary.cpc) }}</strong></span>
-          </div>
-
-          <el-table :data="detailList" v-loading="detailLoading" stripe style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}" @sort-change="handleDetailSortChange">
-            <el-table-column prop="report_date" label="日期" width="105" sortable="custom" />
-            <el-table-column prop="campaign_name" label="广告活动" min-width="180" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="campaign_status_label" label="状态" width="90" align="center">
-              <template #default="scope">
-                <el-tag v-if="scope.row.campaign_status === 'ENABLED'" type="success" size="small">{{ scope.row.campaign_status_label || '启用' }}</el-tag>
-                <el-tag v-else-if="scope.row.campaign_status === 'PAUSED'" type="warning" size="small">{{ scope.row.campaign_status_label || '暂停' }}</el-tag>
-                <el-tag v-else-if="scope.row.campaign_status === 'ARCHIVED'" type="info" size="small">{{ scope.row.campaign_status_label || '归档' }}</el-tag>
-                <span v-else>{{ scope.row.campaign_status_label || scope.row.campaign_status }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="预算" align="right" width="120">
-              <template #default="scope">
-                <span v-if="scope.row.campaign_budget">${{ formatNumber(scope.row.campaign_budget) }}</span>
-                <span v-else>-</span>
-                <span v-if="scope.row.campaign_budget_type_label" style="color:#909399;font-size:11px;margin-left:4px;">{{ scope.row.campaign_budget_type_label }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="impressions" label="曝光" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="clicks" label="点击" align="right" width="85" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="cost" label="花费" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cost) }}</template>
-            </el-table-column>
-            <el-table-column prop="purchases_7d" label="订单(7d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="purchases_14d" label="订单(14d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="purchases_30d" label="订单(30d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
-            </el-table-column>
-            <el-table-column prop="sales_14d" label="销售(14d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_14d) }}</template>
-            </el-table-column>
-            <el-table-column prop="sales_30d" label="销售(30d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_30d) }}</template>
-            </el-table-column>
-            <el-table-column prop="ctr" label="CTR" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
-            </el-table-column>
-            <el-table-column prop="cpc" label="CPC" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
-            </el-table-column>
-            <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">
-                <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="detailPage" v-model:page-size="detailPageSize"
-            :total="detailTotal" :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
-        </el-tab-pane>
-
         <!-- ===== 推广商品 ===== -->
         <el-tab-pane label="推广商品" name="products">
           <div class="detail-toolbar">
@@ -608,14 +608,14 @@ export default {
     const showGuide = ref(false)
 
     // 原始数据详情相关状态
-    const detailTab = ref('search-terms')
+    const detailTab = ref('campaigns')
     const detailLoading = ref(false)
     const detailList = ref([])
     const detailTotal = ref(0)
     const detailPage = ref(1)
     const detailPageSize = ref(20)
     const detailSearch = reactive({ keyword: '', asin: '' })
-    const detailSort = reactive({ sort_by: 'cost', sort_dir: 'desc' })
+    const detailSort = reactive({ sort_by: 'report_date', sort_dir: 'desc' })
     const detailSummary = ref(null)
 
     // 共享筛选栏
@@ -927,7 +927,7 @@ export default {
       // 切换 tab 时仅重置搜索和排序，保留筛选条件
       detailSearch.keyword = ''
       detailSearch.asin = ''
-      detailSort.sort_by = 'cost'
+      detailSort.sort_by = 'report_date'
       detailSort.sort_dir = 'desc'
       detailPage.value = 1
       detailSummary.value = null

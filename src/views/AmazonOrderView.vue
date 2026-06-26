@@ -158,7 +158,21 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="商品数" width="100" align="center">
+        <el-table-column label="SKU明细" min-width="260">
+          <template #default="scope">
+            <div class="sku-items" v-if="scope.row.items && scope.row.items.length > 0">
+              <div v-for="(item, idx) in scope.row.items" :key="idx" class="sku-item">
+                <span class="sku-code">{{ item.seller_sku }}</span>
+                <span v-if="item.name_cn || item.title" class="sku-name"> - {{ item.name_cn || item.title }}</span>
+                <span class="sku-qty"> ×{{ item.quantity_ordered }}</span>
+                <span v-if="item.asin" class="sku-asin">({{ item.asin }})</span>
+              </div>
+            </div>
+            <span v-else style="color:#ccc;">—</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="SKU数量" width="100" align="center">
           <template #default="scope">
             <span v-if="scope.row.item_count !== undefined && scope.row.item_count !== null" class="qty-total">
               {{ scope.row.item_count }}
@@ -864,5 +878,40 @@ export default {
     align-items: flex-start;
     gap: 8px;
   }
+}
+
+/* SKU明细列 */
+.sku-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sku-item {
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sku-code {
+  color: #1f2937;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.sku-name {
+  color: #6b7280;
+}
+
+.sku-qty {
+  color: #667eea;
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.sku-asin {
+  color: #9ca3af;
+  font-size: 11px;
+  margin-left: 4px;
 }
 </style>
