@@ -199,12 +199,12 @@
         <el-tag v-if="filter.type === 'daily'" type="warning" size="small" effect="plain">日报 ACOS 仅作趋势参考</el-tag>
       </div>
       <el-table :data="list" v-loading="loading" style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}">
-        <el-table-column v-if="filter.dimension === 'overall'" prop="report_date" label="日期" width="110" />
         <el-table-column v-if="filter.dimension === 'campaign'" prop="campaign_name" label="广告活动" min-width="180" show-overflow-tooltip />
         <el-table-column v-if="filter.dimension === 'ad_group'" prop="campaign_name" label="广告活动" min-width="160" show-overflow-tooltip />
         <el-table-column v-if="filter.dimension === 'ad_group'" prop="ad_group_name" label="广告组" min-width="160" show-overflow-tooltip />
         <el-table-column v-if="filter.dimension === 'asin'" prop="asin" label="ASIN" width="130" />
         <el-table-column v-if="filter.dimension === 'asin'" prop="sku" label="SKU" width="120" />
+        <el-table-column prop="report_date" label="日期" width="110" />
 
         <el-table-column prop="impressions" label="曝光" align="right" width="100">
           <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
