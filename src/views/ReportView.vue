@@ -39,7 +39,7 @@
       <!-- data_status 提示 -->
       <div class="status-hint">
         <el-icon style="color:#909399;margin-right:6px;"><InfoFilled /></el-icon>
-        Finance 数据有 2-3 天延迟：当天/昨天为"预估"（仅含销售额），约 3 天后自动升级为"已结算"完整数据。
+        每行含 data_status 字段: estimated=预估 / partial=部分结算 / settled=已结算
       </div>
       <!-- 筛选栏 -->
       <div class="filter-bar">
@@ -151,8 +151,8 @@
           </el-table-column>
           <el-table-column label="数据状态" width="110" align="center">
             <template #default="scope">
-              <el-tag :type="scope.row.data_status === 'settled' ? 'success' : 'warning'" size="small">
-                {{ scope.row.data_status === 'settled' ? '已结算' : '预估' }}
+              <el-tag :type="getDataStatusType(scope.row.data_status)" size="small">
+                {{ getDataStatusLabel(scope.row.data_status) }}
               </el-tag>
             </template>
           </el-table-column>
@@ -178,12 +178,12 @@
           </el-table-column>
           <el-table-column prop="platform_fees" label="平台佣金" align="right" width="110">
             <template #default="scope">
-              <span :class="{ 'text-muted': scope.row.data_status === 'settled' }">${{ formatNumber(scope.row.platform_fees) }}</span>
+              <span :class="{ 'text-muted': scope.row.data_status === 'settled' || scope.row.data_status === 'partial' }">${{ formatNumber(scope.row.platform_fees) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="fba_fees" label="FBA费" align="right" width="110">
             <template #default="scope">
-              <span :class="{ 'text-muted': scope.row.data_status === 'settled' }">${{ formatNumber(scope.row.fba_fees) }}</span>
+              <span :class="{ 'text-muted': scope.row.data_status === 'settled' || scope.row.data_status === 'partial' }">${{ formatNumber(scope.row.fba_fees) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="ad_cost" label="广告费" align="right" width="110">
@@ -686,6 +686,16 @@ export default {
         inventory_turnover: '库存周转'
       }
       return map[type] || type
+    }
+
+    const getDataStatusLabel = (status) => {
+      const map = { estimated: '预估', partial: '部分结算', settled: '已结算' }
+      return map[status] || status
+    }
+
+    const getDataStatusType = (status) => {
+      const map = { estimated: 'warning', partial: 'info', settled: 'success' }
+      return map[status] || 'info'
     }
 
     // ============= 数据获取 =============
@@ -1329,6 +1339,7 @@ export default {
       logFilter, logList, logLoading, logPage, logPageSize, logTotal,
       formatNumber, getProfitRateTagType, getStatusTagType, getStatusLabel,
       getTurnoverClass, getLogStatusType, getLogStatusLabel, getReportTypeLabel,
+      getDataStatusLabel, getDataStatusType,
       handleShopChange, fetchBusinessData, handleBusinessTypeChange,
       fetchSkuData, fetchInventoryData, fetchLogs, fetchLogList,
       handleGenerateYesterday, handleGenerateInventory,
