@@ -75,6 +75,17 @@ export function useTabs() {
     }
   }
 
+  function moveTab(path, toIndex) {
+    const fromIdx = findTabIndex(path)
+    if (fromIdx === -1) return
+    const arr = tabs.value.slice()
+    const [moved] = arr.splice(fromIdx, 1)
+    const clamped = Math.max(0, Math.min(toIndex, arr.length))
+    if (clamped === fromIdx) return
+    arr.splice(clamped, 0, moved)
+    tabs.value = arr
+  }
+
   function refreshTab(path) {
     refreshKeys.value = {
       ...refreshKeys.value,
@@ -159,6 +170,7 @@ export function useTabs() {
     closeRight,
     closeLeft,
     closeAll,
+    moveTab,
     getTabKey
   }
 }

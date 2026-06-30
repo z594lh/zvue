@@ -1,14 +1,15 @@
 <template>
   <div class="tab-bar" v-if="tabs.length > 0" @mousedown="onBarMouseDown">
     <span class="tab-scroll-btn tab-scroll-left" @click.stop="scrollTabs(-200)" v-if="showLeftArrow">‹</span>
-    <div class="tab-list" ref="tabListRef" @wheel.prevent="onWheel">
+    <div class="tab-list" ref="tabListRef" :class="{ 'no-anim': noAnim }" @wheel.prevent="onWheel">
       <div
         v-for="tab in tabs"
         :key="tab.path"
         class="tab-item"
-        :class="{ active: activePath === tab.path }"
+        :class="{ active: activePath === tab.path, dragging: draggingPath === tab.path }"
+        :style="tabStyle(tab)"
         :ref="el => setTabRef(tab.path, el)"
-        @click="switchTab(tab)"
+        @mousedown="onTabMouseDown($event, tab)"
         @contextmenu.prevent="openContextMenu($event, tab)"
         @mouseup.middle.prevent="removeTab(tab.path)"
       >
@@ -54,13 +55,25 @@ export default {
       refreshTab,
       closeOther,
       closeRight,
-      closeLeft
+      closeLeft,
+      moveTab
     } = useTabs()
 
     const tabListRef = ref(null)
     const tabRefs = {}
     const showLeftArrow = ref(false)
     const showRightArrow = ref(false)
+    const draggingPath = ref(null)
+    const dragDx = ref(0)
+    const shifts = ref({})
+    const noAnim = ref(false)
+    let pressPath = null
+    let pressStartX = 0
+    let dragMoved = false
+    let startIndex = -1
+    let rects = []
+    let stepWidth = 0
+    let currentTarget = -1
 
     const contextMenu = ref({
       visible: false,
@@ -79,6 +92,87 @@ export default {
       if (route.path !== tab.path) {
         router.push(tab.fullPath)
       }
+    }
+
+    function tabStyle(tab) {
+      if (tab.path === draggingPath.value) {
+        return { transform: `translateX(${dragDx.value}px)` }
+      }
+      const s = shifts.value[tab.path]
+      return s ? { transform: `translateX(${s}px)` } : null
+    }
+
+    function onTabMouseDown(e, tab) {
+      if (e.button !== 0) return
+      if (e.target.closest('.tab-close, .tab-refresh')) return
+      switchTab(tab)
+      pressPath = tab.path
+      pressStartX = e.clientX
+      dragMoved = false
+      document.addEventListener('mousemove', onDragMove)
+      document.addEventListener('mouseup', onDragEnd)
+    }
+
+    function beginDrag() {
+      startIndex = tabs.value.findIndex(t => t.path === pressPath)
+      rects = tabs.value.map(t => {
+        const r = tabRefs[t.path].getBoundingClientRect()
+        return { left: r.left, width: r.width, center: r.left + r.width / 2 }
+      })
+      stepWidth = rects[startIndex].width + 2
+      currentTarget = startIndex
+      draggingPath.value = pressPath
+    }
+
+    function onDragMove(e) {
+      if (!pressPath) return
+      if (!dragMoved) {
+        if (Math.abs(e.clientX - pressStartX) < 5) return
+        dragMoved = true
+        beginDrag()
+      }
+      const dx = e.clientX - pressStartX
+      dragDx.value = dx
+
+      const draggedCenter = rects[startIndex].center + dx
+      let count = 0
+      for (let k = 0; k < rects.length; k++) {
+        if (k === startIndex) continue
+        if (rects[k].center < draggedCenter) count++
+      }
+      currentTarget = count
+
+      const ns = {}
+      for (let k = 0; k < rects.length; k++) {
+        if (k === startIndex) continue
+        const path = tabs.value[k].path
+        if (k > startIndex && k <= currentTarget) ns[path] = -stepWidth
+        else if (k < startIndex && k >= currentTarget) ns[path] = stepWidth
+        else ns[path] = 0
+      }
+      shifts.value = ns
+    }
+
+    function onDragEnd() {
+      document.removeEventListener('mousemove', onDragMove)
+      document.removeEventListener('mouseup', onDragEnd)
+      if (dragMoved) {
+        const path = pressPath
+        const target = currentTarget
+        noAnim.value = true
+        draggingPath.value = null
+        dragDx.value = 0
+        shifts.value = {}
+        if (target !== startIndex) moveTab(path, target)
+        nextTick(() => {
+          requestAnimationFrame(() => { noAnim.value = false })
+        })
+      }
+      pressPath = null
+      dragMoved = false
+      startIndex = -1
+      rects = []
+      currentTarget = -1
     }
 
     function scrollTabs(offset) {
@@ -195,9 +289,13 @@ export default {
       tabRefs,
       showLeftArrow,
       showRightArrow,
+      draggingPath,
+      noAnim,
       contextMenu,
       setTabRef,
       switchTab,
+      tabStyle,
+      onTabMouseDown,
       scrollTabs,
       onWheel,
       openContextMenu,
@@ -216,9 +314,9 @@ export default {
   display: flex;
   align-items: center;
   height: 36px;
-  background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  background: #eef0f2;
+  border-bottom: 1px solid #e2e4e8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   position: sticky;
   top: 60px;
   z-index: 99;
@@ -251,7 +349,8 @@ export default {
   overflow-x: auto;
   overflow-y: hidden;
   gap: 2px;
-  padding: 0 4px;
+  padding: 0 6px;
+  align-items: center;
   scroll-behavior: smooth;
 }
 
@@ -268,39 +367,59 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 14px;
   height: 32px;
-  border-radius: 4px 4px 0 0;
+  border-radius: 8px 8px 0 0;
   cursor: pointer;
   font-size: 13px;
-  color: #666;
+  color: #5f6368;
   position: relative;
-  transition: all 0.2s;
+  background: transparent;
+  transition: transform 0.22s cubic-bezier(0.25, 0.8, 0.3, 1),
+    background 0.15s ease, color 0.15s ease, box-shadow 0.18s ease;
 }
 
-.tab-item::after {
+.tab-item::before {
   content: '';
   position: absolute;
+  left: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 16px;
-  background: #e8e8e8;
-}
-
-.tab-item:last-child::after {
-  display: none;
+  top: 0;
+  height: 3px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  opacity: 0;
+  transition: opacity 0.18s ease;
 }
 
 .tab-item:hover {
-  color: #333;
-  background: #f5f5f5;
+  color: #2c2c3a;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .tab-item.active {
-  color: #667eea;
-  background: #f0f3ff;
+  color: #1a1a2e;
+  font-weight: 500;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(60, 64, 67, 0.18);
+  z-index: 2;
+}
+
+.tab-item.active::before {
+  opacity: 1;
+}
+
+.tab-item.dragging {
+  z-index: 10;
+  color: #1a1a2e;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(60, 64, 67, 0.28);
+  cursor: grabbing;
+  transition: none;
+}
+
+.tab-list.no-anim .tab-item {
+  transition: none !important;
 }
 
 .tab-title {
