@@ -463,7 +463,7 @@
               </el-descriptions-item>
               <el-descriptions-item label="同步时间">{{ formatDate(listingDetail.sync_time) }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(listingDetail.created_at) }}</el-descriptions-item>
-              <el-descriptions-item label="更新时间">{{ formatDate(listingDetail.updated_at) }}</el-descriptions-item>
+              <el-descriptions-item label="更新时间">{{ formatDate(listingDetail.last_updated_date) }}</el-descriptions-item>
             </el-descriptions>
           </div>
 
