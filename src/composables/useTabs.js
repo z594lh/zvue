@@ -29,6 +29,18 @@ export function useTabs() {
   function addTab(toRoute) {
     if (excludedPaths.includes(toRoute.path)) return
 
+    const isCpc = toRoute.path.startsWith('/cpc/')
+
+    // CPC 广告模块所有子路由共用一个页签
+    if (isCpc) {
+      const otherCpcTabs = tabs.value.filter(t => t.path.startsWith('/cpc/') && t.path !== toRoute.path)
+      otherCpcTabs.forEach(t => {
+        const ci = cachedViews.value.indexOf(t.componentName)
+        if (ci !== -1) cachedViews.value.splice(ci, 1)
+      })
+      tabs.value = tabs.value.filter(t => !t.path.startsWith('/cpc/') || t.path === toRoute.path)
+    }
+
     const exists = findTabIndex(toRoute.path)
     if (exists !== -1) {
       tabs.value[exists].fullPath = toRoute.fullPath

@@ -1,31 +1,5 @@
 <template>
   <div class="cpc-layout">
-    <!-- 顶部账号选择栏 -->
-    <div class="cpc-topbar">
-      <div class="account-select-wrap">
-        <el-select
-          v-model="selectedShopId"
-          placeholder="--请选择账号--"
-          filterable
-          clearable
-          @change="handleShopChange"
-        >
-          <el-option-group
-            v-for="group in accountGroups"
-            :key="group.name"
-            :label="group.name"
-          >
-            <el-option
-              v-for="shop in group.shops"
-              :key="shop.shop_id"
-              :label="shop.shop_name"
-              :value="shop.shop_id"
-            />
-          </el-option-group>
-        </el-select>
-      </div>
-    </div>
-
     <!-- Tab 导航 -->
     <div class="cpc-tabs">
       <div
@@ -38,6 +12,21 @@
         {{ tab.label }}
       </div>
       <div class="cpc-tab-extra">
+        <el-select
+          v-model="selectedShopId"
+          placeholder="--请选择店铺--"
+          filterable
+          clearable
+          style="width:180px"
+          @change="handleShopChange"
+        >
+          <el-option
+            v-for="shop in shopList"
+            :key="shop.id"
+            :label="shop.shop_name"
+            :value="shop.id"
+          />
+        </el-select>
         <slot name="tab-extra" />
       </div>
     </div>
@@ -54,10 +43,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCpcAccounts } from '@/services/cpc'
+import { useShopCache } from '@/composables/useShopCache'
 
 const route = useRoute()
 const router = useRouter()
+const { shopList, fetchShopList, defaultShopId } = useShopCache()
 
 const props = defineProps({
   activeTab: { type: String, required: true }
@@ -66,7 +56,7 @@ const props = defineProps({
 const emit = defineEmits(['shopChange'])
 
 const selectedShopId = ref(null)
-const accountGroups = ref([])
+const CPC_SHOP_KEY = 'cpc_shop_id'
 
 const tabs = [
   { key: 'campaigns', label: 'SP广告活动', routeName: 'CpcCampaigns' }
@@ -74,20 +64,10 @@ const tabs = [
 
 const activeTab = computed(() => props.activeTab)
 
-const loadAccounts = async () => {
-  try {
-    const res = await getCpcAccounts()
-    if (res.data.status === 'success') {
-      const data = res.data.data
-      accountGroups.value = Object.entries(data).map(([name, shops]) => ({ name, shops }))
-    }
-  } catch { ElMessage.error('获取账号列表失败') }
-}
-
 const handleShopChange = (val) => {
   selectedShopId.value = val
-  if (val) sessionStorage.setItem('cpc_shop_id', val)
-  else sessionStorage.removeItem('cpc_shop_id')
+  if (val) sessionStorage.setItem(CPC_SHOP_KEY, val)
+  else sessionStorage.removeItem(CPC_SHOP_KEY)
   emit('shopChange', val)
 }
 
@@ -106,11 +86,13 @@ const switchTab = (tab) => {
 }
 
 onMounted(async () => {
-  await loadAccounts()
-  const saved = sessionStorage.getItem('cpc_shop_id')
-  if (saved) {
-    selectedShopId.value = Number(saved)
-    emit('shopChange', selectedShopId.value)
+  await fetchShopList()
+  const saved = sessionStorage.getItem(CPC_SHOP_KEY)
+  const defId = defaultShopId()
+  const initialId = saved ? Number(saved) : defId
+  if (initialId && shopList.value.find(s => s.id === initialId)) {
+    selectedShopId.value = initialId
+    emit('shopChange', initialId)
   }
 })
 
@@ -122,13 +104,6 @@ defineExpose({ shopId: selectedShopId })
   min-height: 100%;
   background: #f5f7fa;
 }
-.cpc-topbar {
-  background: #2b83d5;
-  padding: 8px 16px;
-}
-.account-select-wrap :deep(.el-input__wrapper) {
-  background: rgba(255,255,255,0.9);
-}
 .cpc-tabs {
   display: flex;
   align-items: center;
@@ -139,6 +114,9 @@ defineExpose({ shopId: selectedShopId })
 .cpc-tab-extra {
   margin-left: auto;
   padding: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .cpc-tab-item {
   padding: 12px 18px;
