@@ -21,9 +21,7 @@
               <th>点击</th>
               <th>花费</th>
               <th>广告订单(7d)</th>
-              <th>实际订单</th>
               <th>广告销售额(7d)</th>
-              <th>实际销售额</th>
               <th>首页首位IS</th>
               <th>CPC</th>
               <th>CTR</th>
@@ -39,9 +37,7 @@
               <td align="right">{{ fmtInt(row.clicks) }}</td>
               <td align="right">${{ formatNum(row.cost) }}</td>
               <td align="right">{{ fmtInt(row.purchases_7d) }}</td>
-              <td align="right">{{ fmtInt(row.total_orders) }}</td>
               <td align="right">${{ formatNum(row.sales_7d) }}</td>
-              <td align="right">${{ formatNum(row.total_sales) }}</td>
               <td align="right">{{ fmtPct(row.top_of_search_impression_share) }}</td>
               <td align="right">${{ formatNum(row.cpc) }}</td>
               <td align="right">{{ fmtPct(row.ctr) }}</td>
@@ -58,8 +54,6 @@
           <span class="summary-item">花费: ${{ formatNum(summary.cost) }}</span>
           <span class="summary-item">广告订单: {{ fmtInt(summary.purchases_7d) }}</span>
           <span class="summary-item">广告销售额: ${{ formatNum(summary.sales_7d) }}</span>
-          <span class="summary-item">实际订单: {{ fmtInt(summary.total_orders) }}</span>
-          <span class="summary-item">实际销售额: ${{ formatNum(summary.total_sales) }}</span>
         </div>
       </div>
     </div>
@@ -106,10 +100,8 @@ const summary = computed(() => {
     acc.cost += Number(row.cost) || 0
     acc.purchases_7d += Number(row.purchases_7d) || 0
     acc.sales_7d += Number(row.sales_7d) || 0
-    acc.total_orders += Number(row.total_orders) || 0
-    acc.total_sales += Number(row.total_sales) || 0
     return acc
-  }, { impressions: 0, clicks: 0, cost: 0, purchases_7d: 0, sales_7d: 0, total_orders: 0, total_sales: 0 })
+  }, { impressions: 0, clicks: 0, cost: 0, purchases_7d: 0, sales_7d: 0 })
 })
 
 const onShopChange = (val) => { shopId.value = val; fetchData() }

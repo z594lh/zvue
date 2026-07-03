@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     :title="dialogTitle"
-    width="1400px"
+    width="1180px"
     :close-on-click-modal="true"
     destroy-on-close
     class="cpc-analysis-dialog"
@@ -27,14 +27,8 @@
       <el-table-column prop="purchases_7d" label="广告订单(7d)" width="110" align="right">
         <template #default="{ row }">{{ fmtInt(row.purchases_7d) }}</template>
       </el-table-column>
-      <el-table-column prop="total_orders" label="实际订单" width="90" align="right">
-        <template #default="{ row }">{{ fmtInt(row.total_orders) }}</template>
-      </el-table-column>
       <el-table-column prop="sales_7d" label="广告销售额(7d)" width="120" align="right">
         <template #default="{ row }">{{ formatNum(row.sales_7d) }}</template>
-      </el-table-column>
-      <el-table-column prop="total_sales" label="实际销售额" width="100" align="right">
-        <template #default="{ row }">{{ formatNum(row.total_sales) }}</template>
       </el-table-column>
       <el-table-column prop="top_of_search_impression_share" label="搜索结果首页首位IS" width="150" align="right">
         <template #default="{ row }">{{ fmtPct(row.top_of_search_impression_share) }}</template>
@@ -51,7 +45,7 @@
       <el-table-column prop="cpa" label="CPA" width="70" align="right">
         <template #default="{ row }">{{ formatNum(row.cpa) }}</template>
       </el-table-column>
-      <el-table-column prop="acos" label="ACOS" width="80" align="right">
+      <el-table-column prop="acos" label="ACOS" align="right">
         <template #default="{ row }">{{ fmtPct(row.acos) }}</template>
       </el-table-column>
     </el-table>
@@ -118,7 +112,7 @@ const getSummaries = (param) => {
   const sums = []
   columns.forEach((col, index) => {
     if (index === 0) { sums[index] = '合计'; return }
-    if (!['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d', 'total_orders', 'total_sales'].includes(col.property)) {
+    if (!['impressions', 'clicks', 'cost', 'purchases_7d', 'sales_7d'].includes(col.property)) {
       sums[index] = ''
       return
     }
