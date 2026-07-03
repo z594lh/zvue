@@ -53,7 +53,18 @@
     "parserOptions": {
       "parser": "@babel/eslint-parser"
     },
-    "rules": {}
+    "globals": {
+      "defineProps": "readonly",
+      "defineEmits": "readonly",
+      "defineExpose": "readonly",
+      "withDefaults": "readonly",
+      "useSlots": "readonly",
+      "useAttrs": "readonly"
+    },
+    "rules": {
+      "no-empty": ["error", { "allowEmptyCatch": true }],
+      "vue/multi-word-component-names": "off"
+    }
   },
   "browserslist": [
     "> 1%",

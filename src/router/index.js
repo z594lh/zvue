@@ -196,6 +196,58 @@ const routes = [
     meta: { title: '广告报表', componentName: 'AdvertisingReportView' }
   },
   {
+    path: '/cpc',
+    redirect: '/cpc/campaigns'
+  },
+  {
+    path: '/cpc/campaigns',
+    name: 'CpcCampaigns',
+    component: () => import('../views/cpc/CampaignList.vue'),
+    meta: { title: 'CPC广告活动', componentName: 'CpcCampaigns' }
+  },
+  {
+    path: '/cpc/campaigns/:id/detail',
+    name: 'CpcCampaignDetail',
+    component: () => import('../views/cpc/CampaignDetail.vue'),
+    meta: { title: 'CPC广告活动详情', componentName: 'CpcCampaignDetail' }
+  },
+  {
+    path: '/cpc/campaigns/create',
+    name: 'CpcCreateCampaign',
+    component: () => import('../views/cpc/CreateCampaign.vue'),
+    meta: { title: '创建广告活动', componentName: 'CpcCreateCampaign' }
+  },
+  {
+    path: '/cpc/campaigns/:id/create-group',
+    name: 'CpcCreateGroup',
+    component: () => import('../views/cpc/CreateGroup.vue'),
+    meta: { title: '添加广告组', componentName: 'CpcCreateGroup' }
+  },
+  {
+    path: '/cpc/campaigns/:id/groups/:adGroupId',
+    name: 'CpcGroupDetail',
+    component: () => import('../views/cpc/GroupDetail.vue'),
+    meta: { title: 'CPC广告组详情', componentName: 'CpcGroupDetail' }
+  },
+  {
+    path: '/cpc/days/:type/:id',
+    name: 'CpcDailyData',
+    component: () => import('../views/cpc/DailyData.vue'),
+    meta: { title: 'CPC分日数据', componentName: 'CpcDailyData' }
+  },
+  {
+    path: '/cpc/days/summary',
+    name: 'CpcDailyDataSummary',
+    component: () => import('../views/cpc/DailyData.vue'),
+    meta: { title: 'CPC汇总分日数据', componentName: 'CpcDailyDataSummary' }
+  },
+  {
+    path: '/cpc/structure',
+    name: 'CpcStructure',
+    component: () => import('../views/cpc/CpcStructure.vue'),
+    meta: { title: 'CPC广告结构', componentName: 'CpcStructure' }
+  },
+  {
     path: '/system/cron-tasks',
     name: 'CronTasks',
     component: CronTasksView,
