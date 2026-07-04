@@ -225,15 +225,25 @@
     <!-- ========== SKU 利润 ========== -->
     <div v-show="activeTab === 'sku-profit'" class="tab-content">
       <div class="filter-bar">
-        <el-date-picker
-          v-model="skuDateRange"
-          type="daterange"
-          range-separator="~"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          value-format="YYYY-MM-DD"
-          @change="fetchSkuData"
-        />
+        <div class="date-range-pickers">
+          <el-date-picker
+            v-model="skuDateRange[0]"
+            type="date"
+            placeholder="开始日期"
+            value-format="YYYY-MM-DD"
+            class="date-start-picker"
+            @change="onSkuStartDateChange"
+          />
+          <span class="date-separator">~</span>
+          <el-date-picker
+            v-model="skuDateRange[1]"
+            type="date"
+            placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            class="date-end-picker"
+            @change="onSkuEndDateChange"
+          />
+        </div>
         <el-input v-model="skuKeyword" placeholder="搜索 ASIN / SKU / 产品名" clearable style="width:240px" @keyup.enter="fetchSkuData">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
@@ -241,27 +251,55 @@
         <el-button plain @click="exportSkuProfit"><el-icon><Download /></el-icon> 导出</el-button>
       </div>
 
-      <!-- TOP 排行 -->
-      <div class="chart-row">
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><Top /></el-icon> TOP 盈利 SKU</h3></div>
-          <div ref="topProfitChartRef" class="chart-body" style="height:300px;"></div>
+      <!-- TOP 汇总卡片 -->
+      <div class="summary-cards sku-summary">
+        <div class="summary-card card-sku-orders">
+          <div class="card-icon"><el-icon size="28"><ShoppingCart /></el-icon></div>
+          <div class="card-body">
+            <div class="card-label">订单数前三 SKU</div>
+            <div class="top-sku-list">
+              <div v-for="(item, idx) in topOrderSkus" :key="idx" class="top-sku-item">
+                <span class="top-sku-rank">{{ idx + 1 }}</span>
+                <span class="top-sku-name" :title="`${item.sku || '-'} - ${item.product_name || '-'}`">
+                  {{ item.sku || '-' }} - {{ item.product_name || '-' }}
+                </span>
+                <span class="top-sku-value">{{ formatNumber(item.sales_qty, 0) }}</span>
+              </div>
+              <div v-if="!topOrderSkus.length" class="top-sku-empty">暂无数据</div>
+            </div>
+          </div>
         </div>
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><Bottom /></el-icon> TOP 亏损 SKU</h3></div>
-          <div ref="topLossChartRef" class="chart-body" style="height:300px;"></div>
+        <div class="summary-card card-sku-sales">
+          <div class="card-icon"><el-icon size="28"><Money /></el-icon></div>
+          <div class="card-body">
+            <div class="card-label">销售额前三 SKU</div>
+            <div class="top-sku-list">
+              <div v-for="(item, idx) in topSalesSkus" :key="idx" class="top-sku-item">
+                <span class="top-sku-rank">{{ idx + 1 }}</span>
+                <span class="top-sku-name" :title="`${item.sku || '-'} - ${item.product_name || '-'}`">
+                  {{ item.sku || '-' }} - {{ item.product_name || '-' }}
+                </span>
+                <span class="top-sku-value">${{ formatNumber(item.sales_amount) }}</span>
+              </div>
+              <div v-if="!topSalesSkus.length" class="top-sku-empty">暂无数据</div>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <!-- 成本构成 -->
-      <div class="chart-row">
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><PieChart /></el-icon> 平均成本构成</h3></div>
-          <div ref="skuCostPieRef" class="chart-body" style="height:280px;"></div>
-        </div>
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><Histogram /></el-icon> 利润率分布</h3></div>
-          <div ref="profitDistChartRef" class="chart-body" style="height:280px;"></div>
+        <div class="summary-card card-sku-profit">
+          <div class="card-icon"><el-icon size="28"><Coin /></el-icon></div>
+          <div class="card-body">
+            <div class="card-label">利润前三 SKU</div>
+            <div class="top-sku-list">
+              <div v-for="(item, idx) in topProfitSkus" :key="idx" class="top-sku-item">
+                <span class="top-sku-rank">{{ idx + 1 }}</span>
+                <span class="top-sku-name" :title="`${item.sku || '-'} - ${item.product_name || '-'}`">
+                  {{ item.sku || '-' }} - {{ item.product_name || '-' }}
+                </span>
+                <span class="top-sku-value">${{ formatNumber(item.net_profit) }}</span>
+              </div>
+              <div v-if="!topProfitSkus.length" class="top-sku-empty">暂无数据</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -329,6 +367,30 @@
           class="pagination"
           @change="fetchSkuList"
         />
+      </div>
+
+      <!-- TOP 排行 -->
+      <div class="chart-row">
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><Top /></el-icon> TOP 盈利 SKU</h3></div>
+          <div ref="topProfitChartRef" class="chart-body" style="height:300px;"></div>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><Bottom /></el-icon> TOP 亏损 SKU</h3></div>
+          <div ref="topLossChartRef" class="chart-body" style="height:300px;"></div>
+        </div>
+      </div>
+
+      <!-- 成本构成 -->
+      <div class="chart-row">
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><PieChart /></el-icon> 平均成本构成</h3></div>
+          <div ref="skuCostPieRef" class="chart-body" style="height:280px;"></div>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><Histogram /></el-icon> 利润率分布</h3></div>
+          <div ref="profitDistChartRef" class="chart-body" style="height:280px;"></div>
+        </div>
       </div>
     </div>
 
@@ -557,7 +619,7 @@ import {
 import {
   getShopOptions,
   getBusinessReports, getBusinessSummary, getBusinessTrend, getBusinessCostBreakdown,
-  getSkuProfitList, getSkuProfitTop,
+  getSkuProfitTop, getSkuProfitAggregate,
   getInventoryTurnover, getInventoryStats,
   getGenerationLogs,
   generateYesterdayReports, generateInventoryTurnover
@@ -654,6 +716,9 @@ export default {
     const skuPage = ref(1)
     const skuPageSize = ref(20)
     const skuTotal = ref(0)
+    const topOrderSkus = ref([])
+    const topSalesSkus = ref([])
+    const topProfitSkus = ref([])
 
     // ============= 库存周转 =============
     const inventoryFilter = reactive({ status: '' })
@@ -863,25 +928,43 @@ export default {
     }
 
     const fetchSkuData = async () => {
+      fetchSkuTopCards()
       fetchSkuTop()
       fetchSkuList()
     }
 
+    const fetchSkuTopCards = async () => {
+      try {
+        const baseParams = { shop_id: selectedShop.value, limit: 3 }
+        if (skuDateRange.value?.length === 2) {
+          baseParams.start_date = skuDateRange.value[0]
+          baseParams.end_date = skuDateRange.value[1]
+        }
+        const [resOrder, resSales, resProfit] = await Promise.all([
+          getSkuProfitTop({ ...baseParams, sort_by: 'sales_qty', sort_dir: 'desc' }),
+          getSkuProfitTop({ ...baseParams, sort_by: 'sales_amount', sort_dir: 'desc' }),
+          getSkuProfitTop({ ...baseParams, sort_by: 'net_profit', sort_dir: 'desc' })
+        ])
+        if (resOrder.data.status === 'success') topOrderSkus.value = resOrder.data.data || []
+        if (resSales.data.status === 'success') topSalesSkus.value = resSales.data.data || []
+        if (resProfit.data.status === 'success') topProfitSkus.value = resProfit.data.data || []
+      } catch (e) { console.error(e) }
+    }
+
     const fetchSkuTop = async () => {
       try {
-        const params = { sort_by: 'net_profit', sort_dir: 'desc', limit: 10, shop_id: selectedShop.value }
+        const baseParams = { shop_id: selectedShop.value, limit: 10 }
         if (skuDateRange.value?.length === 2) {
-          params.start_date = skuDateRange.value[0]
-          params.end_date = skuDateRange.value[1]
+          baseParams.start_date = skuDateRange.value[0]
+          baseParams.end_date = skuDateRange.value[1]
         }
-        const res = await getSkuProfitTop(params)
-        if (res.data.status === 'success') {
-          updateTopProfitChart(res.data.data || [])
+        const resProfit = await getSkuProfitTop({ ...baseParams, sort_by: 'net_profit', sort_dir: 'desc' })
+        if (resProfit.data.status === 'success') {
+          updateTopProfitChart(resProfit.data.data || [])
         }
-        params.sort_dir = 'asc'
-        const res2 = await getSkuProfitTop(params)
-        if (res2.data.status === 'success') {
-          updateTopLossChart(res2.data.data || [])
+        const resLoss = await getSkuProfitTop({ ...baseParams, sort_by: 'net_profit', sort_dir: 'asc' })
+        if (resLoss.data.status === 'success') {
+          updateTopLossChart(resLoss.data.data || [])
         }
       } catch (e) { console.error(e) }
     }
@@ -899,7 +982,7 @@ export default {
           params.start_date = skuDateRange.value[0]
           params.end_date = skuDateRange.value[1]
         }
-        const res = await getSkuProfitList(params)
+        const res = await getSkuProfitAggregate(params)
         if (res.data.status === 'success') {
           skuList.value = res.data.data.list || []
           skuTotal.value = res.data.data.total || 0
@@ -908,6 +991,22 @@ export default {
         }
       } catch (e) { console.error(e) }
       finally { skuLoading.value = false }
+    }
+
+    const onSkuStartDateChange = (val) => {
+      if (val && skuDateRange.value[1] && val > skuDateRange.value[1]) {
+        skuDateRange.value[1] = val
+      }
+      skuPage.value = 1
+      fetchSkuData()
+    }
+
+    const onSkuEndDateChange = (val) => {
+      if (val && skuDateRange.value[0] && val < skuDateRange.value[0]) {
+        skuDateRange.value[0] = val
+      }
+      skuPage.value = 1
+      fetchSkuData()
     }
 
     const fetchInventoryData = async () => {
@@ -1123,14 +1222,29 @@ export default {
       fetchBusinessTrend()
     }
 
+    const formatSkuChartLabel = (d) => {
+      const sku = d.sku || d.asin || '-'
+      const name = d.product_name || ''
+      const full = name ? `${sku} - ${name}` : sku
+      return full.length > 26 ? full.slice(0, 26) + '...' : full
+    }
+
     const updateTopProfitChart = (data) => {
       if (!topProfitChart) return
       const list = data.slice(0, 10).reverse()
       topProfitChart.setOption({
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: '{b}: ${c}' },
-        grid: { left: 120, right: 30, top: 10, bottom: 20 },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: (params) => {
+            const item = list[params[0].dataIndex]
+            const label = item ? formatSkuChartLabel(item) : params[0].name
+            return `${label}<br/>净利润: $${formatNumber(params[0].value)}`
+          }
+        },
+        grid: { left: 200, right: 30, top: 10, bottom: 20 },
         xAxis: { type: 'value', splitLine: { lineStyle: { color: '#f0f0f0' } } },
-        yAxis: { type: 'category', data: list.length ? list.map(d => d.sku || d.asin || '-') : ['暂无数据'], axisLabel: { color: '#666' } },
+        yAxis: { type: 'category', data: list.length ? list.map(formatSkuChartLabel) : ['暂无数据'], axisLabel: { color: '#666', width: 190, overflow: 'truncate' } },
         series: [{
           type: 'bar',
           data: list.length ? list.map(d => d.net_profit || 0) : [0],
@@ -1144,10 +1258,18 @@ export default {
       if (!topLossChart) return
       const list = data.slice(0, 10).reverse()
       topLossChart.setOption({
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: '{b}: ${c}' },
-        grid: { left: 120, right: 30, top: 10, bottom: 20 },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: (params) => {
+            const item = list[params[0].dataIndex]
+            const label = item ? formatSkuChartLabel(item) : params[0].name
+            return `${label}<br/>净利润: $${formatNumber(params[0].value)}`
+          }
+        },
+        grid: { left: 200, right: 30, top: 10, bottom: 20 },
         xAxis: { type: 'value', splitLine: { lineStyle: { color: '#f0f0f0' } } },
-        yAxis: { type: 'category', data: list.length ? list.map(d => d.sku || d.asin || '-') : ['暂无数据'], axisLabel: { color: '#666' } },
+        yAxis: { type: 'category', data: list.length ? list.map(formatSkuChartLabel) : ['暂无数据'], axisLabel: { color: '#666', width: 190, overflow: 'truncate' } },
         series: [{
           type: 'bar',
           data: list.length ? list.map(d => d.net_profit || 0) : [0],
@@ -1418,6 +1540,7 @@ export default {
       businessFilter, businessDateRange, businessSummary, costBreakdown, costTreemapItems, businessList,
       businessLoading, businessPage, businessPageSize, businessTotal, trendMetric,
       skuDateRange, skuKeyword, skuList, skuLoading, skuPage, skuPageSize, skuTotal,
+      topOrderSkus, topSalesSkus, topProfitSkus,
       inventoryFilter, inventoryKeyword, inventoryStats, inventoryList,
       inventoryLoading, inventoryPage, inventoryPageSize, inventoryTotal,
       logFilter, logList, logLoading, logPage, logPageSize, logTotal,
@@ -1426,7 +1549,8 @@ export default {
       getDataStatusLabel, getDataStatusType,
       handleShopChange, fetchBusinessData, handleBusinessTypeChange,
       onStartDateChange, onEndDateChange,
-      fetchSkuData, fetchInventoryData, fetchLogs, fetchLogList,
+      fetchSkuData, onSkuStartDateChange, onSkuEndDateChange,
+      fetchInventoryData, fetchLogs, fetchLogList,
       handleGenerateYesterday, handleGenerateInventory,
       updateTrendChart, updateCostPieChart, exportBusiness, exportSkuProfit
     }
@@ -1704,6 +1828,78 @@ export default {
   margin-top: 2px;
 }
 
+/* SKU 利润 TOP 汇总卡片 */
+.summary-cards.sku-summary {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.summary-cards.sku-summary .summary-card {
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.card-sku-orders .card-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.card-sku-sales .card-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
+.card-sku-profit .card-icon { background: linear-gradient(135deg, #10b981, #059669); }
+
+.top-sku-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-sku-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.top-sku-rank {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #9ca3af;
+  flex-shrink: 0;
+}
+
+.top-sku-item:nth-child(1) .top-sku-rank { background: #f59e0b; }
+.top-sku-item:nth-child(2) .top-sku-rank { background: #9ca3af; }
+.top-sku-item:nth-child(3) .top-sku-rank { background: #b45309; }
+
+.top-sku-name {
+  flex: 1;
+  min-width: 0;
+  color: #374151;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-sku-value {
+  color: #1f2937;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.top-sku-empty {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 12px 0;
+  text-align: center;
+}
+
 /* 图表卡片 */
 .chart-card {
   background: #fff;
@@ -1802,6 +1998,8 @@ export default {
   .summary-cards { grid-template-columns: repeat(3, 1fr); }
   .summary-cards.business-summary { grid-template-columns: repeat(2, 1fr); }
   .summary-cards.business-summary .card-cost { grid-column: span 2; }
+  .summary-cards.sku-summary { grid-template-columns: repeat(2, 1fr); }
+  .summary-cards.sku-summary .card-sku-profit { grid-column: span 2; }
   .summary-cards.inventory-summary { grid-template-columns: repeat(4, 1fr); }
   .chart-row { grid-template-columns: 1fr; }
 }
@@ -1812,6 +2010,8 @@ export default {
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
   .summary-cards.business-summary { grid-template-columns: repeat(1, 1fr); }
   .summary-cards.business-summary .card-cost { grid-column: span 1; }
+  .summary-cards.sku-summary { grid-template-columns: repeat(1, 1fr); }
+  .summary-cards.sku-summary .card-sku-profit { grid-column: span 1; }
   .summary-cards.inventory-summary { grid-template-columns: repeat(2, 1fr); }
   .tab-item { padding: 8px 12px; font-size: 13px; }
   .filter-bar { gap: 8px; }

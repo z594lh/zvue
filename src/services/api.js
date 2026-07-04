@@ -1131,6 +1131,14 @@ export const getSkuProfitTop = (params = {}) => {
 };
 
 /**
+ * 获取SKU利润汇总（按日期范围聚合到SKU维度）
+ * @param {Object} params {keyword, start_date, end_date, shop_id, page, page_size}
+ */
+export const getSkuProfitAggregate = (params = {}) => {
+  return api.get('/reports/sku-profit/aggregate', { params });
+};
+
+/**
  * 手动触发SKU利润生成
  * @param {Object} data {period_start, period_end, shop_id}
  */
