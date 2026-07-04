@@ -13,7 +13,7 @@
         </div>
       </div>
       <div class="form-row">
-        <label>状态</label>
+        <label>预算状态</label>
         <span class="status-text">{{ servingStatusLabel }}</span>
       </div>
       <div class="form-row">
@@ -47,10 +47,7 @@ const form = reactive({ name: '', state: 'ENABLED', defaultBid: 0.5 })
 
 const servingStatusLabel = computed(() => {
   if (!props.groupInfo) return '--'
-  if (props.groupInfo.state === 'ENABLED') return '超出预算'
-  if (props.groupInfo.state === 'PAUSED') return '已暂停'
-  if (props.groupInfo.state === 'ARCHIVED') return '已归档'
-  return '未知'
+  return props.groupInfo.serving_status || '预算状态暂时无法获取'
 })
 
 watch(() => props.groupInfo, (info) => {
