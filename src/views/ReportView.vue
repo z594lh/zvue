@@ -48,35 +48,68 @@
           <el-radio-button label="weekly">周报</el-radio-button>
           <el-radio-button label="monthly">月报</el-radio-button>
         </el-radio-group>
-        <el-date-picker
-          v-model="businessDateRange"
-          type="daterange"
-          range-separator="~"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          value-format="YYYY-MM-DD"
-          @change="fetchBusinessData"
-        />
+        <div class="date-range-pickers">
+          <el-date-picker
+            v-model="businessDateRange[0]"
+            type="date"
+            placeholder="开始日期"
+            value-format="YYYY-MM-DD"
+            class="date-start-picker"
+            @change="onStartDateChange"
+          />
+          <span class="date-separator">~</span>
+          <el-date-picker
+            v-model="businessDateRange[1]"
+            type="date"
+            placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            class="date-end-picker"
+            @change="onEndDateChange"
+          />
+        </div>
         <el-button type="primary" @click="fetchBusinessData"><el-icon><Search /></el-icon> 查询</el-button>
         <el-button plain @click="exportBusiness"><el-icon><Download /></el-icon> 导出</el-button>
       </div>
 
       <!-- 汇总卡片 -->
-      <div class="summary-cards">
+      <div class="summary-cards business-summary">
         <div class="summary-card card-sales">
           <div class="card-icon"><el-icon size="28"><Money /></el-icon></div>
           <div class="card-body">
-            <div class="card-label">总销售额</div>
+            <div class="card-label">销售额</div>
             <div class="card-value">${{ formatNumber(businessSummary.sum_sales) }}</div>
             <div class="card-sub">共 {{ businessSummary.record_count || 0 }} 条记录</div>
+          </div>
+        </div>
+        <div class="summary-card card-cost">
+          <div class="cost-header">
+            <div class="card-icon"><el-icon size="28"><Wallet /></el-icon></div>
+            <div class="card-body">
+              <div class="card-label">成本</div>
+              <div class="card-value">${{ formatNumber(businessSummary.sum_total_cost) }}</div>
+            </div>
+          </div>
+          <div class="cost-treemap">
+            <div
+              v-for="item in costTreemapItems"
+              :key="item.key"
+              class="cost-treemap-item"
+              :class="'cost-' + item.key"
+              :style="{ flex: item.flex }"
+              :title="`${item.name}: $${formatNumber(item.value)} (${item.percent}%)`"
+            >
+              <div class="cost-treemap-name">{{ item.name }}</div>
+              <div class="cost-treemap-value">${{ formatNumber(item.value) }}</div>
+              <div class="cost-treemap-percent">{{ item.percent }}%</div>
+            </div>
           </div>
         </div>
         <div class="summary-card card-profit">
           <div class="card-icon"><el-icon size="28"><Coin /></el-icon></div>
           <div class="card-body">
-            <div class="card-label">总毛利</div>
+            <div class="card-label">利润</div>
             <div class="card-value">${{ formatNumber(businessSummary.sum_gross_profit) }}</div>
-            <div class="card-sub">毛利率 {{ (businessSummary.sum_sales > 0 ? ((businessSummary.sum_gross_profit || 0) / businessSummary.sum_sales * 100).toFixed(1) : 0) }}%</div>
+            <div class="card-sub">利润率 {{ (businessSummary.sum_sales > 0 ? ((businessSummary.sum_gross_profit || 0) / businessSummary.sum_sales * 100).toFixed(1) : 0) }}%</div>
           </div>
         </div>
         <div class="summary-card card-order">
@@ -86,55 +119,6 @@
             <div class="card-value">{{ formatNumber(businessSummary.sum_orders, 0) }}</div>
             <div class="card-sub">平均 {{ businessSummary.record_count ? ((businessSummary.sum_orders || 0) / businessSummary.record_count).toFixed(0) : 0 }} 单/天</div>
           </div>
-        </div>
-        <div class="summary-card card-ad">
-          <div class="card-icon"><el-icon size="28"><Promotion /></el-icon></div>
-          <div class="card-body">
-            <div class="card-label">广告费</div>
-            <div class="card-value">${{ formatNumber(businessSummary.sum_ad_cost) }}</div>
-            <div class="card-sub">占比 {{ (businessSummary.sum_sales > 0 ? ((businessSummary.sum_ad_cost || 0) / businessSummary.sum_sales * 100).toFixed(1) : 0) }}%</div>
-          </div>
-        </div>
-        <div class="summary-card card-refund">
-          <div class="card-icon"><el-icon size="28"><RefreshLeft /></el-icon></div>
-          <div class="card-body">
-            <div class="card-label">退款金额</div>
-            <div class="card-value">${{ formatNumber(businessSummary.sum_refund) }}</div>
-            <div class="card-sub">退款率 {{ ((businessSummary.avg_refund_rate || 0) * 100).toFixed(1) }}%</div>
-          </div>
-        </div>
-        <div class="summary-card card-headway">
-          <div class="card-icon"><el-icon size="28"><Ship /></el-icon></div>
-          <div class="card-body">
-            <div class="card-label">头程费用</div>
-            <div class="card-value">${{ formatNumber(businessSummary.sum_headway_cost) }}</div>
-            <div class="card-sub">占比 {{ ((businessSummary.avg_headway_ratio || 0) * 100).toFixed(1) }}%</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 趋势图 -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3><el-icon><TrendCharts /></el-icon> 经营趋势</h3>
-          <el-radio-group v-model="trendMetric" size="small" @change="updateTrendChart">
-            <el-radio-button label="sales">销售额</el-radio-button>
-            <el-radio-button label="profit">毛利</el-radio-button>
-            <el-radio-button label="profit_rate">毛利率</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div ref="trendChartRef" class="chart-body" style="height:320px;"></div>
-      </div>
-
-      <!-- 成本构成 & 利润结构 -->
-      <div class="chart-row">
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><PieChart /></el-icon> 成本构成分析</h3></div>
-          <div ref="costPieChartRef" class="chart-body" style="height:280px;"></div>
-        </div>
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><DataAnalysis /></el-icon> 利润结构对比</h3></div>
-          <div ref="profitBarChartRef" class="chart-body" style="height:280px;"></div>
         </div>
       </div>
 
@@ -176,27 +160,27 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="platform_fees" label="平台佣金" align="right" width="110">
-            <template #default="scope">
-              <span :class="{ 'text-muted': scope.row.data_status === 'settled' || scope.row.data_status === 'partial' }">${{ formatNumber(scope.row.platform_fees) }}</span>
-            </template>
+          <el-table-column prop="ad_cost" label="广告费" align="right" width="110">
+            <template #default="scope">${{ formatNumber(scope.row.ad_cost) }}</template>
           </el-table-column>
           <el-table-column prop="fba_fees" label="FBA费" align="right" width="110">
             <template #default="scope">
               <span :class="{ 'text-muted': scope.row.data_status === 'settled' || scope.row.data_status === 'partial' }">${{ formatNumber(scope.row.fba_fees) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="ad_cost" label="广告费" align="right" width="110">
-            <template #default="scope">${{ formatNumber(scope.row.ad_cost) }}</template>
-          </el-table-column>
-          <el-table-column prop="refund_amount" label="退款" align="right" width="110">
-            <template #default="scope">${{ formatNumber(scope.row.refund_amount) }}</template>
+          <el-table-column prop="platform_fees" label="平台佣金" align="right" width="110">
+            <template #default="scope">
+              <span :class="{ 'text-muted': scope.row.data_status === 'settled' || scope.row.data_status === 'partial' }">${{ formatNumber(scope.row.platform_fees) }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="product_cost" label="产品成本" align="right" width="110">
             <template #default="scope">${{ formatNumber(scope.row.product_cost) }}</template>
           </el-table-column>
           <el-table-column prop="headway_cost" label="头程" align="right" width="110">
             <template #default="scope">${{ formatNumber(scope.row.headway_cost) }}</template>
+          </el-table-column>
+          <el-table-column prop="refund_amount" label="退款" align="right" width="110">
+            <template #default="scope">${{ formatNumber(scope.row.refund_amount) }}</template>
           </el-table-column>
           <el-table-column prop="order_count" label="订单" align="right" width="80" />
           <el-table-column prop="sku_count" label="SKU" align="right" width="80" />
@@ -210,6 +194,31 @@
           class="pagination"
           @change="fetchBusinessList"
         />
+      </div>
+
+      <!-- 趋势图 -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3><el-icon><TrendCharts /></el-icon> 经营趋势</h3>
+          <el-radio-group v-model="trendMetric" size="small" @change="updateTrendChart">
+            <el-radio-button label="sales">销售额</el-radio-button>
+            <el-radio-button label="profit">毛利</el-radio-button>
+            <el-radio-button label="profit_rate">毛利率</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div ref="trendChartRef" class="chart-body" style="height:320px;"></div>
+      </div>
+
+      <!-- 成本构成 & 利润结构 -->
+      <div class="chart-row">
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><PieChart /></el-icon> 成本构成分析</h3></div>
+          <div ref="costPieChartRef" class="chart-body" style="height:280px;"></div>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><DataAnalysis /></el-icon> 利润结构对比</h3></div>
+          <div ref="profitBarChartRef" class="chart-body" style="height:280px;"></div>
+        </div>
       </div>
     </div>
 
@@ -536,7 +545,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import {
@@ -547,7 +556,7 @@ import {
 } from '@element-plus/icons-vue'
 import {
   getShopOptions,
-  getBusinessReports, getBusinessSummary, getBusinessTrend,
+  getBusinessReports, getBusinessSummary, getBusinessTrend, getBusinessCostBreakdown,
   getSkuProfitList, getSkuProfitTop,
   getInventoryTurnover, getInventoryStats,
   getGenerationLogs,
@@ -600,6 +609,36 @@ export default {
     const businessFilter = reactive({ type: 'daily' })
     const businessDateRange = ref([])
     const businessSummary = reactive({})
+    const costBreakdown = reactive({
+      ad_cost: 0,
+      fba_fees: 0,
+      platform_fees: 0,
+      product_cost: 0,
+      headway_cost: 0,
+      refund_amount: 0
+    })
+
+    const costTreemapItems = computed(() => {
+      const total = Math.max(
+        Number(businessSummary.sum_total_cost || 0),
+        0.01
+      )
+      const items = [
+        { key: 'ad_cost', name: '广告费', value: Number(costBreakdown.ad_cost || 0), color: '#f59e0b' },
+        { key: 'fba_fees', name: 'FBA费', value: Number(costBreakdown.fba_fees || 0), color: '#3b82f6' },
+        { key: 'platform_fees', name: '平台佣金', value: Number(costBreakdown.platform_fees || 0), color: '#8b5cf6' },
+        { key: 'product_cost', name: '产品成本', value: Number(costBreakdown.product_cost || 0), color: '#10b981' },
+        { key: 'headway_cost', name: '头程', value: Number(costBreakdown.headway_cost || 0), color: '#06b6d4' },
+        { key: 'refund_amount', name: '退款', value: Number(costBreakdown.refund_amount || 0), color: '#ef4444' }
+      ].filter(i => i.value > 0)
+        .sort((a, b) => b.value - a.value)
+      return items.map(i => ({
+        ...i,
+        flex: Math.max(i.value / total, 0.05),
+        percent: ((i.value / total) * 100).toFixed(1)
+      }))
+    })
+
     const businessList = ref([])
     const businessLoading = ref(false)
     const businessPage = ref(1)
@@ -716,6 +755,7 @@ export default {
 
     const fetchBusinessData = async () => {
       fetchBusinessSummary()
+      fetchBusinessCostBreakdown()
       fetchBusinessTrend()
       fetchBusinessList()
     }
@@ -729,7 +769,36 @@ export default {
         }
         const res = await getBusinessSummary(params)
         if (res.data.status === 'success') {
-          Object.assign(businessSummary, res.data.data || {})
+          const data = res.data.data || {}
+          Object.assign(businessSummary, data)
+          // 优先使用汇总接口返回的 cost_breakdown，否则后续调用专项接口
+          if (data.cost_breakdown) {
+            Object.assign(costBreakdown, data.cost_breakdown)
+            updateCostPieChart()
+          }
+        }
+      } catch (e) { console.error(e) }
+    }
+
+    const fetchBusinessCostBreakdown = async () => {
+      try {
+        const params = { type: businessFilter.type, shop_id: selectedShop.value }
+        if (businessDateRange.value?.length === 2) {
+          params.start_date = businessDateRange.value[0]
+          params.end_date = businessDateRange.value[1]
+        }
+        const res = await getBusinessCostBreakdown(params)
+        if (res.data.status === 'success') {
+          const data = res.data.data || {}
+          Object.assign(costBreakdown, {
+            ad_cost: data.ad_cost || 0,
+            fba_fees: data.fba_fees || 0,
+            platform_fees: data.platform_fees || 0,
+            product_cost: data.product_cost || 0,
+            headway_cost: data.headway_cost || 0,
+            refund_amount: data.refund_amount || 0
+          })
+          updateCostPieChart()
         }
       } catch (e) { console.error(e) }
     }
@@ -767,10 +836,25 @@ export default {
         if (res.data.status === 'success') {
           businessList.value = res.data.data.list || []
           businessTotal.value = res.data.data.total || 0
-          updateCostPieChart(businessList.value)
         }
       } catch (e) { console.error(e) }
       finally { businessLoading.value = false }
+    }
+
+    const onStartDateChange = (val) => {
+      if (val && businessDateRange.value[1] && val > businessDateRange.value[1]) {
+        businessDateRange.value[1] = val
+      }
+      businessPage.value = 1
+      fetchBusinessData()
+    }
+
+    const onEndDateChange = (val) => {
+      if (val && businessDateRange.value[0] && val < businessDateRange.value[0]) {
+        businessDateRange.value[0] = val
+      }
+      businessPage.value = 1
+      fetchBusinessData()
     }
 
     const handleBusinessTypeChange = () => {
@@ -943,30 +1027,30 @@ export default {
       }, true)
     }
 
-    // 成本构成饼图（基于经营报表列表的第一条数据）
+    // 成本构成饼图（基于筛选日期范围汇总数据）
     // total_cost = 产品成本 + FBA费 + 平台佣金 + 头程 + 退款 + 广告费
-    const updateCostPieChart = (list) => {
+    const updateCostPieChart = () => {
       if (!costPieChart) return
-      if (list.length > 0) {
-        const latest = list[0]
-        const totalCost = Number(latest.total_cost || 0)
-        const productCost = Number(latest.product_cost || 0)
-        const fbaFees = Number(latest.fba_fees || 0)
-        const platformFees = Number(latest.platform_fees || 0)
-        const headwayCost = Number(latest.headway_cost || 0)
-        const adCost = Number(latest.ad_cost || 0)
-        const refundAmount = Number(latest.refund_amount || 0)
-        const pieData = [
-          { value: productCost, name: '产品成本' },
-          { value: fbaFees, name: 'FBA费' },
-          { value: platformFees, name: '平台佣金' },
-          { value: headwayCost, name: '头程' },
-          { value: adCost, name: '广告费' },
-          { value: refundAmount, name: '退款' }
-        ].filter(d => d.value > 0)
+      const breakdown = costBreakdown || {}
+      const totalCost = Number(businessSummary.sum_total_cost || 0)
+      const productCost = Number(breakdown.product_cost || 0)
+      const fbaFees = Number(breakdown.fba_fees || 0)
+      const platformFees = Number(breakdown.platform_fees || 0)
+      const headwayCost = Number(breakdown.headway_cost || 0)
+      const adCost = Number(breakdown.ad_cost || 0)
+      const refundAmount = Number(breakdown.refund_amount || 0)
+      const pieData = [
+        { value: productCost, name: '产品成本' },
+        { value: fbaFees, name: 'FBA费' },
+        { value: platformFees, name: '平台佣金' },
+        { value: headwayCost, name: '头程' },
+        { value: adCost, name: '广告费' },
+        { value: refundAmount, name: '退款' }
+      ].filter(d => d.value > 0)
+      if (pieData.length > 0) {
         costPieChart.setOption({
           title: {
-            text: `总成本\n$${totalCost.toLocaleString()}`,
+            text: `总成本\n$${formatNumber(totalCost)}`,
             left: '60%',
             top: '50%',
             textAlign: 'center',
@@ -983,7 +1067,7 @@ export default {
             avoidLabelOverlap: true,
             itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
             label: { show: true, formatter: '{b}\n{d}%' },
-            data: pieData.length ? pieData : [{ value: 0, name: '暂无数据' }]
+            data: pieData
           }]
         }, true)
       } else {
@@ -1331,7 +1415,7 @@ export default {
       trendChartRef, costPieChartRef, profitBarChartRef,
       topProfitChartRef, topLossChartRef, skuCostPieRef, profitDistChartRef,
       inventoryPieRef, turnoverDistRef,
-      businessFilter, businessDateRange, businessSummary, businessList,
+      businessFilter, businessDateRange, businessSummary, costBreakdown, costTreemapItems, businessList,
       businessLoading, businessPage, businessPageSize, businessTotal, trendMetric,
       skuDateRange, skuKeyword, skuList, skuLoading, skuPage, skuPageSize, skuTotal,
       inventoryFilter, inventoryKeyword, inventoryStats, inventoryList,
@@ -1341,9 +1425,10 @@ export default {
       getTurnoverClass, getLogStatusType, getLogStatusLabel, getReportTypeLabel,
       getDataStatusLabel, getDataStatusType,
       handleShopChange, fetchBusinessData, handleBusinessTypeChange,
+      onStartDateChange, onEndDateChange,
       fetchSkuData, fetchInventoryData, fetchLogs, fetchLogList,
       handleGenerateYesterday, handleGenerateInventory,
-      updateTrendChart, exportBusiness, exportSkuProfit
+      updateTrendChart, updateCostPieChart, exportBusiness, exportSkuProfit
     }
   }
 }
@@ -1429,12 +1514,35 @@ export default {
   flex-wrap: wrap;
 }
 
+.date-range-pickers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-range-pickers .el-date-picker {
+  width: 150px;
+}
+
+.date-separator {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
 /* 汇总卡片 */
 .summary-cards {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 16px;
   margin-bottom: 20px;
+}
+
+.summary-cards.business-summary {
+  grid-template-columns: 1fr 2fr 1fr 1fr;
+}
+
+.summary-cards.business-summary .card-cost {
+  grid-column: span 1;
 }
 
 .summary-cards.inventory-summary {
@@ -1471,6 +1579,7 @@ export default {
 .card-sales .card-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
 .card-profit .card-icon { background: linear-gradient(135deg, #10b981, #059669); }
 .card-order .card-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.card-cost .card-icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
 .card-ad .card-icon { background: linear-gradient(135deg, #f59e0b, #d97706); }
 .card-refund .card-icon { background: linear-gradient(135deg, #ef4444, #dc2626); }
 .card-headway .card-icon { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
@@ -1508,6 +1617,83 @@ export default {
   color: #6b7280;
   margin-top: 2px;
 }
+
+/* 成本卡片 — 横向树状图 */
+.card-cost {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 16px;
+  gap: 12px;
+}
+
+.cost-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cost-treemap {
+  display: flex;
+  width: 100%;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.cost-treemap-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-width: 56px;
+  padding: 6px 4px;
+  color: #fff;
+  text-align: center;
+  transition: filter 0.2s;
+  cursor: default;
+}
+
+.cost-treemap-item:hover {
+  filter: brightness(1.08);
+}
+
+.cost-treemap-item + .cost-treemap-item {
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cost-treemap-name {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.cost-treemap-value {
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.cost-treemap-percent {
+  font-size: 10px;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+
+.cost-ad_cost { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.cost-fba_fees { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.cost-platform_fees { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+.cost-product_cost { background: linear-gradient(135deg, #10b981, #059669); }
+.cost-headway_cost { background: linear-gradient(135deg, #06b6d4, #0891b2); }
+.cost-refund_amount { background: linear-gradient(135deg, #ef4444, #dc2626); }
 
 .card-trend {
   font-size: 12px;
@@ -1614,6 +1800,8 @@ export default {
 /* 响应式 */
 @media (max-width: 1280px) {
   .summary-cards { grid-template-columns: repeat(3, 1fr); }
+  .summary-cards.business-summary { grid-template-columns: repeat(2, 1fr); }
+  .summary-cards.business-summary .card-cost { grid-column: span 2; }
   .summary-cards.inventory-summary { grid-template-columns: repeat(4, 1fr); }
   .chart-row { grid-template-columns: 1fr; }
 }
@@ -1622,8 +1810,12 @@ export default {
   .report-page { padding: 12px; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .summary-cards.business-summary { grid-template-columns: repeat(1, 1fr); }
+  .summary-cards.business-summary .card-cost { grid-column: span 1; }
   .summary-cards.inventory-summary { grid-template-columns: repeat(2, 1fr); }
   .tab-item { padding: 8px 12px; font-size: 13px; }
   .filter-bar { gap: 8px; }
+  .date-range-pickers { width: 100%; }
+  .date-range-pickers .el-date-picker { flex: 1; }
 }
 </style>

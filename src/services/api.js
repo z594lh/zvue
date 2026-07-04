@@ -1082,6 +1082,8 @@ export const getBusinessReports = (params = {}) => {
 /**
  * 获取经营报表汇总
  * @param {Object} params {type, start_date, end_date, shop_id}
+ * @returns {Object} data 建议包含：sum_sales, sum_total_cost, sum_gross_profit, sum_orders,
+ *                   record_count, cost_breakdown: {ad_cost, fba_fees, platform_fees, product_cost, headway_cost, refund_amount}
  */
 export const getBusinessSummary = (params = {}) => {
   return api.get('/reports/business/summary', { params });
@@ -1093,6 +1095,15 @@ export const getBusinessSummary = (params = {}) => {
  */
 export const getBusinessTrend = (params = {}) => {
   return api.get('/reports/business/trend', { params });
+};
+
+/**
+ * 获取成本构成汇总（用于成本饼图，按筛选日期范围聚合）
+ * @param {Object} params {type, start_date, end_date, shop_id}
+ * @returns {Object} data {ad_cost, fba_fees, platform_fees, product_cost, headway_cost, refund_amount, total_cost}
+ */
+export const getBusinessCostBreakdown = (params = {}) => {
+  return api.get('/reports/business/cost-breakdown', { params });
 };
 
 /**
