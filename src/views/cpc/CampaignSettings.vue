@@ -27,7 +27,7 @@
         </div>
       </div>
       <div class="form-row">
-        <label>状态</label>
+        <label>预算状态</label>
         <span class="status-text">{{ servingStatusLabel }}</span>
       </div>
       <div class="form-row">
@@ -154,11 +154,8 @@ const parseBidding = (bidding) => {
 }
 
 const servingStatusLabel = computed(() => {
-  const state = form.state
-  if (state === 'ENABLED') return '超出预算'
-  if (state === 'PAUSED') return '已暂停'
-  if (state === 'ARCHIVED') return '已归档'
-  return '未知'
+  if (!props.campaignInfo) return '--'
+  return props.campaignInfo.serving_status || '预算状态暂时无法获取'
 })
 
 const parsePlacements = (placementBidding = []) => {
