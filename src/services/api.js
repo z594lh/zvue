@@ -1163,6 +1163,14 @@ export const getInventoryStats = (params = {}) => {
 };
 
 /**
+ * 按库存状态获取SKU列表（用于汇总卡片点击弹框）
+ * @param {Object} params {status, keyword, shop_id, page, page_size}
+ */
+export const getInventoryByStatus = (params = {}) => {
+  return api.get('/reports/inventory-turnover/by-status', { params });
+};
+
+/**
  * 手动触发库存周转生成
  * @param {Object} data {shop_id}
  */

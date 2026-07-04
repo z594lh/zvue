@@ -192,7 +192,6 @@
           :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next"
           class="pagination"
-          @change="fetchBusinessList"
         />
       </div>
 
@@ -365,7 +364,6 @@
           :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next"
           class="pagination"
-          @change="fetchSkuList"
         />
       </div>
 
@@ -427,59 +425,33 @@
             <div class="card-value">{{ formatNumber(inventoryStats.total_stock, 0) }}</div>
           </div>
         </div>
-        <div class="summary-card card-inventory-inbound">
-          <div class="card-icon"><el-icon size="28"><Truck /></el-icon></div>
-          <div class="card-body">
-            <div class="card-label">在途数量</div>
-            <div class="card-value">{{ formatNumber(inventoryStats.total_inbound, 0) }}</div>
-          </div>
-        </div>
-        <div class="summary-card card-inventory-value">
-          <div class="card-icon"><el-icon size="28"><Wallet /></el-icon></div>
-          <div class="card-body">
-            <div class="card-label">总货值</div>
-            <div class="card-value">${{ formatNumber(inventoryStats.total_inventory_value) }}</div>
-          </div>
-        </div>
-        <div class="summary-card card-status-normal">
+        <div class="summary-card card-status-normal clickable" @click="openInventoryStatusDialog('normal')">
           <div class="card-icon"><el-icon size="28"><CircleCheck /></el-icon></div>
           <div class="card-body">
             <div class="card-label">正常</div>
             <div class="card-value">{{ inventoryStats.normal_count || 0 }}</div>
           </div>
         </div>
-        <div class="summary-card card-status-warning">
+        <div class="summary-card card-status-warning clickable" @click="openInventoryStatusDialog('warning')">
           <div class="card-icon"><el-icon size="28"><Warning /></el-icon></div>
           <div class="card-body">
             <div class="card-label">预警</div>
             <div class="card-value">{{ inventoryStats.warning_count || 0 }}</div>
           </div>
         </div>
-        <div class="summary-card card-status-slow">
+        <div class="summary-card card-status-slow clickable" @click="openInventoryStatusDialog('slow')">
           <div class="card-icon"><el-icon size="28"><Timer /></el-icon></div>
           <div class="card-body">
             <div class="card-label">滞销</div>
             <div class="card-value">{{ inventoryStats.slow_count || 0 }}</div>
           </div>
         </div>
-        <div class="summary-card card-status-out">
+        <div class="summary-card card-status-out clickable" @click="openInventoryStatusDialog('out_of_stock')">
           <div class="card-icon"><el-icon size="28"><CircleClose /></el-icon></div>
           <div class="card-body">
             <div class="card-label">缺货</div>
             <div class="card-value">{{ inventoryStats.out_of_stock_count || 0 }}</div>
           </div>
-        </div>
-      </div>
-
-      <!-- 库存状态图 -->
-      <div class="chart-row">
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><PieChart /></el-icon> 库存状态分布</h3></div>
-          <div ref="inventoryPieRef" class="chart-body" style="height:300px;"></div>
-        </div>
-        <div class="chart-card half">
-          <div class="chart-header"><h3><el-icon><Histogram /></el-icon> 周转天数分布</h3></div>
-          <div ref="turnoverDistRef" class="chart-body" style="height:300px;"></div>
         </div>
       </div>
 
@@ -545,9 +517,64 @@
           :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next"
           class="pagination"
-          @change="fetchInventoryList"
         />
       </div>
+
+      <!-- 库存状态图 -->
+      <div class="chart-row">
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><PieChart /></el-icon> 库存状态分布</h3></div>
+          <div ref="inventoryPieRef" class="chart-body" style="height:300px;"></div>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-header"><h3><el-icon><Histogram /></el-icon> 周转天数分布</h3></div>
+          <div ref="turnoverDistRef" class="chart-body" style="height:300px;"></div>
+        </div>
+      </div>
+
+      <!-- 库存状态SKU弹框 -->
+      <el-dialog
+        v-model="inventoryDialogVisible"
+        :title="inventoryDialogTitle"
+        width="900px"
+        top="10vh"
+        destroy-on-close
+      >
+        <el-table :data="inventoryDialogList" v-loading="inventoryDialogLoading" style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}">
+          <el-table-column label="产品" min-width="240">
+            <template #default="scope">
+              <div class="product-cell-simple">
+                <div class="product-name">{{ scope.row.product_name || '-' }}</div>
+                <div class="product-code">{{ scope.row.asin }} / {{ scope.row.sku }}</div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="current_stock" label="FBA库存" align="right" width="100" />
+          <el-table-column prop="turnover_days" label="周转天" align="right" width="90">
+            <template #default="scope">
+              {{ scope.row.turnover_days === 9999 ? '—' : (scope.row.turnover_days || '-') }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="last_sale_date" label="最后销售" align="center" width="110">
+            <template #default="scope">
+              {{ scope.row.last_sale_date || '从未销售' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="days_without_sale" label="无销售天" align="right" width="100">
+            <template #default="scope">
+              {{ scope.row.days_without_sale === 999 ? '—' : (scope.row.days_without_sale || 0) }}
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          v-model:current-page="inventoryDialogPage"
+          v-model:page-size="inventoryDialogPageSize"
+          :total="inventoryDialogTotal"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          class="pagination"
+        />
+      </el-dialog>
     </div>
 
     <!-- ========== 生成日志 ========== -->
@@ -599,7 +626,6 @@
           :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next"
           class="pagination"
-          @change="fetchLogList"
         />
       </div>
     </div>
@@ -613,14 +639,14 @@ import * as echarts from 'echarts'
 import {
   DataLine, Money, Coin, ShoppingCart, Promotion, RefreshLeft, Ship,
   TrendCharts, PieChart, DataAnalysis, List, Search, Download,
-  Refresh, Top, Bottom, Histogram, Box, OfficeBuilding, Truck,
+  Refresh, Top, Bottom, Histogram, Box, OfficeBuilding,
   Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown, InfoFilled
 } from '@element-plus/icons-vue'
 import {
   getShopOptions,
   getBusinessReports, getBusinessSummary, getBusinessTrend, getBusinessCostBreakdown,
   getSkuProfitTop, getSkuProfitAggregate,
-  getInventoryTurnover, getInventoryStats,
+  getInventoryTurnover, getInventoryStats, getInventoryByStatus,
   getGenerationLogs,
   generateYesterdayReports, generateInventoryTurnover
 } from '@/services/api.js'
@@ -630,8 +656,8 @@ export default {
   components: {
     DataLine, Money, Coin, ShoppingCart, Promotion, RefreshLeft, Ship,
     TrendCharts, PieChart, DataAnalysis, List, Search, Download,
-    Refresh, Top, Bottom, Histogram, Box, OfficeBuilding, Truck,
-  Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown, InfoFilled
+    Refresh, Top, Bottom, Histogram, Box, OfficeBuilding,
+    Wallet, CircleCheck, Warning, Timer, CircleClose, ArrowUp, ArrowDown, InfoFilled
   },
   setup() {
     const activeTab = ref('business')
@@ -729,6 +755,16 @@ export default {
     const inventoryPage = ref(1)
     const inventoryPageSize = ref(20)
     const inventoryTotal = ref(0)
+
+    // 库存状态弹框
+    const inventoryDialogVisible = ref(false)
+    const inventoryDialogStatus = ref('')
+    const inventoryDialogTitle = ref('')
+    const inventoryDialogList = ref([])
+    const inventoryDialogLoading = ref(false)
+    const inventoryDialogPage = ref(1)
+    const inventoryDialogPageSize = ref(20)
+    const inventoryDialogTotal = ref(0)
 
     // ============= 生成日志 =============
     const logFilter = reactive({ report_type: '', status: '' })
@@ -1045,6 +1081,34 @@ export default {
       finally { inventoryLoading.value = false }
     }
 
+    const openInventoryStatusDialog = (status) => {
+      const statusMap = { normal: '正常', warning: '预警', slow: '滞销', out_of_stock: '缺货' }
+      inventoryDialogStatus.value = status
+      inventoryDialogTitle.value = `${statusMap[status] || status} SKU 列表`
+      inventoryDialogPage.value = 1
+      inventoryDialogPageSize.value = 20
+      inventoryDialogVisible.value = true
+      fetchInventoryDialogList()
+    }
+
+    const fetchInventoryDialogList = async () => {
+      inventoryDialogLoading.value = true
+      try {
+        const params = {
+          status: inventoryDialogStatus.value,
+          shop_id: selectedShop.value,
+          page: inventoryDialogPage.value,
+          page_size: inventoryDialogPageSize.value
+        }
+        const res = await getInventoryByStatus(params)
+        if (res.data.status === 'success') {
+          inventoryDialogList.value = res.data.data.list || []
+          inventoryDialogTotal.value = res.data.data.total || 0
+        }
+      } catch (e) { console.error(e) }
+      finally { inventoryDialogLoading.value = false }
+    }
+
     const fetchLogs = async () => {
       logLoading.value = true
       try {
@@ -1104,12 +1168,13 @@ export default {
     // ============= 图表更新 =============
     const updateTrendChartData = (data) => {
       if (!trendChart) return
-      // 趋势接口返回字段：time_label, total_sales, gross_profit, gross_profit_rate, headway_cost, headway_ratio
+      // 趋势接口返回字段：time_label, total_sales, gross_profit, gross_profit_rate, headway_cost, headway_ratio, ad_cost
       const xAxis = data.map(d => d.time_label || '-')
       const series = []
       if (trendMetric.value === 'sales') {
         series.push({ name: '销售额', type: 'line', data: data.map(d => d.total_sales || 0), smooth: true, areaStyle: { opacity: 0.15 }, itemStyle: { color: '#667eea' }, lineStyle: { width: 3 } })
         series.push({ name: '毛利', type: 'line', data: data.map(d => d.gross_profit || 0), smooth: true, areaStyle: { opacity: 0.1 }, itemStyle: { color: '#10b981' }, lineStyle: { width: 3 } })
+        series.push({ name: '广告费', type: 'line', data: data.map(d => d.ad_cost || 0), smooth: true, itemStyle: { color: '#f59e0b' }, lineStyle: { width: 3 } })
       } else if (trendMetric.value === 'profit') {
         series.push({ name: '毛利', type: 'bar', data: data.map(d => d.gross_profit || 0), itemStyle: { color: '#10b981', borderRadius: [4, 4, 0, 0] } })
         series.push({ name: '头程', type: 'bar', data: data.map(d => d.headway_cost || 0), itemStyle: { color: '#f59e0b', borderRadius: [4, 4, 0, 0] } })
@@ -1505,6 +1570,27 @@ export default {
       skuDateRange.value = [fmt(start), fmt(end)]
     }
 
+    // ============= 监听分页变化 =============
+    watch([businessPage, businessPageSize], () => {
+      if (activeTab.value === 'business') fetchBusinessList()
+    })
+
+    watch([skuPage, skuPageSize], () => {
+      if (activeTab.value === 'sku-profit') fetchSkuList()
+    })
+
+    watch([inventoryPage, inventoryPageSize], () => {
+      if (activeTab.value === 'inventory') fetchInventoryList()
+    })
+
+    watch([inventoryDialogPage, inventoryDialogPageSize], () => {
+      if (inventoryDialogVisible.value) fetchInventoryDialogList()
+    })
+
+    watch([logPage, logPageSize], () => {
+      if (activeTab.value === 'logs') fetchLogList()
+    })
+
     // ============= 监听 Tab 切换 =============
     watch(activeTab, (val) => {
       nextTick(() => {
@@ -1543,6 +1629,8 @@ export default {
       topOrderSkus, topSalesSkus, topProfitSkus,
       inventoryFilter, inventoryKeyword, inventoryStats, inventoryList,
       inventoryLoading, inventoryPage, inventoryPageSize, inventoryTotal,
+      inventoryDialogVisible, inventoryDialogTitle, inventoryDialogStatus, inventoryDialogList,
+      inventoryDialogLoading, inventoryDialogPage, inventoryDialogPageSize, inventoryDialogTotal,
       logFilter, logList, logLoading, logPage, logPageSize, logTotal,
       formatNumber, getProfitRateTagType, getStatusTagType, getStatusLabel,
       getTurnoverClass, getLogStatusType, getLogStatusLabel, getReportTypeLabel,
@@ -1550,7 +1638,7 @@ export default {
       handleShopChange, fetchBusinessData, handleBusinessTypeChange,
       onStartDateChange, onEndDateChange,
       fetchSkuData, onSkuStartDateChange, onSkuEndDateChange,
-      fetchInventoryData, fetchLogs, fetchLogList,
+      fetchInventoryData, openInventoryStatusDialog, fetchInventoryDialogList, fetchLogs, fetchLogList,
       handleGenerateYesterday, handleGenerateInventory,
       updateTrendChart, updateCostPieChart, exportBusiness, exportSkuProfit
     }
@@ -1670,7 +1758,7 @@ export default {
 }
 
 .summary-cards.inventory-summary {
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 }
 
 .summary-card {
@@ -1684,9 +1772,13 @@ export default {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.summary-card:hover {
+.summary-card.clickable {
+  cursor: pointer;
+}
+
+.summary-card.clickable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
 }
 
 .card-icon {
@@ -2000,7 +2092,7 @@ export default {
   .summary-cards.business-summary .card-cost { grid-column: span 2; }
   .summary-cards.sku-summary { grid-template-columns: repeat(2, 1fr); }
   .summary-cards.sku-summary .card-sku-profit { grid-column: span 2; }
-  .summary-cards.inventory-summary { grid-template-columns: repeat(4, 1fr); }
+  .summary-cards.inventory-summary { grid-template-columns: repeat(3, 1fr); }
   .chart-row { grid-template-columns: 1fr; }
 }
 
