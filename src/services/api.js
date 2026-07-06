@@ -1298,6 +1298,24 @@ export const getAdvertisingAsinOptions = (params = {}) => {
   return api.get('/options/advertising/asins', { params });
 };
 
+/**
+ * 广告商品下拉（按活动+广告组联动，数据来自 amazon_ads_raw_reports 去重）
+ * @param {Object} params {shop_id, campaign_id, ad_group_id}
+ */
+export const getAdvertisingProductOptions = (params = {}) => {
+  return api.get('/options/advertising/products', { params });
+};
+
+// ==================== 广告效果分日明细接口（四层可展开表格）====================
+
+/**
+ * 获取分日广告完整树形数据（当前页一次性返回：日期 -> 活动 -> 广告组 -> 商品）
+ * @param {Object} params {type, start_date, end_date, shop_id, page, page_size}
+ */
+export const getAdvertisingDailyTree = (params = {}) => {
+  return api.get('/reports/advertising/daily/tree', { params });
+};
+
 // ==================== 广告原始数据详情接口（对标 Amazon 后台页签）====================
 
 /**

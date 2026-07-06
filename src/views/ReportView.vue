@@ -960,6 +960,7 @@ export default {
 
     const handleBusinessTypeChange = () => {
       businessPage.value = 1
+      setBusinessDefaultDateRange()
       fetchBusinessData()
     }
 
@@ -1561,12 +1562,26 @@ export default {
     }
 
     // ============= 初始化日期 =============
+    const setBusinessDefaultDateRange = () => {
+      const end = new Date()
+      const start = new Date()
+      if (businessFilter.type === 'daily') {
+        start.setDate(start.getDate() - 30)
+      } else if (businessFilter.type === 'weekly') {
+        start.setDate(start.getDate() - 90)
+      } else if (businessFilter.type === 'monthly') {
+        start.setDate(start.getDate() - 365)
+      }
+      const fmt = (d) => d.toISOString().split('T')[0]
+      businessDateRange.value = [fmt(start), fmt(end)]
+    }
+
     const initDates = () => {
       const end = new Date()
       const start = new Date()
       start.setDate(start.getDate() - 30)
       const fmt = (d) => d.toISOString().split('T')[0]
-      businessDateRange.value = [fmt(start), fmt(end)]
+      setBusinessDefaultDateRange()
       skuDateRange.value = [fmt(start), fmt(end)]
     }
 

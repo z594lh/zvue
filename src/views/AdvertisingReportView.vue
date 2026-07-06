@@ -23,28 +23,32 @@
       </div>
     </div>
 
-    <!-- 筛选栏 -->
+    <!-- 筛选栏：与店铺报表一致，使用两个独立日期选择器 -->
     <div class="filter-bar">
       <el-radio-group v-model="filter.type" @change="handleTypeChange">
         <el-radio-button label="daily">日报</el-radio-button>
         <el-radio-button label="weekly">周报</el-radio-button>
         <el-radio-button label="monthly">月报</el-radio-button>
       </el-radio-group>
-      <el-date-picker
-        v-model="dateRange"
-        type="daterange"
-        range-separator="~"
-        start-placeholder="开始日期"
-        end-placeholder="结束日期"
-        value-format="YYYY-MM-DD"
-        @change="fetchAllData"
-      />
-      <el-select v-model="filter.dimension" placeholder="维度" style="width:140px" @change="handleDimensionChange">
-        <el-option label="整体" value="overall" />
-        <el-option label="广告活动" value="campaign" />
-        <el-option label="广告组" value="ad_group" />
-        <el-option label="ASIN" value="asin" />
-      </el-select>
+      <div class="date-range-pickers">
+        <el-date-picker
+          v-model="startDate"
+          type="date"
+          placeholder="开始日期"
+          value-format="YYYY-MM-DD"
+          class="date-start-picker"
+          @change="onStartDateChange"
+        />
+        <span class="date-separator">~</span>
+        <el-date-picker
+          v-model="endDate"
+          type="date"
+          placeholder="结束日期"
+          value-format="YYYY-MM-DD"
+          class="date-end-picker"
+          @change="onEndDateChange"
+        />
+      </div>
       <el-button type="primary" @click="fetchAllData"><el-icon><Search /></el-icon> 查询</el-button>
     </div>
 
@@ -183,29 +187,76 @@
     <div class="chart-card">
       <div class="chart-header">
         <h3><el-icon><DataLine /></el-icon> 广告趋势走势</h3>
-        <div class="chart-legend-hint">
-          <span class="hint-bar">花费</span>
-          <span class="hint-line acos">ACOS</span>
-          <span class="hint-line roas">ROAS</span>
+        <div class="chart-filter-bar">
+          <el-select v-model="trendFilter.campaign_id" placeholder="全部广告活动" clearable filterable style="width:190px" @change="onTrendCampaignChange">
+            <el-option label="全部广告活动" value="" />
+            <el-option v-for="c in campaignOptions" :key="c.campaign_id" :label="c.campaign_name" :value="c.campaign_id" />
+          </el-select>
+          <el-select v-model="trendFilter.ad_group_id" placeholder="全部广告组" clearable filterable style="width:170px" :disabled="adGroupDisabled" @change="onTrendAdGroupChange">
+            <el-option label="全部广告组" value="" />
+            <el-option v-for="g in adGroupOptions" :key="g.ad_group_id" :label="g.ad_group_name" :value="g.ad_group_id" />
+          </el-select>
+          <el-select v-model="trendFilter.advertised_asin" placeholder="全部广告商品" clearable filterable style="width:240px" :disabled="productDisabled" @change="onTrendProductChange">
+            <el-option label="全部广告商品" value="" />
+            <el-option v-for="p in productOptions" :key="p.value" :label="p.label" :value="p.value" />
+          </el-select>
+          <el-button plain size="small" @click="resetTrendFilter">
+            <el-icon><RefreshLeft /></el-icon> 重置
+          </el-button>
         </div>
+      </div>
+      <div class="chart-legend-hint" style="margin-bottom:8px;">
+        <span class="hint-bar">花费</span>
+        <span class="hint-bar sales">销售额</span>
+        <span class="hint-line acos">ACOS</span>
+        <span class="hint-line ctr">CTR</span>
+        <span class="hint-line cpc">CPC</span>
       </div>
       <div ref="trendChartRef" class="chart-body" style="height:340px;"></div>
     </div>
 
-    <!-- 数据表格 -->
+    <!-- 数据表格：三层可展开（日期 -> 广告活动 -> 广告商品） -->
     <div class="table-card">
       <div class="table-header">
-        <h3><el-icon><List /></el-icon> {{ dimensionLabel }} 明细</h3>
-        <el-tag v-if="filter.type === 'daily'" type="warning" size="small" effect="plain">日报 ACOS 仅作趋势参考</el-tag>
+        <h3><el-icon><List /></el-icon> 广告明细</h3>
+        <div class="table-actions">
+          <el-button size="small" plain @click="expandAllRows">
+            <el-icon><ArrowDown /></el-icon> 一键展开
+          </el-button>
+          <el-button size="small" plain @click="collapseAllRows">
+            <el-icon><ArrowUp /></el-icon> 一键折叠
+          </el-button>
+        </div>
       </div>
-      <el-table :data="list" v-loading="loading" style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}">
-        <el-table-column v-if="filter.dimension === 'campaign'" prop="campaign_name" label="广告活动" min-width="180" show-overflow-tooltip />
-        <el-table-column v-if="filter.dimension === 'ad_group'" prop="campaign_name" label="广告活动" min-width="160" show-overflow-tooltip />
-        <el-table-column v-if="filter.dimension === 'ad_group'" prop="ad_group_name" label="广告组" min-width="160" show-overflow-tooltip />
-        <el-table-column v-if="filter.dimension === 'asin'" prop="asin" label="ASIN" width="130" />
-        <el-table-column v-if="filter.dimension === 'asin'" prop="sku" label="SKU" width="120" />
-        <el-table-column prop="report_date" label="日期" width="110" />
-
+      <el-table
+        ref="detailTableRef"
+        :data="list"
+        v-loading="loading"
+        style="width:100%"
+        row-key="id"
+        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        @row-click="handleRowClick"
+      >
+        <el-table-column label="维度" min-width="260">
+          <template #default="scope">
+            <span v-if="scope.row.level === 'date'" class="tree-level-date">{{ scope.row.report_date }}</span>
+            <span v-else-if="scope.row.level === 'campaign'" class="tree-level-campaign">
+              <el-tag size="small" effect="plain" type="primary" class="level-tag">广告活动</el-tag>
+              {{ scope.row.campaign_name }}
+            </span>
+            <span v-else-if="scope.row.level === 'ad_group'" class="tree-level-ad-group">
+              <el-tag size="small" effect="plain" type="success" class="level-tag">广告组</el-tag>
+              {{ scope.row.ad_group_name }}
+            </span>
+            <span v-else class="tree-level-product">
+              <el-tag size="small" effect="plain" type="warning" class="level-tag">广告商品</el-tag>
+              {{ scope.row.advertised_asin }}
+              <span v-if="scope.row.product_name" class="product-name">- {{ scope.row.product_name }}</span>
+              <span v-else-if="scope.row.advertised_sku" class="product-sku">({{ scope.row.advertised_sku }})</span>
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="impressions" label="曝光" align="right" width="100">
           <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
         </el-table-column>
@@ -260,319 +311,6 @@
         @change="fetchList"
       />
     </div>
-
-    <!-- 原始数据详情（对标 Amazon 后台 4 个页签）-->
-    <div class="table-card">
-      <div class="table-header">
-        <h3><el-icon><DataAnalysis /></el-icon> 原始数据详情</h3>
-        <span style="font-size:12px;color:#909399;">对标 Amazon 后台页签 · 支持搜索、排序</span>
-      </div>
-
-      <!-- 共享筛选栏 -->
-      <div class="detail-filter-bar">
-        <el-date-picker
-          v-model="detailDateRange"
-          type="daterange"
-          range-separator="~"
-          start-placeholder="开始"
-          end-placeholder="结束"
-          value-format="YYYY-MM-DD"
-          style="width:340px"
-          @change="onDetailDateChange"
-        />
-        <el-select v-model="detailFilter.campaign_id" placeholder="广告活动" clearable filterable style="width:190px" @change="onCampaignFilterChange">
-          <el-option v-for="c in campaignOptions" :key="c.campaign_id" :label="c.campaign_name" :value="c.campaign_id" />
-        </el-select>
-        <el-select v-model="detailFilter.ad_group_id" placeholder="广告组" clearable filterable style="width:170px" :disabled="adGroupDisabled" @change="onAdGroupFilterChange">
-          <el-option v-for="g in adGroupOptions" :key="g.ad_group_id" :label="g.ad_group_name" :value="g.ad_group_id" />
-        </el-select>
-        <el-select v-model="detailFilter.asin" placeholder="推广ASIN" clearable filterable style="width:170px" :disabled="asinDisabled" @change="onAsinFilterChange">
-          <el-option v-for="a in asinOptions" :key="a" :label="a" :value="a" />
-        </el-select>
-      </div>
-
-      <el-tabs v-model="detailTab" @tab-change="handleDetailTabChange">
-        <!-- ===== 广告活动 ===== -->
-        <el-tab-pane label="广告活动" name="campaigns">
-          <div class="detail-toolbar">
-            <el-input v-model="detailSearch.keyword" placeholder="搜索活动名称..." clearable style="width:220px" @clear="fetchDetail" @keyup.enter="fetchDetail">
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-            <span class="detail-sort-hint" v-if="detailSort.sort_by">
-              排序：<strong>{{ detailSort.sort_by }}</strong>
-              <el-icon><SortUp v-if="detailSort.sort_dir === 'asc'" /><SortDown v-else /></el-icon>
-              <el-button size="small" link @click="detailSort.sort_by='';detailSort.sort_dir='desc';fetchDetail()">清除</el-button>
-            </span>
-            <el-button type="primary" size="small" @click="fetchDetail">查询</el-button>
-          </div>
-
-          <div v-if="detailSummary" class="detail-summary">
-            <span class="ds-item">共 <strong>{{ detailSummary.total_rows }}</strong> 行</span>
-            <span class="ds-item">曝光 <strong>{{ formatNumber(detailSummary.total_impressions, 0) }}</strong></span>
-            <span class="ds-item">点击 <strong>{{ formatNumber(detailSummary.total_clicks, 0) }}</strong></span>
-            <span class="ds-item">花费 <strong>${{ formatNumber(detailSummary.total_cost) }}</strong></span>
-            <span class="ds-item">CTR <strong>{{ formatPct(detailSummary.ctr) }}</strong></span>
-            <span class="ds-item">CPC <strong>${{ formatNumber(detailSummary.cpc) }}</strong></span>
-          </div>
-
-          <el-table :data="detailList" v-loading="detailLoading" stripe style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}" @sort-change="handleDetailSortChange">
-            <el-table-column prop="report_date" label="日期" width="105" sortable="custom" />
-            <el-table-column prop="campaign_name" label="广告活动" min-width="180" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="campaign_status_label" label="状态" width="90" align="center">
-              <template #default="scope">
-                <el-tag v-if="scope.row.campaign_status === 'ENABLED'" type="success" size="small">{{ scope.row.campaign_status_label || '启用' }}</el-tag>
-                <el-tag v-else-if="scope.row.campaign_status === 'PAUSED'" type="warning" size="small">{{ scope.row.campaign_status_label || '暂停' }}</el-tag>
-                <el-tag v-else-if="scope.row.campaign_status === 'ARCHIVED'" type="info" size="small">{{ scope.row.campaign_status_label || '归档' }}</el-tag>
-                <span v-else>{{ scope.row.campaign_status_label || scope.row.campaign_status }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="预算" align="right" width="120">
-              <template #default="scope">
-                <span v-if="scope.row.campaign_budget">${{ formatNumber(scope.row.campaign_budget) }}</span>
-                <span v-else>-</span>
-                <span v-if="scope.row.campaign_budget_type_label" style="color:#909399;font-size:11px;margin-left:4px;">{{ scope.row.campaign_budget_type_label }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="impressions" label="曝光" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="clicks" label="点击" align="right" width="85" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="cost" label="花费" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cost) }}</template>
-            </el-table-column>
-            <el-table-column prop="purchases_7d" label="订单(7d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="purchases_14d" label="订单(14d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="purchases_30d" label="订单(30d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
-            </el-table-column>
-            <el-table-column prop="sales_14d" label="销售(14d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_14d) }}</template>
-            </el-table-column>
-            <el-table-column prop="sales_30d" label="销售(30d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_30d) }}</template>
-            </el-table-column>
-            <el-table-column prop="ctr" label="CTR" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
-            </el-table-column>
-            <el-table-column prop="cpc" label="CPC" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
-            </el-table-column>
-            <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">
-                <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="detailPage" v-model:page-size="detailPageSize"
-            :total="detailTotal" :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
-        </el-tab-pane>
-
-        <!-- ===== 搜索词 ===== -->
-        <el-tab-pane label="搜索词" name="search-terms">
-          <div class="detail-toolbar">
-            <el-input v-model="detailSearch.keyword" placeholder="搜索客户搜索词..." clearable style="width:220px" @clear="fetchDetail" @keyup.enter="fetchDetail">
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-            <span class="detail-sort-hint" v-if="detailSort.sort_by">
-              排序：<strong>{{ detailSort.sort_by }}</strong>
-              <el-icon><SortUp v-if="detailSort.sort_dir === 'asc'" /><SortDown v-else /></el-icon>
-              <el-button size="small" link @click="detailSort.sort_by='';detailSort.sort_dir='desc';fetchDetail()">清除</el-button>
-            </span>
-            <el-button type="primary" size="small" @click="fetchDetail">查询</el-button>
-          </div>
-
-          <div v-if="detailSummary" class="detail-summary">
-            <span class="ds-item">共 <strong>{{ detailSummary.total_rows }}</strong> 行</span>
-            <span class="ds-item">曝光 <strong>{{ formatNumber(detailSummary.total_impressions, 0) }}</strong></span>
-            <span class="ds-item">点击 <strong>{{ formatNumber(detailSummary.total_clicks, 0) }}</strong></span>
-            <span class="ds-item">花费 <strong>${{ formatNumber(detailSummary.total_cost) }}</strong></span>
-            <span class="ds-item">CTR <strong>{{ formatPct(detailSummary.ctr) }}</strong></span>
-            <span class="ds-item">CPC <strong>${{ formatNumber(detailSummary.cpc) }}</strong></span>
-          </div>
-
-          <el-table :data="detailList" v-loading="detailLoading" stripe style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}" @sort-change="handleDetailSortChange">
-            <el-table-column prop="report_date" label="日期" width="105" sortable="custom" />
-            <el-table-column prop="campaign_name" label="广告活动" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="ad_group_name" label="广告组" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="customer_search_term" label="客户搜索词" min-width="150" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="keyword_text_label" label="关键词" min-width="110" show-overflow-tooltip />
-            <el-table-column prop="keyword_type_label" label="关键词类型" width="100" show-overflow-tooltip />
-            <el-table-column prop="impressions" label="曝光" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="clicks" label="点击" align="right" width="85" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="cost" label="花费" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cost) }}</template>
-            </el-table-column>
-            <el-table-column prop="purchases_7d" label="订单(7d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
-            </el-table-column>
-            <el-table-column prop="ctr" label="CTR" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
-            </el-table-column>
-            <el-table-column prop="cpc" label="CPC" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
-            </el-table-column>
-            <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">
-                <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="detailPage" v-model:page-size="detailPageSize"
-            :total="detailTotal" :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
-        </el-tab-pane>
-
-        <!-- ===== 定向 ===== -->
-        <el-tab-pane label="定向" name="targeting">
-          <div class="detail-toolbar">
-            <el-input v-model="detailSearch.keyword" placeholder="搜索关键词..." clearable style="width:220px" @clear="fetchDetail" @keyup.enter="fetchDetail">
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-            <span class="detail-sort-hint" v-if="detailSort.sort_by">
-              排序：<strong>{{ detailSort.sort_by }}</strong>
-              <el-icon><SortUp v-if="detailSort.sort_dir === 'asc'" /><SortDown v-else /></el-icon>
-              <el-button size="small" link @click="detailSort.sort_by='';detailSort.sort_dir='desc';fetchDetail()">清除</el-button>
-            </span>
-            <el-button type="primary" size="small" @click="fetchDetail">查询</el-button>
-          </div>
-
-          <div v-if="detailSummary" class="detail-summary">
-            <span class="ds-item">共 <strong>{{ detailSummary.total_rows }}</strong> 行</span>
-            <span class="ds-item">曝光 <strong>{{ formatNumber(detailSummary.total_impressions, 0) }}</strong></span>
-            <span class="ds-item">点击 <strong>{{ formatNumber(detailSummary.total_clicks, 0) }}</strong></span>
-            <span class="ds-item">花费 <strong>${{ formatNumber(detailSummary.total_cost) }}</strong></span>
-            <span class="ds-item">CTR <strong>{{ formatPct(detailSummary.ctr) }}</strong></span>
-            <span class="ds-item">CPC <strong>${{ formatNumber(detailSummary.cpc) }}</strong></span>
-          </div>
-
-          <el-table :data="detailList" v-loading="detailLoading" stripe style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}" @sort-change="handleDetailSortChange">
-            <el-table-column prop="report_date" label="日期" width="105" sortable="custom" />
-            <el-table-column prop="campaign_name" label="广告活动" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="ad_group_name" label="广告组" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="keyword_text_label" label="关键词" min-width="110" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="keyword_type_label" label="类型" width="100" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="keyword_match_type_label" label="匹配类型" width="100" show-overflow-tooltip />
-            <el-table-column prop="targeting_expression_label" label="定向表达式" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="impressions" label="曝光" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="clicks" label="点击" align="right" width="85" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="cost" label="花费" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cost) }}</template>
-            </el-table-column>
-            <el-table-column prop="purchases_7d" label="订单(7d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
-            </el-table-column>
-            <el-table-column prop="ctr" label="CTR" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
-            </el-table-column>
-            <el-table-column prop="cpc" label="CPC" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
-            </el-table-column>
-            <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">
-                <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="detailPage" v-model:page-size="detailPageSize"
-            :total="detailTotal" :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
-        </el-tab-pane>
-
-        <!-- ===== 推广商品 ===== -->
-        <el-tab-pane label="推广商品" name="products">
-          <div class="detail-toolbar">
-            <el-input v-model="detailSearch.keyword" placeholder="搜索SKU..." clearable style="width:200px" @clear="fetchDetail" @keyup.enter="fetchDetail">
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-            <el-input v-model="detailSearch.asin" placeholder="ASIN精确筛选..." clearable style="width:180px" @clear="fetchDetail" @keyup.enter="fetchDetail" />
-            <span class="detail-sort-hint" v-if="detailSort.sort_by">
-              排序：<strong>{{ detailSort.sort_by }}</strong>
-              <el-icon><SortUp v-if="detailSort.sort_dir === 'asc'" /><SortDown v-else /></el-icon>
-              <el-button size="small" link @click="detailSort.sort_by='';detailSort.sort_dir='desc';fetchDetail()">清除</el-button>
-            </span>
-            <el-button type="primary" size="small" @click="fetchDetail">查询</el-button>
-          </div>
-
-          <div v-if="detailSummary" class="detail-summary">
-            <span class="ds-item">共 <strong>{{ detailSummary.total_rows }}</strong> 行</span>
-            <span class="ds-item">曝光 <strong>{{ formatNumber(detailSummary.total_impressions, 0) }}</strong></span>
-            <span class="ds-item">点击 <strong>{{ formatNumber(detailSummary.total_clicks, 0) }}</strong></span>
-            <span class="ds-item">花费 <strong>${{ formatNumber(detailSummary.total_cost) }}</strong></span>
-            <span class="ds-item">CTR <strong>{{ formatPct(detailSummary.ctr) }}</strong></span>
-            <span class="ds-item">CPC <strong>${{ formatNumber(detailSummary.cpc) }}</strong></span>
-          </div>
-
-          <el-table :data="detailList" v-loading="detailLoading" stripe style="width:100%" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}" @sort-change="handleDetailSortChange">
-            <el-table-column prop="report_date" label="日期" width="105" sortable="custom" />
-            <el-table-column prop="campaign_name" label="广告活动" min-width="140" show-overflow-tooltip />
-            <el-table-column prop="ad_group_name" label="广告组" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="advertised_asin" label="ASIN" width="130" sortable="custom" />
-            <el-table-column prop="advertised_sku" label="SKU" width="130" show-overflow-tooltip sortable="custom" />
-            <el-table-column prop="impressions" label="曝光" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="clicks" label="点击" align="right" width="85" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
-            </el-table-column>
-            <el-table-column prop="cost" label="花费" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cost) }}</template>
-            </el-table-column>
-            <el-table-column prop="purchases_7d" label="订单(7d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="purchases_30d" label="订单(30d)" align="right" width="100" sortable="custom" />
-            <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
-            </el-table-column>
-            <el-table-column prop="sales_30d" label="销售(30d)" align="right" width="110" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.sales_30d) }}</template>
-            </el-table-column>
-            <el-table-column prop="ctr" label="CTR" align="right" width="90" sortable="custom">
-              <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
-            </el-table-column>
-            <el-table-column prop="cpc" label="CPC" align="right" width="90" sortable="custom">
-              <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
-            </el-table-column>
-            <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">
-                <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110" sortable="custom">
-              <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="detailPage" v-model:page-size="detailPageSize"
-            :total="detailTotal" :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next" class="pagination" @change="fetchDetail" />
-        </el-tab-pane>
-      </el-tabs>
-    </div>
   </div>
 </template>
 
@@ -581,51 +319,41 @@ import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import {
-  Promotion, Refresh, Search, View, Mouse, Money, TrendCharts,
+  Promotion, Refresh, RefreshLeft, Search, View, Mouse, Money, TrendCharts,
   Coin, DataAnalysis, Histogram, ShoppingCart, Wallet, DataLine, List,
-  Document, InfoFilled, SortUp, SortDown
+  Document, InfoFilled, ArrowDown, ArrowUp
 } from '@element-plus/icons-vue'
 import {
   getShopOptions,
-  getAdvertisingReports, getAdvertisingSummary, getAdvertisingTrend, generateAdvertisingReport,
-  getAdvertisingSearchTerms, getAdvertisingTargeting, getAdvertisingCampaigns, getAdvertisingProducts,
-  getAdvertisingCampaignOptions, getAdvertisingAdGroupOptions, getAdvertisingAsinOptions
+  getAdvertisingSummary, getAdvertisingTrend, generateAdvertisingReport,
+  getAdvertisingCampaignOptions, getAdvertisingAdGroupOptions, getAdvertisingProductOptions,
+  getAdvertisingDailyTree
 } from '@/services/api.js'
 
 export default {
   name: 'AdvertisingReportView',
   components: {
-    Promotion, Refresh, Search, View, Mouse, Money, TrendCharts,
-    Coin, DataAnalysis, Histogram, ShoppingCart, Wallet, DataLine, List, Document, InfoFilled, SortUp, SortDown
+    Promotion, Refresh, RefreshLeft, Search, View, Mouse, Money, TrendCharts,
+    Coin, DataAnalysis, Histogram, ShoppingCart, Wallet, DataLine, List,
+    Document, InfoFilled, ArrowDown, ArrowUp
   },
   setup() {
     const selectedShop = ref(null)
     const shopList = ref([])
     const generating = ref(false)
 
-    const filter = reactive({ type: 'daily', dimension: 'campaign' })
-    const dateRange = ref([])
+    const filter = reactive({ type: 'daily' })
+    const startDate = ref('')
+    const endDate = ref('')
     const showGuide = ref(false)
 
-    // 原始数据详情相关状态
-    const detailTab = ref('campaigns')
-    const detailLoading = ref(false)
-    const detailList = ref([])
-    const detailTotal = ref(0)
-    const detailPage = ref(1)
-    const detailPageSize = ref(20)
-    const detailSearch = reactive({ keyword: '', asin: '' })
-    const detailSort = reactive({ sort_by: 'report_date', sort_dir: 'desc' })
-    const detailSummary = ref(null)
-
-    // 共享筛选栏
-    const detailDateRange = ref([])
-    const detailFilter = reactive({ campaign_id: '', ad_group_id: '', asin: '' })
+    // 趋势图联动筛选
+    const trendFilter = reactive({ campaign_id: '', ad_group_id: '', advertised_asin: '' })
     const campaignOptions = ref([])
     const adGroupOptions = ref([])
-    const asinOptions = ref([])
-    const adGroupDisabled = computed(() => !detailFilter.campaign_id)
-    const asinDisabled = computed(() => !detailFilter.campaign_id)
+    const productOptions = ref([])
+    const adGroupDisabled = computed(() => !trendFilter.campaign_id)
+    const productDisabled = computed(() => !trendFilter.ad_group_id)
 
     const summary = reactive({})
     const list = ref([])
@@ -636,11 +364,7 @@ export default {
 
     let trendChart = null
     const trendChartRef = ref(null)
-
-    const dimensionLabel = computed(() => {
-      const map = { overall: '整体', campaign: '广告活动', ad_group: '广告组', asin: 'ASIN' }
-      return map[filter.dimension] || filter.dimension
-    })
+    const detailTableRef = ref(null)
 
     const formatNumber = (val, digits = 2) => {
       if (val === null || val === undefined) return '-'
@@ -662,12 +386,15 @@ export default {
       if (val === null || val === undefined) return '—'
       const n = Number(val)
       if (isNaN(n)) return '—'
-      return (n * 100).toFixed(2) + '%'
+      return n.toFixed(2) + '%'
     }
 
     const getAcosClass = (val) => {
       if (val === null || val === undefined) return ''
-      const v = Number(val)
+      let v = Number(val)
+      if (isNaN(v)) return ''
+      // 兼容后端返回百分比数值（如 55.36）或小数（如 0.5536）
+      if (v > 1) v = v / 100
       if (v > 0.5) return 'text-danger'
       if (v > 0.3) return 'text-warning'
       if (v > 0) return 'text-success'
@@ -684,27 +411,36 @@ export default {
     }
 
     const handleShopChange = () => {
-      fetchAllData()
-      // 店铺切换后重新加载活动选项
-      detailFilter.campaign_id = ''
-      detailFilter.ad_group_id = ''
-      detailFilter.asin = ''
+      // 店铺切换后重置联动筛选并刷新
+      trendFilter.campaign_id = ''
+      trendFilter.ad_group_id = ''
+      trendFilter.advertised_asin = ''
       adGroupOptions.value = []
-      asinOptions.value = []
+      productOptions.value = []
       loadCampaignOptions()
-      // 如果详情标签页已打开，刷新
-      if (detailList.value.length || detailSummary.value) fetchDetail()
+      fetchAllData()
     }
 
     const buildParams = () => {
       const params = {
         type: filter.type,
-        dimension: filter.dimension,
         shop_id: selectedShop.value
       }
-      if (dateRange.value?.length === 2) {
-        params.start_date = dateRange.value[0]
-        params.end_date = dateRange.value[1]
+      if (startDate.value && endDate.value) {
+        params.start_date = startDate.value
+        params.end_date = endDate.value
+      }
+      return params
+    }
+
+    const buildTrendParams = () => {
+      const params = buildParams()
+      if (trendFilter.advertised_asin) {
+        params.advertised_asin = trendFilter.advertised_asin
+      } else if (trendFilter.ad_group_id) {
+        params.ad_group_id = trendFilter.ad_group_id
+      } else if (trendFilter.campaign_id) {
+        params.campaign_id = trendFilter.campaign_id
       }
       return params
     }
@@ -713,14 +449,16 @@ export default {
       try {
         const res = await getAdvertisingSummary(buildParams())
         if (res.data.status === 'success') {
-          Object.assign(summary, res.data.data || {})
+          const data = res.data.data || {}
+          console.log('[广告报表] 汇总数据:', JSON.parse(JSON.stringify(data)))
+          Object.assign(summary, data)
         }
       } catch (e) { console.error(e) }
     }
 
     const fetchTrend = async () => {
       try {
-        const res = await getAdvertisingTrend(buildParams())
+        const res = await getAdvertisingTrend(buildTrendParams())
         if (res.data.status === 'success') {
           updateTrendChart(res.data.data || [])
         }
@@ -730,18 +468,24 @@ export default {
     const fetchList = async () => {
       loading.value = true
       try {
-        const params = { ...buildParams(), page: page.value, page_size: pageSize.value }
-        const res = await getAdvertisingReports(params)
+        const params = {
+          type: filter.type,
+          shop_id: selectedShop.value,
+          page: page.value,
+          page_size: pageSize.value
+        }
+        if (startDate.value && endDate.value) {
+          params.start_date = startDate.value
+          params.end_date = endDate.value
+        }
+        const res = await getAdvertisingDailyTree(params)
         if (res.data.status === 'success') {
-          list.value = res.data.data.list || []
+          list.value = normalizeDateRows(res.data.data.list || [])
           total.value = res.data.data.total || 0
         }
       } catch (e) { console.error(e) }
       finally { loading.value = false }
     }
-
-    // 标记详情是否已初始化（onMounted 后即为 true）
-    const detailReady = ref(false)
 
     const fetchAllData = () => {
       fetchSummary()
@@ -751,12 +495,24 @@ export default {
 
     const handleTypeChange = () => {
       page.value = 1
+      setDefaultDateRange()
       fetchAllData()
     }
 
-    const handleDimensionChange = () => {
+    const onStartDateChange = (val) => {
+      if (val && endDate.value && val > endDate.value) {
+        endDate.value = val
+      }
       page.value = 1
-      fetchList()
+      fetchAllData()
+    }
+
+    const onEndDateChange = (val) => {
+      if (val && startDate.value && val < startDate.value) {
+        startDate.value = val
+      }
+      page.value = 1
+      fetchAllData()
     }
 
     const guideMetrics = [
@@ -778,12 +534,12 @@ export default {
       try {
         const body = { report_type: filter.type, shop_id: selectedShop.value }
         if (filter.type === 'daily') {
-          body.period = dateRange.value?.[1] || new Date().toISOString().split('T')[0]
+          body.period = endDate.value || new Date().toISOString().split('T')[0]
         } else if (filter.type === 'weekly') {
-          body.period_start = dateRange.value?.[0]
-          body.period_end = dateRange.value?.[1]
+          body.period_start = startDate.value
+          body.period_end = endDate.value
         } else if (filter.type === 'monthly') {
-          const d = dateRange.value?.[1] || new Date().toISOString().split('T')[0]
+          const d = endDate.value || new Date().toISOString().split('T')[0]
           body.period = d.slice(0, 7)
         }
         const res = await generateAdvertisingReport(body)
@@ -800,17 +556,7 @@ export default {
       }
     }
 
-    // --- 原始数据详情方法 ---
-
-    // API 映射
-    const detailApiMap = {
-      'search-terms': getAdvertisingSearchTerms,
-      'targeting': getAdvertisingTargeting,
-      'campaigns': getAdvertisingCampaigns,
-      'products': getAdvertisingProducts
-    }
-
-    // --- 筛选下拉框方法 ---
+    // --- 趋势图联动下拉框 ---
 
     const loadCampaignOptions = async () => {
       try {
@@ -820,132 +566,157 @@ export default {
     }
 
     const loadAdGroupOptions = async () => {
-      if (!detailFilter.campaign_id) {
+      if (!trendFilter.campaign_id) {
         adGroupOptions.value = []
         return
       }
       try {
         const res = await getAdvertisingAdGroupOptions({
           shop_id: selectedShop.value,
-          campaign_id: detailFilter.campaign_id
+          campaign_id: trendFilter.campaign_id
         })
         adGroupOptions.value = res.data?.data || []
       } catch (e) { console.error('加载广告组选项失败:', e) }
     }
 
-    const loadAsinOptions = async () => {
-      if (!detailFilter.campaign_id) {
-        asinOptions.value = []
+    const loadProductOptions = async () => {
+      if (!trendFilter.campaign_id) {
+        productOptions.value = []
         return
       }
       try {
-        const res = await getAdvertisingAsinOptions({
+        const res = await getAdvertisingProductOptions({
           shop_id: selectedShop.value,
-          campaign_id: detailFilter.campaign_id
+          campaign_id: trendFilter.campaign_id,
+          ad_group_id: trendFilter.ad_group_id
         })
         const raw = res.data?.data || []
-        // 兼容两种格式：字符串数组 ["B0XXX"] 或 对象数组 [{ asin: "B0XXX" }]
-        asinOptions.value = raw.map(item =>
-          typeof item === 'string' ? item : (item.asin || item.advertised_asin || '')
-        ).filter(Boolean)
-      } catch (e) { console.error('加载ASIN选项失败:', e) }
+        productOptions.value = raw.map(item => {
+          if (typeof item === 'string') {
+            return { value: item, label: item }
+          }
+          const value = item.advertised_asin || item.asin || ''
+          const label = item.product_name
+            ? `${value} - ${item.product_name}`
+            : value
+          return { value, label }
+        }).filter(i => i.value)
+      } catch (e) { console.error('加载广告商品选项失败:', e) }
     }
 
-    const onCampaignFilterChange = () => {
-      // 清除下级筛选
-      detailFilter.ad_group_id = ''
-      detailFilter.asin = ''
+    const onTrendCampaignChange = () => {
+      trendFilter.ad_group_id = ''
+      trendFilter.advertised_asin = ''
       adGroupOptions.value = []
-      asinOptions.value = []
-      // 加载联动下拉数据
+      productOptions.value = []
       loadAdGroupOptions()
-      loadAsinOptions()
-      // 刷新数据
-      detailPage.value = 1
-      fetchDetail()
+      loadProductOptions()
+      fetchTrend()
     }
 
-    const onAdGroupFilterChange = () => {
-      detailPage.value = 1
-      fetchDetail()
+    const onTrendAdGroupChange = () => {
+      trendFilter.advertised_asin = ''
+      productOptions.value = []
+      loadProductOptions()
+      fetchTrend()
     }
 
-    const onAsinFilterChange = () => {
-      detailPage.value = 1
-      fetchDetail()
+    const onTrendProductChange = () => {
+      fetchTrend()
     }
 
-    const onDetailDateChange = () => {
-      detailPage.value = 1
-      fetchDetail()
+    // --- 趋势图筛选重置 ---
+
+    const resetTrendFilter = () => {
+      trendFilter.campaign_id = ''
+      trendFilter.ad_group_id = ''
+      trendFilter.advertised_asin = ''
+      adGroupOptions.value = []
+      productOptions.value = []
+      loadCampaignOptions()
+      fetchTrend()
     }
 
-    const fetchDetail = async () => {
-      detailLoading.value = true
-      try {
-        const apiFn = detailApiMap[detailTab.value]
-        if (!apiFn) return
+    // --- 明细表格展开/折叠 ---
 
-        const params = {
-          shop_id: selectedShop.value,
-          page: detailPage.value,
-          page_size: detailPageSize.value,
-          sort_by: detailSort.sort_by,
-          sort_dir: detailSort.sort_dir
+    const toDateStr = (val) => {
+      if (!val) return ''
+      if (typeof val === 'string') return val.trim().split(' ')[0]
+      const d = new Date(val)
+      return d.toISOString().split('T')[0]
+    }
+
+    const normalizeProductRows = (date, campaignId, adGroupId, rows) => {
+      return (rows || []).map(item => ({
+        ...item,
+        id: `product_${date}_${campaignId}_${adGroupId}_${item.advertised_asin || item.asin || Math.random().toString(36).slice(2)}`,
+        level: 'product',
+        report_date: date,
+        campaign_id: campaignId,
+        ad_group_id: adGroupId,
+        hasChildren: false,
+        children: []
+      }))
+    }
+
+    const normalizeAdGroupRows = (date, campaignId, rows) => {
+      return (rows || []).map(item => ({
+        ...item,
+        id: `ad_group_${date}_${campaignId}_${item.ad_group_id}`,
+        level: 'ad_group',
+        report_date: date,
+        campaign_id: campaignId,
+        hasChildren: (item.children || []).length > 0,
+        children: normalizeProductRows(date, campaignId, item.ad_group_id, item.children)
+      }))
+    }
+
+    const normalizeCampaignRows = (date, rows) => {
+      return (rows || []).map(item => ({
+        ...item,
+        id: `campaign_${date}_${item.campaign_id}`,
+        level: 'campaign',
+        report_date: date,
+        hasChildren: (item.children || []).length > 0,
+        children: normalizeAdGroupRows(date, item.campaign_id, item.children)
+      }))
+    }
+
+    const normalizeDateRows = (rows) => {
+      return (rows || []).map(item => {
+        const date = toDateStr(item.report_date)
+        return {
+          ...item,
+          report_date: date,
+          id: `date_${date}`,
+          level: 'date',
+          hasChildren: (item.children || []).length > 0,
+          children: normalizeCampaignRows(date, item.children)
         }
-        // 日期范围
-        if (detailDateRange.value?.length === 2) {
-          params.start_date = detailDateRange.value[0]
-          params.end_date = detailDateRange.value[1]
-        }
-        // 共享筛选栏参数
-        if (detailFilter.campaign_id) params.campaign_id = detailFilter.campaign_id
-        if (detailFilter.ad_group_id) params.ad_group_id = detailFilter.ad_group_id
-        if (detailFilter.asin) params.asin = detailFilter.asin
-        // 搜索关键词
-        if (detailSearch.keyword) params.keyword = detailSearch.keyword
-        // ASIN 搜索框 (仅 products 标签页的额外搜索)
-        if (detailTab.value === 'products' && detailSearch.asin) params.asin = detailSearch.asin
+      })
+    }
 
-        const res = await apiFn(params)
-        if (res.data.status === 'success') {
-          const data = res.data.data
-          detailList.value = data.list || []
-          detailTotal.value = data.total || 0
-          detailPage.value = data.page || 1
-          detailSummary.value = data.summary || null
+    const handleRowClick = (row) => {
+      if (!detailTableRef.value) return
+      detailTableRef.value.toggleRowExpansion(row)
+    }
+
+    const expandRows = (rows, expanded) => {
+      if (!detailTableRef.value) return
+      for (const row of rows || []) {
+        detailTableRef.value.toggleRowExpansion(row, expanded)
+        if (row.children?.length) {
+          expandRows(row.children, expanded)
         }
-      } catch (e) {
-        console.error('获取详情失败:', e)
-        detailList.value = []
-      } finally {
-        detailLoading.value = false
       }
     }
 
-    const handleDetailTabChange = () => {
-      // 切换 tab 时仅重置搜索和排序，保留筛选条件
-      detailSearch.keyword = ''
-      detailSearch.asin = ''
-      detailSort.sort_by = 'report_date'
-      detailSort.sort_dir = 'desc'
-      detailPage.value = 1
-      detailSummary.value = null
-      detailList.value = []
-      fetchDetail()
+    const expandAllRows = () => {
+      expandRows(list.value, true)
     }
 
-    const handleDetailSortChange = ({ prop, order }) => {
-      if (!order) {
-        // 取消排序 → 恢复默认
-        detailSort.sort_by = ''
-        detailSort.sort_dir = 'desc'
-      } else {
-        detailSort.sort_by = prop
-        detailSort.sort_dir = order === 'ascending' ? 'asc' : 'desc'
-      }
-      detailPage.value = 1
-      fetchDetail()
+    const collapseAllRows = () => {
+      expandRows(list.value, false)
     }
 
     const updateTrendChart = (data) => {
@@ -954,7 +725,7 @@ export default {
         trendChart.setOption({
           tooltip: { show: false },
           xAxis: { type: 'category', data: ['暂无数据'], axisLabel: { color: '#999' } },
-          yAxis: [{ type: 'value', show: false }, { type: 'value', show: false }],
+          yAxis: [{ type: 'value', show: false }, { type: 'value', show: false }, { type: 'value', show: false }, { type: 'value', show: false }],
           series: [],
           graphic: [{
             type: 'text', left: 'center', top: 'middle',
@@ -963,7 +734,12 @@ export default {
         }, true)
         return
       }
-      const xAxis = data.map(d => d.time_label)
+      const formatAxisDate = (label) => {
+        if (!label) return label
+        if (typeof label === 'string' && label.includes(' ')) return label.split(' ')[0]
+        return label
+      }
+      const xAxis = data.map(d => formatAxisDate(d.time_label))
       trendChart.setOption({
         tooltip: {
           trigger: 'axis',
@@ -972,9 +748,9 @@ export default {
             let html = `<div style="font-weight:600;margin-bottom:6px;">${params[0].axisValue}</div>`
             params.forEach(p => {
               let val = p.value
-              if (p.seriesName === 'ACOS') val = (val * 100).toFixed(2) + '%'
-              else if (p.seriesName === 'ROAS') val = val.toFixed(2) + 'x'
-              else if (p.seriesName === '花费') val = '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+              if (['ACOS', 'CTR'].includes(p.seriesName)) val = Number(val).toFixed(2) + '%'
+              else if (p.seriesName === 'CPC') val = '$' + Number(val).toFixed(2)
+              else val = '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
               html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">
                 <span style="width:8px;height:8px;border-radius:50%;background:${p.color};"></span>
                 <span style="flex:1;">${p.seriesName}</span>
@@ -984,8 +760,8 @@ export default {
             return html
           }
         },
-        legend: { data: ['花费', 'ACOS', 'ROAS'], bottom: 0 },
-        grid: { left: 60, right: 60, top: 30, bottom: 40 },
+        legend: { data: ['花费', '销售额', 'ACOS', 'CTR', 'CPC'], bottom: 0 },
+        grid: { left: 70, right: 130, top: 30, bottom: 50 },
         xAxis: {
           type: 'category',
           data: xAxis,
@@ -995,7 +771,7 @@ export default {
         yAxis: [
           {
             type: 'value',
-            name: '花费 ($)',
+            name: '金额 ($)',
             position: 'left',
             axisLine: { show: false },
             splitLine: { lineStyle: { color: '#f0f0f0' } },
@@ -1003,14 +779,29 @@ export default {
           },
           {
             type: 'value',
-            name: '比率',
+            name: 'ACOS (%)',
             position: 'right',
             axisLine: { show: false },
             splitLine: { show: false },
-            axisLabel: {
-              color: '#666',
-              formatter: (v) => (v * 100).toFixed(0) + '%'
-            }
+            axisLabel: { color: '#666', formatter: (v) => Number(v).toFixed(0) + '%' }
+          },
+          {
+            type: 'value',
+            name: 'CTR (%)',
+            position: 'right',
+            offset: 60,
+            axisLine: { show: false },
+            splitLine: { show: false },
+            axisLabel: { color: '#666', formatter: (v) => Number(v).toFixed(2) + '%' }
+          },
+          {
+            type: 'value',
+            name: 'CPC ($)',
+            position: 'right',
+            offset: 120,
+            axisLine: { show: false },
+            splitLine: { show: false },
+            axisLabel: { color: '#666', formatter: '${value}' }
           }
         ],
         series: [
@@ -1019,13 +810,20 @@ export default {
             type: 'bar',
             data: data.map(d => d.ad_spend || 0),
             itemStyle: { color: '#667eea', borderRadius: [4, 4, 0, 0] },
-            barMaxWidth: 28
+            barMaxWidth: 24
+          },
+          {
+            name: '销售额',
+            type: 'bar',
+            data: data.map(d => d.sales_7d || 0),
+            itemStyle: { color: '#0ea5e9', borderRadius: [4, 4, 0, 0] },
+            barMaxWidth: 24
           },
           {
             name: 'ACOS',
             type: 'line',
             yAxisIndex: 1,
-            data: data.map(d => d.acos_7d || 0),
+            data: data.map(d => d.acos || 0),
             smooth: true,
             itemStyle: { color: '#ef4444' },
             lineStyle: { width: 3 },
@@ -1033,12 +831,23 @@ export default {
             symbolSize: 6
           },
           {
-            name: 'ROAS',
+            name: 'CTR',
             type: 'line',
-            yAxisIndex: 1,
-            data: data.map(d => d.roas_7d || 0),
+            yAxisIndex: 2,
+            data: data.map(d => d.ctr || 0),
             smooth: true,
             itemStyle: { color: '#10b981' },
+            lineStyle: { width: 3 },
+            symbol: 'circle',
+            symbolSize: 6
+          },
+          {
+            name: 'CPC',
+            type: 'line',
+            yAxisIndex: 3,
+            data: data.map(d => d.cpc || 0),
+            smooth: true,
+            itemStyle: { color: '#f59e0b' },
             lineStyle: { width: 3 },
             symbol: 'circle',
             symbolSize: 6
@@ -1062,29 +871,32 @@ export default {
       trendChart?.resize()
     }
 
-    const initDates = () => {
+    const setDefaultDateRange = () => {
       const end = new Date()
       const start = new Date()
-      start.setDate(start.getDate() - 14)
+      if (filter.type === 'daily') {
+        start.setDate(start.getDate() - 30)
+      } else if (filter.type === 'weekly') {
+        start.setDate(start.getDate() - 90)
+      } else if (filter.type === 'monthly') {
+        start.setDate(start.getDate() - 365)
+      }
       const fmt = (d) => d.toISOString().split('T')[0]
-      dateRange.value = [fmt(start), fmt(end)]
+      startDate.value = fmt(start)
+      endDate.value = fmt(end)
+    }
+
+    const initDates = () => {
+      setDefaultDateRange()
     }
 
     onMounted(() => {
       fetchShops()
       initDates()
-      // 初始化详情日期范围（沿用页面默认范围）
-      const end = new Date()
-      const start = new Date()
-      start.setDate(start.getDate() - 14)
-      const fmt = (d) => d.toISOString().split('T')[0]
-      detailDateRange.value = [fmt(start), fmt(end)]
       nextTick(() => {
         initChart()
-        fetchAllData()
         loadCampaignOptions()
-        fetchDetail()
-        detailReady.value = true
+        fetchAllData()
         window.addEventListener('resize', resizeChart)
       })
     })
@@ -1095,19 +907,18 @@ export default {
     })
 
     return {
-      selectedShop, shopList, generating, detailReady,
-      filter, dateRange, summary, list, loading, page, pageSize, total,
-      trendChartRef, dimensionLabel, showGuide,
-      detailTab, detailLoading, detailList, detailTotal, detailPage, detailPageSize,
-      detailSearch, detailSort, detailSummary,
-      detailDateRange, detailFilter, campaignOptions, adGroupOptions, asinOptions,
-      adGroupDisabled, asinDisabled,
+      selectedShop, shopList, generating,
+      filter, startDate, endDate, summary, list, loading, page, pageSize, total,
+      trendChartRef, detailTableRef, showGuide,
+      trendFilter, campaignOptions, adGroupOptions, productOptions,
+      adGroupDisabled, productDisabled,
       formatNumber, formatK, formatPct, getAcosClass,
       guideMetrics, guideConversion,
       handleShopChange, fetchAllData, fetchList,
-      handleTypeChange, handleDimensionChange, handleGenerate,
-      fetchDetail, handleDetailTabChange, handleDetailSortChange,
-      onCampaignFilterChange, onAdGroupFilterChange, onAsinFilterChange, onDetailDateChange
+      handleTypeChange, onStartDateChange, onEndDateChange, handleGenerate,
+      onTrendCampaignChange, onTrendAdGroupChange, onTrendProductChange,
+      resetTrendFilter,
+      handleRowClick, expandAllRows, collapseAllRows
     }
   }
 }
@@ -1160,6 +971,22 @@ export default {
   border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   flex-wrap: wrap;
+}
+
+.date-range-pickers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-separator {
+  color: #909399;
+  font-size: 14px;
+}
+
+.date-start-picker,
+.date-end-picker {
+  width: 150px;
 }
 
 /* 汇总卡片 */
@@ -1260,6 +1087,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .chart-header h3 {
@@ -1269,6 +1098,13 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.chart-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .chart-legend-hint {
@@ -1300,8 +1136,11 @@ export default {
   vertical-align: middle;
 }
 
+.hint-bar.sales::before { background: #0ea5e9; }
+
 .hint-line.acos::before { background: #ef4444; }
-.hint-line.roas::before { background: #10b981; }
+.hint-line.ctr::before { background: #10b981; }
+.hint-line.cpc::before { background: #f59e0b; }
 
 /* 表格 */
 .table-card {
@@ -1316,6 +1155,14 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .table-header h3 {
@@ -1325,6 +1172,41 @@ export default {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.tree-level-date {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.tree-level-campaign {
+  color: #374151;
+}
+
+.tree-level-ad-group {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.tree-level-product {
+  color: #4b5563;
+}
+
+.product-sku {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.product-name {
+  color: #606266;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.level-tag {
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 .pagination {
@@ -1424,49 +1306,6 @@ export default {
   font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
-}
-
-/* 原始数据详情 */
-.detail-filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 12px;
-}
-
-.detail-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-
-.detail-sort-hint {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: #667eea;
-  white-space: nowrap;
-}
-
-.detail-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 10px 16px;
-  background: #f0f9ff;
-  border-radius: 8px;
-  margin-bottom: 14px;
-  font-size: 13px;
-  color: #475569;
-}
-
-.ds-item strong {
-  color: #1e293b;
 }
 
 /* 防止排序列表头文字换行 */
