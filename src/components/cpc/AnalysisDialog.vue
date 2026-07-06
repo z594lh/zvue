@@ -8,8 +8,11 @@
     class="cpc-analysis-dialog"
   >
     <div class="analysis-filter">
-      <el-date-picker v-model="startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width:140px" @change="fetchData" />
-      <el-date-picker v-model="endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width:140px" @change="fetchData" />
+      <div class="date-range-pickers">
+        <el-date-picker v-model="startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" class="date-start-picker" @change="onStartDateChange" />
+        <span class="date-separator">~</span>
+        <el-date-picker v-model="endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" class="date-end-picker" @change="onEndDateChange" />
+      </div>
       <el-button type="primary" class="btn-search" @click="fetchData">搜索</el-button>
     </div>
 
@@ -70,8 +73,18 @@ const emit = defineEmits(['update:modelValue'])
 const visible = ref(false)
 const loading = ref(false)
 const tableData = ref([])
-const startDate = ref('')
-const endDate = ref('')
+
+const getLast10Days = () => {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - 10)
+  const fmt = (d) => d.toISOString().split('T')[0]
+  return { startDate: fmt(start), endDate: fmt(end) }
+}
+
+const defaultDateRange = getLast10Days()
+const startDate = ref(defaultDateRange.startDate)
+const endDate = ref(defaultDateRange.endDate)
 
 const isSummary = computed(() => !props.campaignId)
 const dialogTitle = computed(() => isSummary.value ? '所有广告活动汇总' : `广告活动详情:${props.title}`)
@@ -101,6 +114,20 @@ const fetchData = async () => {
     }
   } catch { ElMessage.error('请求失败') }
   finally { loading.value = false }
+}
+
+const onStartDateChange = (val) => {
+  if (val && endDate.value && val > endDate.value) {
+    endDate.value = val
+  }
+  fetchData()
+}
+
+const onEndDateChange = (val) => {
+  if (val && startDate.value && val < startDate.value) {
+    startDate.value = val
+  }
+  fetchData()
 }
 
 const formatNum = (val) => val != null ? Number(val).toFixed(2) : '-'
@@ -139,6 +166,19 @@ defineExpose({ open, close })
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+}
+.date-range-pickers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.date-separator {
+  color: #909399;
+  font-size: 14px;
+}
+.date-start-picker,
+.date-end-picker {
+  width: 150px;
 }
 .btn-search {
   background: #009688;

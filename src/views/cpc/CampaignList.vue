@@ -20,8 +20,11 @@
           <el-option label="自动" value="AUTO" />
           <el-option label="手动" value="MANUAL" />
         </el-select>
-        <el-date-picker v-model="filter.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width:120px" @change="fetchData" />
-        <el-date-picker v-model="filter.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width:120px" @change="fetchData" />
+        <div class="date-range-pickers">
+          <el-date-picker v-model="filter.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" class="date-start-picker" @change="onStartDateChange" />
+          <span class="date-separator">~</span>
+          <el-date-picker v-model="filter.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" class="date-end-picker" @change="onEndDateChange" />
+        </div>
         <el-button type="primary" class="btn-search" @click="fetchData">
           <el-icon><Search /></el-icon> 搜索
         </el-button>
@@ -195,12 +198,22 @@ const analysisVisible = ref(false)
 const analysisTitle = ref('')
 const analysisCampaignId = ref(null)
 
+const getLast30Days = () => {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - 30)
+  const fmt = (d) => d.toISOString().split('T')[0]
+  return { startDate: fmt(start), endDate: fmt(end) }
+}
+
+const defaultDateRange = getLast30Days()
+
 const filter = reactive({
   search: '',
-  state: '',
+  state: 'enabled',
   targetingType: '',
-  startDate: '',
-  endDate: '',
+  startDate: defaultDateRange.startDate,
+  endDate: defaultDateRange.endDate,
   impressions_gte: undefined,
   impressions_lte: undefined,
   clicks_gte: undefined,
@@ -251,8 +264,8 @@ const buildFilterParams = () => {
     search: filter.search,
     state: filter.state,
     targeting_type: filter.targetingType,
-    start_date: filter.startDate,
-    end_date: filter.endDate
+    start_date: filter.startDate || '',
+    end_date: filter.endDate || ''
   }
   metricFilters.forEach(item => {
     const gte = filter[`${item.field}_gte`]
@@ -263,13 +276,28 @@ const buildFilterParams = () => {
   return params
 }
 
+const onStartDateChange = (val) => {
+  if (val && filter.endDate && val > filter.endDate) {
+    filter.endDate = val
+  }
+  page.value = 1
+  fetchData()
+}
+
+const onEndDateChange = (val) => {
+  if (val && filter.startDate && val < filter.startDate) {
+    filter.startDate = val
+  }
+  page.value = 1
+  fetchData()
+}
+
 const resetFilter = () => {
   Object.assign(filter, {
     search: '',
-    state: '',
+    state: 'enabled',
     targetingType: '',
-    startDate: '',
-    endDate: '',
+    ...getLast30Days(),
     impressions_gte: undefined,
     impressions_lte: undefined,
     clicks_gte: undefined,
@@ -487,6 +515,19 @@ onMounted(() => {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 8px;
+}
+.date-range-pickers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.date-separator {
+  color: #909399;
+  font-size: 14px;
+}
+.date-start-picker,
+.date-end-picker {
+  width: 150px;
 }
 .advanced-panel {
   display: flex;
