@@ -9,8 +9,6 @@
         <el-option label="暂停" value="paused" />
         <el-option label="归档" value="archived" />
       </el-select>
-      <el-date-picker v-model="filter.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width:120px" @change="fetchData" />
-      <el-date-picker v-model="filter.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width:120px" @change="fetchData" />
       <el-button type="primary" @click="fetchData">
         <el-icon><Search /></el-icon> 搜索
       </el-button>
@@ -128,6 +126,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCpcProductAds, updateCpcProductAd } from '@/services/cpc'
 import { exportToCSV } from '@/utils/export'
+import { useCpcDateRange } from '@/composables/useCpcDateRange'
 
 const props = defineProps({
   shopId: { type: [Number, String], default: null },
@@ -142,6 +141,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const selectAll = ref(false)
 const batchLoading = ref(false)
+const { startDate, endDate } = useCpcDateRange()
 
 const metricFilters = [
   { field: 'impressions', label: '曝光量', precision: 0, step: 1 },
@@ -160,8 +160,6 @@ const metricFilters = [
 const getDefaultFilter = () => ({
   search: '',
   state: '',
-  startDate: '',
-  endDate: '',
   ...metricFilters.reduce((acc, item) => {
     acc[`${item.field}_gte`] = undefined
     acc[`${item.field}_lte`] = undefined
@@ -175,8 +173,8 @@ const buildFilter = () => {
   const base = {
     search: filter.search,
     state: filter.state,
-    start_date: filter.startDate || '',
-    end_date: filter.endDate || ''
+    start_date: startDate.value || '',
+    end_date: endDate.value || ''
   }
   metricFilters.forEach(item => {
     const gte = filter[`${item.field}_gte`]
@@ -282,6 +280,7 @@ const fmtInt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleS
 const fmtPct = (val) => val != null && Number(val) !== 0 ? Number(val).toFixed(2) + '%' : '--'
 
 watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true })
+watch([startDate, endDate], () => { page.value = 1; fetchData() })
 </script>
 
 <style scoped>

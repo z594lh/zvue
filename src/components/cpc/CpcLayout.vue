@@ -27,6 +27,11 @@
             :value="shop.id"
           />
         </el-select>
+        <div class="date-range-pickers">
+          <el-date-picker v-model="startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" class="date-start-picker" @change="setStartDate" />
+          <span class="date-separator">~</span>
+          <el-date-picker v-model="endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" class="date-end-picker" @change="setEndDate" />
+        </div>
         <slot name="tab-extra" />
       </div>
     </div>
@@ -44,6 +49,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useShopCache } from '@/composables/useShopCache'
+import { useCpcDateRange } from '@/composables/useCpcDateRange'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,6 +63,7 @@ const emit = defineEmits(['shopChange'])
 
 const selectedShopId = ref(null)
 const CPC_SHOP_KEY = 'cpc_shop_id'
+const { startDate, endDate, setStartDate, setEndDate } = useCpcDateRange()
 
 const tabs = [
   { key: 'campaigns', label: 'SP广告活动', routeName: 'CpcCampaigns' }
@@ -117,6 +124,19 @@ defineExpose({ shopId: selectedShopId })
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.date-range-pickers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.date-separator {
+  color: #909399;
+  font-size: 14px;
+}
+.date-start-picker,
+.date-end-picker {
+  width: 150px;
 }
 .cpc-tab-item {
   padding: 12px 18px;

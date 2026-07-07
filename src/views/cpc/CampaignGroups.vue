@@ -18,7 +18,6 @@
         </template>
       </el-dropdown>
       <div class="toolbar-right">
-        <el-date-picker v-model="filter.dateRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width:180px" @change="fetchData" />
         <el-button @click="handleExport">导出</el-button>
       </div>
     </div>
@@ -92,6 +91,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCpcGroups, updateCpcGroup } from '@/services/cpc'
 import { exportToCSV } from '@/utils/export'
+import { useCpcDateRange } from '@/composables/useCpcDateRange'
 
 const props = defineProps({
   shopId: { type: [Number, String], default: null },
@@ -99,6 +99,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const { startDate, endDate } = useCpcDateRange()
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
@@ -106,7 +107,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const selectAll = ref(false)
 const batchLoading = ref(false)
-const filter = reactive({ search: '', state: '', dateRange: [] })
+const filter = reactive({ search: '', state: '' })
 
 const selectedRows = computed(() => tableData.value.filter(row => row._selected))
 
@@ -119,8 +120,8 @@ const fetchData = async () => {
       shop_id: props.shopId,
       page: page.value,
       page_size: pageSize.value,
-      start_date: filter.dateRange?.[0] || '',
-      end_date: filter.dateRange?.[1] || '',
+      start_date: startDate.value || '',
+      end_date: endDate.value || '',
       search: filter.search,
       state: filter.state
     })
@@ -240,6 +241,7 @@ const fmtInt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleS
 const fmtPct = (val) => val != null && Number(val) !== 0 ? Number(val).toFixed(2) + '%' : '--'
 
 watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true })
+watch([startDate, endDate], () => { page.value = 1; fetchData() })
 </script>
 
 <style scoped>
