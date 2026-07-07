@@ -3,9 +3,7 @@ import axios from 'axios';
 
 // src/services/api.js
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production'
-      ? `${process.env.VUE_APP_API_BASE_URL}/api`  // 生产环境使用配置
-      : '/api',                                    // 开发环境使用代理
+  baseURL: '/api',  // 同源：开发走 devServer 代理，生产走 CF Pages Functions 反代
   timeout: 1000000,
   headers: {
       'Content-Type': 'application/json'
