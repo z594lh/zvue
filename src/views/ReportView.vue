@@ -1169,25 +1169,34 @@ export default {
     // ============= 图表更新 =============
     const updateTrendChartData = (data) => {
       if (!trendChart) return
-      // 趋势接口返回字段：time_label, total_sales, gross_profit, gross_profit_rate, headway_cost, headway_ratio, ad_cost
+      // 趋势接口返回字段：time_label, total_sales, gross_profit, gross_profit_rate, headway_cost, headway_ratio, ad_cost, order_count
       const xAxis = data.map(d => d.time_label || '-')
       const series = []
       if (trendMetric.value === 'sales') {
+        series.push({ name: '订单数', type: 'line', yAxisIndex: 1, data: data.map(d => d.order_count || 0), smooth: true, itemStyle: { color: '#f97316' }, lineStyle: { width: 3 } })
         series.push({ name: '销售额', type: 'line', data: data.map(d => d.total_sales || 0), smooth: true, areaStyle: { opacity: 0.15 }, itemStyle: { color: '#667eea' }, lineStyle: { width: 3 } })
-        series.push({ name: '毛利', type: 'line', data: data.map(d => d.gross_profit || 0), smooth: true, areaStyle: { opacity: 0.1 }, itemStyle: { color: '#10b981' }, lineStyle: { width: 3 } })
         series.push({ name: '广告费', type: 'line', data: data.map(d => d.ad_cost || 0), smooth: true, itemStyle: { color: '#f59e0b' }, lineStyle: { width: 3 } })
+        series.push({ name: '毛利', type: 'line', data: data.map(d => d.gross_profit || 0), smooth: true, areaStyle: { opacity: 0.1 }, itemStyle: { color: '#10b981' }, lineStyle: { width: 3 } })
       } else if (trendMetric.value === 'profit') {
         series.push({ name: '毛利', type: 'bar', data: data.map(d => d.gross_profit || 0), itemStyle: { color: '#10b981', borderRadius: [4, 4, 0, 0] } })
         series.push({ name: '头程', type: 'bar', data: data.map(d => d.headway_cost || 0), itemStyle: { color: '#f59e0b', borderRadius: [4, 4, 0, 0] } })
+      } else if (trendMetric.value === 'orders') {
+        series.push({ name: '订单数', type: 'line', data: data.map(d => d.order_count || 0), smooth: true, areaStyle: { opacity: 0.15 }, itemStyle: { color: '#f97316' }, lineStyle: { width: 3 } })
       } else {
         series.push({ name: '毛利率', type: 'line', data: data.map(d => ((d.gross_profit_rate || 0) * 100).toFixed(1)), smooth: true, itemStyle: { color: '#8b5cf6' }, lineStyle: { width: 3 } })
       }
+      const yAxis = trendMetric.value === 'sales'
+        ? [
+            { type: 'value', name: '金额', position: 'left', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f0f0f0' } }, axisLabel: { color: '#666' } },
+            { type: 'value', name: '订单数', position: 'right', axisLine: { show: false }, splitLine: { show: false }, axisLabel: { color: '#666' } }
+          ]
+        : { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f0f0f0' } }, axisLabel: { color: '#666' } }
       trendChart.setOption({
         tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
         legend: { data: series.map(s => s.name), bottom: 0 },
-        grid: { left: 50, right: 30, top: 30, bottom: 40 },
+        grid: { left: 50, right: 50, top: 30, bottom: 40 },
         xAxis: { type: 'category', data: xAxis.length ? xAxis : ['暂无数据'], axisLine: { lineStyle: { color: '#ddd' } }, axisLabel: { color: '#666' } },
-        yAxis: { type: 'value', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f0f0f0' } }, axisLabel: { color: '#666' } },
+        yAxis,
         series: xAxis.length ? series : []
       }, true)
     }
