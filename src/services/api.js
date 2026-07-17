@@ -219,74 +219,92 @@ export const findPermissionCodeByPath = (path) => {
   return found ? found.permission_code : null;
 };
 
-// ==================== 记账相关接口 ====================
+// ==================== 记账（transactions）相关接口 ====================
 
 /**
- * 获取支出列表
- * @param {Object} params {month, category, account_type, reimbursed, page, page_size}
+ * 获取交易记录列表
+ * @param {Object} params {transaction_type, month, category, account_type, reimbursed, created_by, source_no, page, page_size}
  */
-export const getExpenseList = (params = {}) => {
-  return api.get('/expenses/list', { params });
+export const getTransactionList = (params = {}) => {
+  return api.get('/transactions/list', { params });
 };
 
-/**
- * 新增支出记录
- * @param {Object} data {date, category, amount, remark, has_invoice, invoice_image, account_type, reimbursed}
- */
-export const createExpense = (data) => {
-  return api.post('/expenses/add', data);
-};
+// 兼容旧命名
+export const getExpenseList = getTransactionList;
 
 /**
- * 更新支出记录
+ * 新增交易记录
+ * @param {Object} data {transaction_type, date, category, amount, remark, has_invoice, invoice_image, account_type, reimbursed}
+ */
+export const createTransaction = (data) => {
+  return api.post('/transactions/add', data);
+};
+
+// 兼容旧命名
+export const createExpense = createTransaction;
+
+/**
+ * 更新交易记录
  * @param {string} id 记录ID
  * @param {Object} data 更新数据
  */
-export const updateExpense = (id, data) => {
-  return api.put(`/expenses/${id}`, data);
+export const updateTransaction = (id, data) => {
+  return api.put(`/transactions/${id}`, data);
 };
+
+// 兼容旧命名
+export const updateExpense = updateTransaction;
 
 /**
  * 切换私账报销状态
  * @param {string} id 记录ID
  */
 export const toggleReimburseStatus = (id) => {
-  return api.patch(`/expenses/${id}/reimburse`);
+  return api.patch(`/transactions/${id}/reimburse`);
 };
 
 /**
- * 删除支出记录
+ * 删除交易记录
  * @param {string} id 记录ID
  */
-export const deleteExpense = (id) => {
-  return api.delete(`/expenses/${id}`);
+export const deleteTransaction = (id) => {
+  return api.delete(`/transactions/${id}`);
 };
+
+// 兼容旧命名
+export const deleteExpense = deleteTransaction;
 
 /**
  * 上传发票图片（独立接口，返回图片URL）
  * @param {FormData} formData 包含 invoice 文件
  */
 export const uploadInvoiceImage = (formData) => {
-  return api.post('/expenses/upload-invoice', formData, {
+  return api.post('/transactions/upload-invoice', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
 };
 
 /**
- * 获取支出记录操作日志
+ * 获取交易记录操作日志
  * @param {string} id 记录ID
  */
-export const getExpenseLogs = (id) => {
-  return api.get(`/expenses/${id}/logs`);
+export const getTransactionLogs = (id) => {
+  return api.get(`/transactions/${id}/logs`);
 };
 
+// 兼容旧命名
+export const getExpenseLogs = getTransactionLogs;
+
 /**
- * 获取支出统计汇总
- * @param {Object} params {month, category, account_type, reimbursed, created_by}
+ * 获取交易统计汇总
+ * @param {Object} params {transaction_type, month, category, account_type, reimbursed, created_by}
  */
-export const getExpenseSummary = (params = {}) => {
-  return api.get('/expenses/summary', { params });
+export const getTransactionSummary = (params = {}) => {
+  return api.get('/transactions/summary', { params });
 };
+
+// 兼容旧命名
+export const getExpenseSummary = getTransactionSummary;
 
 // ==================== 下拉框选项接口 (/options) ====================
 
@@ -312,6 +330,14 @@ export const getLogisticsProviderOptions = () => {
 
 export const getUserOptions = () => {
   return api.get('/options/users');
+};
+
+/**
+ * 获取记账分类下拉（支出/收入/盘盈冲正）
+ * @param {Object} params {type: 'expense'|'income'|'adjustment'}
+ */
+export const getTransactionCategories = (params = {}) => {
+  return api.get('/options/transactions/categories', { params });
 };
 
 export const getWarehouseOptions = (shop_id) => {

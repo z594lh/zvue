@@ -4,7 +4,7 @@ import JsonTools from '../views/JsonToolstView.vue'
 import AiImageView from '../views/AiImageView.vue'
 import ImageGallery from '../views/ImageGallery.vue'
 import LoginView from '../views/LoginView.vue'
-import ExpenseView from '../views/ExpenseView.vue'
+import TransactionView from '../views/TransactionView.vue'
 import PricingView from '../views/PricingView.vue'
 import FbaLabelView from '../views/FbaLabelView.vue'
 import LabelOrganizeView from '../views/LabelOrganizeView.vue'
@@ -76,10 +76,14 @@ const routes = [
     meta: { title: '图片库', componentName: 'ImageGalleryView' }
   },
   {
+    path: '/transactions',
+    name: 'Transactions',
+    component: TransactionView,
+    meta: { title: '收支记账', componentName: 'TransactionView' }
+  },
+  {
     path: '/expense',
-    name: 'Expense',
-    component: ExpenseView,
-    meta: { title: '支出记账', componentName: 'ExpenseView' }
+    redirect: '/transactions'
   },
   {
     path: '/pricing',
