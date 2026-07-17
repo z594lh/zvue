@@ -716,26 +716,20 @@ export default {
       }))
     })
 
-    // 构建当前筛选参数（不含分页）
-    const buildFilterParams = (extra = {}) => {
+    // 构建汇总接口专用参数：只取日期范围
+    const buildSummaryParams = (extra = {}) => {
       const params = {}
       if (filterStartDate.value) params.start_date = filterStartDate.value
       if (filterEndDate.value) params.end_date = filterEndDate.value
-      if (filterTransactionType.value) params.transaction_type = filterTransactionType.value
-      if (filterCategory.value) params.category = filterCategory.value
-      if (filterAccountType.value) params.account_type = filterAccountType.value
-      if (filterReimbursed.value) params.reimbursed = filterReimbursed.value
-      if (filterCreatedBy.value) params.created_by = filterCreatedBy.value
-      if (filterSourceNo.value) params.source_no = filterSourceNo.value
       return { ...params, ...extra }
     }
 
-    // 获取统计汇总（受当前筛选条件影响）
+    // 获取统计汇总（只受日期范围影响）
     const fetchSummary = async () => {
       try {
         const [summaryRes, unreimbursedRes] = await Promise.all([
-          getTransactionSummary(buildFilterParams()),
-          getTransactionSummary(buildFilterParams({ transaction_type: 'expense', account_type: 'personal', reimbursed: 'false' }))
+          getTransactionSummary(buildSummaryParams()),
+          getTransactionSummary(buildSummaryParams({ transaction_type: 'expense', account_type: 'personal', reimbursed: 'false' }))
         ])
 
         if (summaryRes.data.status === 'success') {
@@ -1074,11 +1068,17 @@ export default {
       })
     }
 
-    // 筛选变化时自动刷新（日期范围和单号回车也会触发）
-    watch([filterStartDate, filterEndDate, filterTransactionType, filterCategory, filterAccountType, filterReimbursed, filterCreatedBy, filterSourceNo], () => {
+    // 日期范围变化时刷新列表和汇总
+    watch([filterStartDate, filterEndDate], () => {
       currentPage.value = 1
       fetchRecords()
       fetchSummary()
+    })
+
+    // 其他筛选条件只刷新列表
+    watch([filterTransactionType, filterCategory, filterAccountType, filterReimbursed, filterCreatedBy, filterSourceNo], () => {
+      currentPage.value = 1
+      fetchRecords()
     })
 
     // 切换类型时清空不匹配的分类筛选
