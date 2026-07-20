@@ -64,7 +64,15 @@
 
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="广告费率 (ACoS)">
+                  <el-form-item>
+                    <template #label>
+                      <span class="label-with-tip">
+                        广告费率 (TACOS)
+                        <el-tooltip effect="dark" content="TACOS = 广告花费 ÷ 总销售额（含自然销售额 + 广告归因销售额），表示广告费占总收入的比例。" placement="top">
+                          <el-icon class="label-tip-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </span>
+                    </template>
                     <el-input-number
                       v-model="formForward.ad_rate"
                       :min="0"
@@ -143,7 +151,7 @@
               <el-descriptions-item label="采购成本">{{ resultForward.purchase_cost ? (resultForward.purchase_cost.value + ' ' + resultForward.purchase_cost.currency + ' ≈ $' + formatNumber(resultForward.purchase_cost.usd)) : '-' }}</el-descriptions-item>
               <el-descriptions-item label="汇率">{{ formatNumber(resultForward.inputs?.exchange_rate) }}</el-descriptions-item>
               <el-descriptions-item label="目标利润率">{{ formatPercent(resultForward.inputs?.target_profit_rate) }}</el-descriptions-item>
-              <el-descriptions-item label="广告费率">{{ formatPercent(resultForward.inputs?.ad_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="广告费率 (TACOS)">{{ formatPercent(resultForward.inputs?.ad_rate) }}</el-descriptions-item>
               <el-descriptions-item label="退货率">{{ formatPercent(resultForward.inputs?.refund_rate) }}</el-descriptions-item>
             </el-descriptions>
 
@@ -262,7 +270,15 @@
 
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="广告费率 (ACoS)">
+                  <el-form-item>
+                    <template #label>
+                      <span class="label-with-tip">
+                        广告费率 (TACOS)
+                        <el-tooltip effect="dark" content="TACOS = 广告花费 ÷ 总销售额（含自然销售额 + 广告归因销售额），表示广告费占总收入的比例。" placement="top">
+                          <el-icon class="label-tip-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </span>
+                    </template>
                     <el-input-number
                       v-model="formReverse.ad_rate"
                       :min="0"
@@ -340,7 +356,7 @@
               </el-descriptions-item>
               <el-descriptions-item label="采购成本">{{ resultReverse.purchase_cost ? (resultReverse.purchase_cost.value + ' ' + resultReverse.purchase_cost.currency + ' ≈ $' + formatNumber(resultReverse.purchase_cost.usd)) : '-' }}</el-descriptions-item>
               <el-descriptions-item label="汇率">{{ formatNumber(resultReverse.inputs?.exchange_rate) }}</el-descriptions-item>
-              <el-descriptions-item label="广告费率">{{ formatPercent(resultReverse.inputs?.ad_rate) }}</el-descriptions-item>
+              <el-descriptions-item label="广告费率 (TACOS)">{{ formatPercent(resultReverse.inputs?.ad_rate) }}</el-descriptions-item>
               <el-descriptions-item label="退货率">{{ formatPercent(resultReverse.inputs?.refund_rate) }}</el-descriptions-item>
             </el-descriptions>
 
@@ -461,7 +477,7 @@
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, View } from '@element-plus/icons-vue'
+import { Search, Refresh, View, QuestionFilled } from '@element-plus/icons-vue'
 import { calculatePricing, calculateProfitRate, getProductOptions } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -470,7 +486,8 @@ export default {
   components: {
     Search,
     Refresh,
-    View
+    View,
+    QuestionFilled
   },
   setup() {
     const activeTab = ref('forward')
@@ -1050,6 +1067,18 @@ export default {
   padding: 4px 8px;
   border-radius: 4px;
   font-family: monospace;
+}
+
+.label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.label-tip-icon {
+  color: #909399;
+  cursor: help;
+  font-size: 14px;
 }
 
 /* 响应式 */

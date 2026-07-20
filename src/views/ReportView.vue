@@ -314,6 +314,57 @@
               </div>
             </template>
           </el-table-column>
+          <el-table-column label="广告效率" align="center" width="220">
+            <template #default="scope">
+              <el-popover placement="top-start" :width="280" trigger="hover" popper-class="ad-efficiency-popover">
+                <template #reference>
+                  <div class="ad-efficiency-inline">
+                    <div class="ad-eff-item">
+                      <span class="ad-eff-label">ACOS</span>
+                      <span class="ad-eff-value" :class="{ 'text-danger': isAcosHigh(scope.row) }">{{ formatPercent(scope.row.ad_acos) }}</span>
+                    </div>
+                    <div class="ad-eff-item">
+                      <span class="ad-eff-label">TACOS</span>
+                      <span class="ad-eff-value">{{ formatPercent(scope.row.tacos) }}</span>
+                    </div>
+                    <div class="ad-eff-item">
+                      <span class="ad-eff-label">广告销</span>
+                      <span class="ad-eff-value">${{ formatNumber(scope.row.ad_sales) }}</span>
+                    </div>
+                    <div class="ad-eff-item">
+                      <span class="ad-eff-label">自然销</span>
+                      <span class="ad-eff-value">${{ formatNumber(organicSales(scope.row)) }}</span>
+                    </div>
+                  </div>
+                </template>
+                <div class="ad-efficiency-card">
+                  <div class="ad-efficiency-card-title">广告效率</div>
+                  <div class="ad-efficiency-card-grid">
+                    <div class="ad-eff-card-metric">
+                      <span class="ad-eff-card-label">ACOS</span>
+                      <span class="ad-eff-card-value" :class="{ 'text-danger': isAcosHigh(scope.row) }">{{ formatPercent(scope.row.ad_acos) }}</span>
+                      <span class="ad-eff-card-desc">广告投入产出效率</span>
+                    </div>
+                    <div class="ad-eff-card-metric">
+                      <span class="ad-eff-card-label">TACOS</span>
+                      <span class="ad-eff-card-value">{{ formatPercent(scope.row.tacos) }}</span>
+                      <span class="ad-eff-card-desc">广告占总收入比例</span>
+                    </div>
+                    <div class="ad-eff-card-metric">
+                      <span class="ad-eff-card-label">广告销售额</span>
+                      <span class="ad-eff-card-value">${{ formatNumber(scope.row.ad_sales) }}</span>
+                      <span class="ad-eff-card-desc">归因广告带来的销售额</span>
+                    </div>
+                    <div class="ad-eff-card-metric">
+                      <span class="ad-eff-card-label">自然销售额</span>
+                      <span class="ad-eff-card-value">${{ formatNumber(organicSales(scope.row)) }}</span>
+                      <span class="ad-eff-card-desc">全部销售额 - 广告销售额</span>
+                    </div>
+                  </div>
+                </div>
+              </el-popover>
+            </template>
+          </el-table-column>
           <el-table-column prop="sales_qty" label="销量" align="right" width="80" />
           <el-table-column prop="sales_amount" label="销售额" align="right" width="120">
             <template #default="scope">${{ formatNumber(scope.row.sales_amount) }}</template>
@@ -780,6 +831,27 @@ export default {
       const n = Number(val)
       if (isNaN(n)) return '-'
       return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    }
+
+    const formatPercent = (val, digits = 2) => {
+      if (val === null || val === undefined || val === '') return '-'
+      const n = Number(val)
+      if (isNaN(n)) return '-'
+      return (n * 100).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }) + '%'
+    }
+
+    const organicSales = (row) => {
+      const sales = Number(row.sales_amount || 0)
+      const ad = Number(row.ad_sales || 0)
+      return Math.max(sales - ad, 0)
+    }
+
+    const isAcosHigh = (row) => {
+      const acos = Number(row.ad_acos || 0)
+      const sales = Number(row.sales_amount || 0)
+      if (!sales || acos <= 0) return false
+      const grossMargin = (Number(row.gross_profit || 0)) / sales
+      return acos > grossMargin
     }
 
     const getProfitRateTagType = (rate) => {
@@ -1656,7 +1728,8 @@ export default {
       inventoryDialogVisible, inventoryDialogTitle, inventoryDialogStatus, inventoryDialogList,
       inventoryDialogLoading, inventoryDialogPage, inventoryDialogPageSize, inventoryDialogTotal,
       logFilter, logList, logLoading, logPage, logPageSize, logTotal,
-      formatNumber, getProfitRateTagType, getStatusTagType, getStatusLabel,
+      formatNumber, formatPercent, organicSales, isAcosHigh,
+      getProfitRateTagType, getStatusTagType, getStatusLabel,
       getTurnoverClass, getLogStatusType, getLogStatusLabel, getReportTypeLabel,
       getDataStatusLabel, getDataStatusType,
       handleShopChange, fetchBusinessData, handleBusinessTypeChange,
@@ -2088,6 +2161,35 @@ export default {
   font-family: monospace;
 }
 
+/* 广告效率列 */
+.ad-efficiency-inline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.ad-eff-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.ad-eff-label {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ad-eff-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
 /* 文本颜色 */
 .text-profit { color: #10b981; font-weight: 600; }
 .text-loss { color: #ef4444; font-weight: 600; }
@@ -2133,5 +2235,67 @@ export default {
   .filter-bar { gap: 8px; }
   .date-range-pickers { width: 100%; }
   .date-range-pickers .el-date-picker { flex: 1; }
+}
+</style>
+
+<style>
+/* 悬浮卡片：广告效率 */
+.ad-efficiency-popover {
+  padding: 0 !important;
+}
+
+.ad-efficiency-card {
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  min-width: 240px;
+}
+
+.ad-efficiency-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ad-efficiency-card-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.ad-efficiency-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.ad-eff-card-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-eff-card-label {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ad-eff-card-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.ad-eff-card-desc {
+  font-size: 10px;
+  color: #94a3b8;
 }
 </style>
