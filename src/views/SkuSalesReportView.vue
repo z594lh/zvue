@@ -38,6 +38,7 @@
         <div class="control-group">
           <el-button type="primary" @click="handleSearch"><el-icon><Search /></el-icon> 查询</el-button>
           <el-button plain @click="handleExport"><el-icon><Download /></el-icon> 导出</el-button>
+          <el-button plain @click="handleReset"><el-icon><CircleClose /></el-icon> 重置筛选</el-button>
         </div>
         <div class="control-group window-select-group">
           <span class="control-label">选择时间窗口</span>
@@ -286,7 +287,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   ShoppingCart, Box, OfficeBuilding, Coin, Wallet, Money,
-  Search, Refresh, Download
+  Search, Refresh, Download, CircleClose
 } from '@element-plus/icons-vue'
 import {
   getShopOptions,
@@ -299,7 +300,7 @@ export default {
   name: 'SkuSalesReportView',
   components: {
     ShoppingCart, Box, OfficeBuilding, Coin, Wallet, Money,
-    Search, Refresh, Download
+    Search, Refresh, Download, CircleClose
   },
   setup() {
     const selectedShop = ref(null)
@@ -540,6 +541,17 @@ export default {
       ElMessage.info('导出功能开发中...')
     }
 
+    const handleReset = () => {
+      selectedShop.value = null
+      keyword.value = ''
+      sku.value = ''
+      selectedWindows.value = ['1d', '7d', '30d']
+      page.value = 1
+      sortBy.value = 'sales_30d'
+      sortDir.value = 'desc'
+      fetchSkuSalesData()
+    }
+
     watch([page, pageSize], () => {
       fetchSkuSalesData()
     })
@@ -558,7 +570,7 @@ export default {
       formatNumber, formatPercent, getProfitRateTagType, getAcosClass, getAdRatio,
       headerCellStyle,
       fetchSkuSalesData, handleSearch, handleSortChange,
-      handleGenerateAll, handleGenerateSingle, handleExport
+      handleGenerateAll, handleGenerateSingle, handleExport, handleReset
     }
   }
 }
