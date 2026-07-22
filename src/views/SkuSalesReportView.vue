@@ -38,9 +38,20 @@
         <div class="control-group">
           <el-button type="primary" @click="handleSearch"><el-icon><Search /></el-icon> 查询</el-button>
           <el-button plain @click="handleExport"><el-icon><Download /></el-icon> 导出</el-button>
-          <el-button link @click="showAllWindows = !showAllWindows">
-            {{ showAllWindows ? '收起窗口' : '展开全部窗口' }}
-          </el-button>
+        </div>
+        <div class="control-group window-select-group">
+          <span class="control-label">选择时间窗口</span>
+          <div class="window-chips">
+            <button
+              v-for="w in allWindows"
+              :key="w"
+              class="window-chip"
+              :class="{ active: selectedWindows.includes(w) }"
+              @click="toggleWindow(w)"
+            >
+              {{ windowLabels[w] }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -303,14 +314,24 @@ export default {
     const list = ref([])
     const loading = ref(false)
     const generating = ref(false)
-    const showAllWindows = ref(false)
-
     const allWindows = ['1d', '3d', '7d', '14d', '30d']
-    const defaultWindows = ['1d', '7d', '30d']
-    const displayWindows = computed(() => showAllWindows.value ? allWindows : defaultWindows)
+    const selectedWindows = ref(['1d', '7d', '30d'])
+    const displayWindows = computed(() => allWindows.filter(w => selectedWindows.value.includes(w)))
     const windowLabels = { '1d': '1天', '3d': '3天', '7d': '7天', '14d': '14天', '30d': '30天' }
 
     const windows = allWindows
+
+    const toggleWindow = (w) => {
+      const idx = selectedWindows.value.indexOf(w)
+      if (idx > -1) {
+        if (selectedWindows.value.length > 1) {
+          selectedWindows.value.splice(idx, 1)
+        }
+      } else {
+        selectedWindows.value.push(w)
+        selectedWindows.value.sort((a, b) => allWindows.indexOf(a) - allWindows.indexOf(b))
+      }
+    }
 
     const summary = reactive({
       total_stock: 0,
@@ -532,7 +553,7 @@ export default {
       selectedShop, shopList,
       keyword, sku, sortBy, sortDir,
       page, pageSize, total, list, loading, generating,
-      showAllWindows, displayWindows, windows, windowLabels,
+      allWindows, selectedWindows, displayWindows, windows, windowLabels, toggleWindow,
       summary,
       formatNumber, formatPercent, getProfitRateTagType, getAcosClass, getAdRatio,
       headerCellStyle,
@@ -799,6 +820,43 @@ export default {
 .text-success { color: #10b981; }
 .text-warning { color: #f59e0b; }
 .text-danger { color: #ef4444; }
+
+/* 窗口选择器 */
+.window-select-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.window-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.window-chip {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #4b5563;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.window-chip:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.window-chip.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
 
 /* 分页 */
 .pagination-bar {
