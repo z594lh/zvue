@@ -24,6 +24,7 @@ import ShopView from '../views/ShopView.vue'
 import ProductBoardView from '../views/ProductBoardView.vue'
 import ReportView from '../views/ReportView.vue'
 import AdvertisingReportView from '../views/AdvertisingReportView.vue'
+import SkuSalesReportView from '../views/SkuSalesReportView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ForbiddenView from '../views/ForbiddenView.vue'
 import SystemPermissionsView from '../views/SystemPermissionsView.vue'
@@ -192,6 +193,12 @@ const routes = [
     name: 'Reports',
     component: ReportView,
     meta: { title: '店铺报表', componentName: 'ReportView' }
+  },
+  {
+    path: '/reports/sku-sales',
+    name: 'SkuSalesReports',
+    component: SkuSalesReportView,
+    meta: { title: 'SKU销售报表', componentName: 'SkuSalesReportView' }
   },
   {
     path: '/reports/advertising',
