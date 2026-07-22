@@ -59,6 +59,20 @@
           <el-option label="已取消" value="Canceled" />
           <el-option label="无法配送" value="Unfulfillable" />
         </el-select>
+        <el-select
+          v-model="searchForm.sku"
+          placeholder="选择SKU"
+          clearable
+          filterable
+          style="width: 220px"
+        >
+          <el-option
+            v-for="product in productOptions"
+            :key="product.seller_sku"
+            :label="`${product.seller_sku}${product.product_name ? ' - ' + product.product_name : ''}`"
+            :value="product.seller_sku"
+          />
+        </el-select>
         <el-input
           v-model="searchForm.amazon_order_id"
           placeholder="亚马逊订单号"
@@ -397,7 +411,8 @@ import {
   getAmazonOrders,
   getAmazonOrder,
   syncAmazonOrdersAll,
-  syncAmazonOrderItems
+  syncAmazonOrderItems,
+  getProductOptions
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -418,12 +433,14 @@ export default {
 
     const { shopList, fetchShopList, refreshShopList, getShopName, defaultShopId } = useShopCache()
     const selectedShopId = ref(null)
+    const productOptions = ref([])
 
     // 搜索表单
     const searchForm = reactive({
       order_status: '',
       amazon_order_id: '',
-      buyer_name: ''
+      buyer_name: '',
+      sku: ''
     })
 
     const dateRange = ref(null)
@@ -441,6 +458,7 @@ export default {
       order_status: { get: () => searchForm.order_status, set: v => searchForm.order_status = v },
       amazon_order_id: { get: () => searchForm.amazon_order_id, set: v => searchForm.amazon_order_id = v },
       buyer_name: { get: () => searchForm.buyer_name, set: v => searchForm.buyer_name = v },
+      sku: { get: () => searchForm.sku, set: v => searchForm.sku = v },
       purchase_date_from: { get: () => dateRange.value?.[0] || '', set: v => { if (!dateRange.value) dateRange.value = [null, null]; dateRange.value[0] = v || null } },
       purchase_date_to: { get: () => dateRange.value?.[1] || '', set: v => { if (!dateRange.value) dateRange.value = [null, null]; dateRange.value[1] = v || null } }
     })
@@ -450,6 +468,20 @@ export default {
     const detailLoading = ref(false)
     const currentOrder = ref(null)
     const orderDetail = ref(null)
+
+    // 加载产品SKU下拉选项
+    const loadProductOptions = async () => {
+      try {
+        const response = await getProductOptions()
+        if (response.data.status === 'success') {
+          productOptions.value = response.data.data || []
+        } else {
+          console.error('加载产品列表失败:', response.data.message)
+        }
+      } catch (error) {
+        console.error('加载产品列表失败:', error)
+      }
+    }
 
     // 获取订单列表
     const fetchOrders = async () => {
@@ -475,6 +507,9 @@ export default {
         }
         if (searchForm.buyer_name) {
           params.buyer_name = searchForm.buyer_name
+        }
+        if (searchForm.sku) {
+          params.sku = searchForm.sku
         }
         if (dateRange.value && dateRange.value.length === 2) {
           params.purchase_date_from = dateRange.value[0]
@@ -515,6 +550,7 @@ export default {
       searchForm.order_status = ''
       searchForm.amazon_order_id = ''
       searchForm.buyer_name = ''
+      searchForm.sku = ''
       dateRange.value = null
       pagination.page = 1
       pagination.page_size = 20
@@ -704,6 +740,7 @@ export default {
 
     onMounted(async () => {
       await fetchShopList()
+      loadProductOptions()
       if (shopList.value.length > 0) {
         selectedShopId.value = defaultShopId()
       }
@@ -725,7 +762,9 @@ export default {
       orderDetail,
       shopList,
       selectedShopId,
+      productOptions,
       fetchOrders,
+      loadProductOptions,
       handleSearch,
       resetSearch,
       refreshData,

@@ -465,7 +465,7 @@ export const syncAmazonInboundPlanBoxes = (plan_id, data = {}) => {
 
 /**
  * 获取亚马逊订单列表
- * @param {Object} params {shop_id, order_status, amazon_order_id, buyer_name, purchase_date_from, purchase_date_to, page, page_size}
+ * @param {Object} params {shop_id, order_status, amazon_order_id, buyer_name, sku, purchase_date_from, purchase_date_to, page, page_size}
  */
 export const getAmazonOrders = (params = {}) => {
   return api.get('/amazon/orders', { params });
