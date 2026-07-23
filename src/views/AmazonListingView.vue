@@ -448,18 +448,32 @@
               </el-descriptions-item>
               <el-descriptions-item label="商品标题" :span="3">
                 <template v-if="editingSection === 'title'">
-                  <el-input v-model="editForm.title" type="textarea" :rows="2" style="flex:1;" />
-                  <div style="display:flex;gap:8px;margin-top:8px;">
+                  <div style="display:flex;flex-direction:column;gap:12px;">
+                    <div>
+                      <div style="font-size:13px;color:#333;margin-bottom:6px;font-weight:500;">标题（最多 75 字符）</div>
+                      <el-input v-model="editForm.title" type="textarea" :rows="2" maxlength="75" show-word-limit style="width:100%;" />
+                    </div>
+                    <div>
+                      <div style="font-size:13px;color:#333;margin-bottom:6px;font-weight:500;">亮点（最多 125 字符）</div>
+                      <el-input v-model="editForm.titleDifferentiation" type="textarea" :rows="2" maxlength="125" show-word-limit style="width:100%;" />
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:12px;">
                     <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
                     <el-button size="small" @click="cancelEdit">取消</el-button>
                   </div>
                 </template>
                 <template v-else>
-                  <span>{{ listingDetail.item_name || '-' }}</span>
-                  <el-button type="primary" size="small" style="margin-left:8px;" @click="startEdit('title')">
-                    <el-icon><Edit /></el-icon> 编辑
-                  </el-button>
+                  <div style="display:flex;align-items:flex-start;gap:8px;">
+                    <span style="flex:1;">{{ listingDetail.item_name || '-' }}</span>
+                    <el-button type="primary" size="small" @click="startEdit('title')">
+                      <el-icon><Edit /></el-icon> 编辑
+                    </el-button>
+                  </div>
                 </template>
+              </el-descriptions-item>
+              <el-descriptions-item label="商品亮点" :span="3">
+                {{ listingDetail.title_differentiation || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="同步时间">{{ formatDate(listingDetail.sync_time) }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(listingDetail.created_at) }}</el-descriptions-item>
@@ -739,6 +753,7 @@ export default {
     const languageDialogSelected = ref('en_US')
     const editForm = reactive({
       title: '',
+      titleDifferentiation: '',
       standardPrice: 0,
       salePrice: 0,
       saleStartDate: null,
@@ -960,6 +975,9 @@ export default {
         editForm.title = typeof detail.item_name === 'string'
           ? detail.item_name
           : (detail.item_name?.[0]?.value || '')
+        editForm.titleDifferentiation = typeof detail.title_differentiation === 'string'
+          ? detail.title_differentiation
+          : (detail.title_differentiation?.[0]?.value || '')
       } else if (section === 'price') {
         const offers = detail.offers || []
         const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
@@ -998,16 +1016,16 @@ export default {
       const shopId = selectedShopId.value
       const productType = listingDetail.value.product_type || ''
 
-      let patchValue
-      let patchPath
+      let patches = []
       let sectionLabel = ''
 
       if (editingSection.value === 'title') {
-        patchPath = '/attributes/item_name'
-        patchValue = [{ value: editForm.title, language_tag: 'en_US' }]
-        sectionLabel = '标题'
+        sectionLabel = '标题/亮点'
+        patches = [
+          { op: 'replace', path: '/attributes/item_name', value: [{ value: editForm.title, language_tag: 'en_US' }] },
+          { op: 'replace', path: '/attributes/title_differentiation', value: [{ value: editForm.titleDifferentiation, language_tag: 'en_US' }] }
+        ]
       } else if (editingSection.value === 'price') {
-        patchPath = '/attributes/purchasable_offer'
         sectionLabel = '价格'
         const currencyCode = getPriceCurrency()
         const marketplaceId = listingDetail.value.marketplace_id || ''
@@ -1035,21 +1053,18 @@ export default {
             }
           ]
         }
-        patchValue = [purchasableOffer]
+        patches = [{ op: 'replace', path: '/attributes/purchasable_offer', value: [purchasableOffer] }]
       } else if (editingSection.value === 'description') {
-        patchPath = '/attributes/product_description'
-        patchValue = [{ value: editForm.description, language_tag: 'en_US' }]
         sectionLabel = '描述'
+        patches = [{ op: 'replace', path: '/attributes/product_description', value: [{ value: editForm.description, language_tag: 'en_US' }] }]
       } else if (editingSection.value === 'bullets') {
-        patchPath = '/attributes/bullet_point'
-        patchValue = editForm.bullets
-          .filter(b => b.content.trim() !== '')
-          .map(b => ({ value: b.content, language_tag: b.language_tag }))
         sectionLabel = '五点描述'
+        patches = [{ op: 'replace', path: '/attributes/bullet_point', value: editForm.bullets
+          .filter(b => b.content.trim() !== '')
+          .map(b => ({ value: b.content, language_tag: b.language_tag })) }]
       } else if (editingSection.value === 'search_terms') {
-        patchPath = '/attributes/generic_keyword'
-        patchValue = [{ value: editForm.searchTerms, language_tag: 'en_US' }]
         sectionLabel = '搜索关键字'
+        patches = [{ op: 'replace', path: '/attributes/generic_keyword', value: [{ value: editForm.searchTerms, language_tag: 'en_US' }] }]
       } else {
         return
       }
@@ -1069,36 +1084,48 @@ export default {
         const response = await patchAmazonListing(sku, {
           shop_id: shopId,
           product_type: productType,
-          patches: [{ op: 'replace', path: patchPath, value: patchValue }]
+          patches
         })
 
-        if (response.data.status === 'success' && response.data.data?.status === 'ACCEPTED') {
-          if (editingSection.value === 'title') {
-            listingDetail.value.item_name = editForm.title
-          } else if (editingSection.value === 'price') {
-            if (!listingDetail.value.offers) listingDetail.value.offers = []
-            const primaryOffer = listingDetail.value.offers.find(o => o.audience === 'ALL')
-            if (primaryOffer) {
-              primaryOffer.our_price = Number(editForm.standardPrice)
-            } else {
-              listingDetail.value.offers.unshift({
-                currency: getPriceCurrency(),
-                audience: 'ALL',
-                our_price: Number(editForm.standardPrice),
-                start_at: null,
-                end_at: null
-              })
+        if (response.data.status === 'success') {
+          const updatedData = response.data.data
+          if (updatedData && updatedData.sku) {
+            // 后端已同步最新 Listing 详情，直接用响应数据刷新本地状态
+            listingDetail.value = updatedData
+            const idx = listings.value.findIndex(l => l.sku === sku)
+            if (idx !== -1) {
+              listings.value[idx] = { ...listings.value[idx], ...updatedData }
             }
-          } else if (editingSection.value === 'description') {
-            listingDetail.value.product_description = editForm.description
-          } else if (editingSection.value === 'bullets') {
-            listingDetail.value.bullets = editForm.bullets
-              .filter(b => b.content.trim() !== '')
-              .map((b, i) => ({ content: b.content, language_tag: b.language_tag, sort_order: i + 1 }))
-          } else if (editingSection.value === 'search_terms') {
-            listingDetail.value.generic_keyword = editForm.searchTerms
+          } else {
+            // 兼容旧响应：本地回显
+            if (editingSection.value === 'title') {
+              listingDetail.value.item_name = editForm.title
+              listingDetail.value.title_differentiation = editForm.titleDifferentiation
+            } else if (editingSection.value === 'price') {
+              if (!listingDetail.value.offers) listingDetail.value.offers = []
+              const primaryOffer = listingDetail.value.offers.find(o => o.audience === 'ALL')
+              if (primaryOffer) {
+                primaryOffer.our_price = Number(editForm.standardPrice)
+              } else {
+                listingDetail.value.offers.unshift({
+                  currency: getPriceCurrency(),
+                  audience: 'ALL',
+                  our_price: Number(editForm.standardPrice),
+                  start_at: null,
+                  end_at: null
+                })
+              }
+            } else if (editingSection.value === 'description') {
+              listingDetail.value.product_description = editForm.description
+            } else if (editingSection.value === 'bullets') {
+              listingDetail.value.bullets = editForm.bullets
+                .filter(b => b.content.trim() !== '')
+                .map((b, i) => ({ content: b.content, language_tag: b.language_tag, sort_order: i + 1 }))
+            } else if (editingSection.value === 'search_terms') {
+              listingDetail.value.generic_keyword = editForm.searchTerms
+            }
           }
-          ElMessage.success('修改已提交，Amazon 处理中...')
+          ElMessage.success(response.data.message || '修改已提交并同步成功')
           editingSection.value = null
         } else {
           const issues = response.data.data?.issues
