@@ -68,6 +68,13 @@ export const batchCreateCpcKeywords = (data) => {
   return api.post('/keywords/batch', data)
 }
 
+export const uploadCpcKeywords = (data, config = {}) => {
+  return api.post('/keywords/upload', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...config
+  })
+}
+
 export const getCpcBidRecommendationsKeywords = (data) => {
   return api.post('/keywords/bid-recommendations', data)
 }
