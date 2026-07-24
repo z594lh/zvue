@@ -1025,7 +1025,7 @@ export const syncAmazonListing = (sku, shop_id) => {
 
 /**
  * 获取选品看板产品列表
- * @param {Object} params {keyword, amazon_status, is_listed, min_sales, sort_by, sort_dir, page, page_size}
+ * @param {Object} params {keyword, amazon_status, is_listed, min_sales, sort_by, sort_dir, page, page_size, all_batch}
  */
 export const getProductBoardList = (params = {}) => {
   return api.get('/product-board', { params });

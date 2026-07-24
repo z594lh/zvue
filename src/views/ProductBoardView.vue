@@ -65,6 +65,20 @@
       </div>
     </div>
 
+    <!-- 批次切换 -->
+    <div class="batch-switch-bar">
+      <div class="batch-switch-left">
+        <span class="batch-switch-label">数据范围</span>
+        <el-radio-group v-model="batchMode" size="small" @change="handleBatchModeChange">
+          <el-radio-button label="latest">最新批次</el-radio-button>
+          <el-radio-button label="all">全部数据</el-radio-button>
+        </el-radio-group>
+        <el-tag v-if="latestBatchDate" size="small" effect="plain" type="info" class="latest-date-tag">
+          最新批次日期：{{ latestBatchDate }}
+        </el-tag>
+      </div>
+    </div>
+
     <!-- 数据表格 -->
     <div class="table-card">
       <el-table
@@ -77,9 +91,11 @@
         ref="tableRef"
         :row-key="(row) => row.id"
         row-class-name="product-row"
+        :cell-class-name="getBatchStatusCellClass"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         :cell-style="{padding:'10px 0'}"
       >
+        <el-table-column v-if="batchMode === 'all'" width="12" fixed="left" class-name="batch-status-col" />
         <el-table-column type="selection" width="48" align="center" fixed="left" :reserve-selection="true" />
         <el-table-column label="产品" min-width="280" fixed="left">
           <template #default="scope">
@@ -278,11 +294,11 @@
           </template>
           <template #default="scope">
             <div class="timeline-block">
-              <div v-if="scope.row.created_at" class="timeline-row">
-                <el-tooltip :content="getDataAgeTip(scope.row.created_at)" placement="left">
-                  <span class="timeline-tag">导入</span>
+              <div v-if="scope.row.created_at" class="timeline-row" :class="{ 'old-batch-row-timeline': !scope.row.is_latest_batch }">
+                <el-tooltip :content="getTimelineImportTip(scope.row)" placement="left">
+                  <span class="timeline-tag" :class="{ 'old-batch-tag': !scope.row.is_latest_batch }">导入</span>
                 </el-tooltip>
-                <span class="timeline-val">{{ formatDate(scope.row.created_at) }}</span>
+                <span class="timeline-val" :class="{ 'old-batch-val': !scope.row.is_latest_batch }">{{ formatDate(scope.row.created_at) }}</span>
               </div>
               <div v-if="scope.row.dev_time" class="timeline-row">
                 <el-tooltip content="产品开发时间" placement="left">
@@ -495,6 +511,8 @@ export default {
 
     const searchForm = reactive({ keyword: '', amazon_status: '', is_listed: null, is_new_product: null, min_sales: null, sort_by: 'sales_30d', sort_dir: 'desc' })
     const pagination = reactive({ page: 1, page_size: 20, total: 0 })
+    const batchMode = ref('latest')
+    const latestBatchDate = ref('')
 
     const formatNumber = (val) => {
       if (val == null || val === '') return '-'
@@ -574,6 +592,25 @@ export default {
       return `开发于 ${dateStr}，距今 ${diffDays} 天，${isNew ? '属于新品（≤3个月）' : '属于老品（>3个月）'}`
     }
 
+    const getTimelineImportTip = (row) => {
+      if (!row.created_at) return ''
+      const datePart = formatDate(row.created_at)
+      const ageTip = getDataAgeTip(row.created_at)
+      if (row.is_latest_batch && datePart === latestBatchDate.value) return ageTip
+      return `该记录导入于 ${datePart}（非最新批次，最新批次为 ${latestBatchDate.value || '-'}）。${ageTip}`
+    }
+
+    const getBatchStatusCellClass = ({ row, column }) => {
+      if (column.className === 'batch-status-col' && !row.is_latest_batch) return 'batch-status-old-cell'
+      return ''
+    }
+
+    const handleBatchModeChange = () => {
+      clearSelection()
+      pagination.page = 1
+      fetchList()
+    }
+
     const fetchFilters = async () => {
       try {
         const res = await getProductBoardFilterOptions()
@@ -590,6 +627,7 @@ export default {
         if (searchForm.min_sales != null && searchForm.min_sales !== '') params.min_sales = searchForm.min_sales
         if (searchForm.is_listed !== null && searchForm.is_listed !== '') params.is_listed = searchForm.is_listed
         if (searchForm.is_new_product !== null && searchForm.is_new_product !== '') params.is_new_product = searchForm.is_new_product
+        if (batchMode.value === 'all') params.all_batch = true
         const res = await getProductBoardList(params)
         if (res.data.status === 'success') {
           const d = res.data.data || {}
@@ -600,6 +638,7 @@ export default {
           pagination.total = d.total || 0
           pagination.page = d.page || 1
           pagination.page_size = d.page_size || 20
+          latestBatchDate.value = d.latest_batch_date || ''
         } else {
           ElMessage.error(res.data.message || '获取失败')
           productList.value = []; pagination.total = 0
@@ -634,6 +673,7 @@ export default {
     const resetSearch = () => {
       searchForm.keyword = ''; searchForm.amazon_status = ''; searchForm.is_listed = null; searchForm.is_new_product = null; searchForm.min_sales = null
       searchForm.sort_by = 'sales_30d'; searchForm.sort_dir = 'desc'
+      batchMode.value = 'latest'
       clearSelection(); pagination.page = 1; fetchList()
     }
     const handlePageChange = (page) => { pagination.page = page; fetchList() }
@@ -963,11 +1003,11 @@ export default {
       loading, exportLoading, importLoading, trendLoading,
       importDialogVisible, trendDialogVisible, tableRef, uploadRef,
       productList, amazonStatusList, selectedRows, selectAll,
-      searchForm, pagination, defaultImage,
+      searchForm, pagination, defaultImage, batchMode, latestBatchDate,
       trendChartRef, trendProducts, trendMetric,
       formatNumber, formatPercent, formatPercentDecimal, formatDate, getDataAgeTip, getProductAgeTip,
-      getProfitClass, getMarginTagType, getRefundClass,
-      handleSearch, resetSearch, handlePageChange, handleSizeChange,
+      getProfitClass, getMarginTagType, getRefundClass, getTimelineImportTip, getBatchStatusCellClass,
+      handleSearch, resetSearch, handlePageChange, handleSizeChange, handleBatchModeChange,
       handleSelect, handleSelectAll, handleSelectAllChange, removeSelectedRow,
       handleToggleListed, handleDelete, handleBatchDelete,
       handleImportClick, handleFileChange, submitImport, handleExport,
@@ -1088,6 +1128,33 @@ export default {
   flex-wrap: wrap;
 }
 
+.batch-switch-bar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.batch-switch-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.batch-switch-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+.latest-date-tag {
+  margin-left: 4px;
+}
+
 /* ===== 表格卡片 ===== */
 .table-card {
   background: #fff;
@@ -1098,7 +1165,9 @@ export default {
 }
 :deep(.el-table) { --el-table-border-color: #f0f0f0; }
 :deep(.product-row:hover) { background-color: #fafbff !important; }
-
+:deep(.batch-status-old-cell) {
+  border-left: 3px solid #f59e0b !important;
+}
 /* 产品单元格 */
 .product-cell {
   display: flex;
@@ -1187,6 +1256,9 @@ export default {
 .timeline-row { display: flex; align-items: center; gap: 5px; width: 100%; justify-content: center; }
 .timeline-tag { font-size: 10px; color: #888; background: #f0f0f0; padding: 2px 5px; border-radius: 3px; line-height: 1; flex-shrink: 0; }
 .timeline-val { font-size: 12px; color: #444; font-weight: 500; }
+.old-batch-row-timeline .timeline-tag,
+.old-batch-row-timeline .timeline-val { color: #aaa; background: #e8e8e8; }
+.old-batch-row-timeline .timeline-val { background: transparent; text-decoration: line-through; }
 
 /* 文字颜色 */
 .text-green { color: #10b981; }
