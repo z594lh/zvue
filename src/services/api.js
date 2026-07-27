@@ -977,6 +977,24 @@ export const patchAmazonListingLanguage = (sku, data) => {
 };
 
 /**
+ * 获取同父体下的其他变体列表
+ * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID（必填）
+ */
+export const getAmazonListingVariants = (sku, shop_id) => {
+  return api.get(`/options/amazon/listings/${sku}/variants`, { params: { shop_id } });
+};
+
+/**
+ * 将当前 Listing 的指定字段同步到其他变体
+ * @param {string} sku 源 SKU
+ * @param {Object} data {shop_id, target_skus, fields}
+ */
+export const syncAmazonListingToVariants = (sku, data) => {
+  return api.post(`/amazon/listings/${sku}/sync-to-variants`, data);
+};
+
+/**
  * 删除 Listing
  * @param {string} sku 卖家 SKU
  * @param {number} shop_id 店铺ID（必填）

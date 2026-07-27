@@ -368,6 +368,19 @@
             <el-button size="small" @click="openLanguageDialog" :disabled="!listingDetail">
               <el-icon><Switch /></el-icon> 输入语言切换
             </el-button>
+            <el-tooltip
+              effect="dark"
+              placement="top"
+              content="将当前 Listing 的标题、商品亮点、描述、五点描述、搜索关键字等字段，一键同步到同父体下的其他变体。"
+            >
+              <el-button
+                size="small"
+                :disabled="!listingDetail || !listingDetail.parent_sku || listingDetail.parentage_level === 'parent'"
+                @click="openSyncVariantDialog"
+              >
+                <el-icon><CopyDocument /></el-icon> 同步字段到变体
+              </el-button>
+            </el-tooltip>
             <el-button type="warning" size="small" :loading="syncDetailLoading" @click="syncDetail">
               <el-icon><RefreshRight /></el-icon> 同步最新数据
             </el-button>
@@ -662,6 +675,68 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 同步字段到变体弹框 -->
+    <el-dialog
+      v-model="syncVariantDialogVisible"
+      title="同步字段到变体"
+      width="640px"
+      align-center
+      :close-on-click-modal="false"
+    >
+      <div v-loading="syncVariantLoading" style="min-height:180px;">
+        <div style="display:flex;gap:16px;min-height:220px;">
+          <!-- 左侧：字段 -->
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;">
+            <div style="font-weight:600;color:#1a1a2e;margin-bottom:4px;">选择要同步的字段</div>
+            <el-checkbox-group v-model="syncVariantFields" style="display:flex;flex-direction:column;gap:6px;">
+              <el-checkbox
+                v-for="field in syncVariantFieldOptions"
+                :key="field.value"
+                :label="field.value"
+                style="margin-right:0;"
+              >
+                {{ field.label }}
+              </el-checkbox>
+            </el-checkbox-group>
+            <el-link type="primary" :underline="false" style="margin-top:8px;align-self:flex-start;" @click="syncVariantFields = syncVariantFields.length === syncVariantFieldOptions.length ? [] : syncVariantFieldOptions.map(f => f.value)">
+              {{ syncVariantFields.length === syncVariantFieldOptions.length ? '全不选' : '全选' }}
+            </el-link>
+          </div>
+
+          <el-divider direction="vertical" style="height:auto;" />
+
+          <!-- 右侧：变体 -->
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;">
+            <div style="font-weight:600;color:#1a1a2e;margin-bottom:4px;">选择目标变体</div>
+            <el-checkbox-group v-model="syncVariantTargets" style="display:flex;flex-direction:column;gap:6px;">
+              <el-checkbox
+                v-for="variant in syncVariantOptions"
+                :key="variant.sku"
+                :label="variant.sku"
+                style="margin-right:0;"
+              >
+                <span :title="variant.product_name" style="display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;">
+                  {{ variant.sku }}{{ variant.product_name ? ' - ' + variant.product_name : '' }}
+                </span>
+              </el-checkbox>
+            </el-checkbox-group>
+            <div v-if="!syncVariantLoading && syncVariantOptions.length === 0" style="color:#999;font-size:13px;">
+              暂无可同步的变体
+            </div>
+            <el-link v-if="syncVariantOptions.length > 0" type="primary" :underline="false" style="margin-top:8px;align-self:flex-start;" @click="syncVariantTargets = syncVariantTargets.length === syncVariantOptions.length ? [] : syncVariantOptions.map(v => v.sku)">
+              {{ syncVariantTargets.length === syncVariantOptions.length ? '全不选' : '全选' }}
+            </el-link>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="syncVariantDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="syncVariantSubmitLoading" :disabled="syncVariantFields.length === 0 || syncVariantTargets.length === 0" @click="submitSyncVariant">
+          确认同步
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -669,7 +744,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch, DocumentCopy } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
@@ -677,7 +752,9 @@ import {
   syncListingToProduct,
   patchAmazonListing,
   patchAmazonListingLanguage,
-  syncAmazonListing
+  syncAmazonListing,
+  getAmazonListingVariants,
+  syncAmazonListingToVariants
 } from '@/services/api.js'
 import { useShopCache } from '@/composables/useShopCache'
 
@@ -695,7 +772,8 @@ export default {
     Delete,
     Plus,
     Switch,
-    DocumentCopy
+    DocumentCopy,
+    CopyDocument
   },
   setup() {
     const loading = ref(false)
@@ -751,6 +829,26 @@ export default {
     const listingLanguageLoading = ref(false)
     const languageDialogVisible = ref(false)
     const languageDialogSelected = ref('en_US')
+
+    // 变体字段同步弹窗
+    const syncVariantDialogVisible = ref(false)
+    const syncVariantLoading = ref(false)
+    const syncVariantSubmitLoading = ref(false)
+    const syncVariantOptions = ref([])
+    const syncVariantFields = ref([])
+    const syncVariantTargets = ref([])
+    const syncVariantFieldOptions = [
+      { label: '标题', value: 'item_name' },
+      { label: '商品亮点', value: 'title_differentiation' },
+      { label: '描述', value: 'product_description' },
+      { label: '五点描述 1', value: 'bullet_point_1' },
+      { label: '五点描述 2', value: 'bullet_point_2' },
+      { label: '五点描述 3', value: 'bullet_point_3' },
+      { label: '五点描述 4', value: 'bullet_point_4' },
+      { label: '五点描述 5', value: 'bullet_point_5' },
+      { label: '搜索关键字', value: 'generic_keyword' }
+    ]
+
     const editForm = reactive({
       title: '',
       titleDifferentiation: '',
@@ -1211,6 +1309,74 @@ export default {
       }
     }
 
+    // ===== 变体字段同步 =====
+    const openSyncVariantDialog = async () => {
+      if (!listingDetail.value || !selectedShopId.value) return
+
+      syncVariantDialogVisible.value = true
+      syncVariantFields.value = []
+      syncVariantTargets.value = []
+      syncVariantOptions.value = []
+      syncVariantLoading.value = true
+
+      try {
+        const response = await getAmazonListingVariants(listingDetail.value.sku, selectedShopId.value)
+        if (response.data.status === 'success') {
+          const variants = response.data.data?.variants || response.data.data || []
+          syncVariantOptions.value = variants.filter(v => v.sku !== listingDetail.value.sku)
+        } else {
+          ElMessage.error(response.data.message || '获取变体列表失败')
+        }
+      } catch (error) {
+        console.error('获取变体列表失败:', error)
+        ElMessage.error('获取变体列表失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        syncVariantLoading.value = false
+      }
+    }
+
+    const submitSyncVariant = async () => {
+      if (!listingDetail.value || !selectedShopId.value) return
+      if (syncVariantFields.value.length === 0) {
+        ElMessage.warning('请至少选择一个要同步的字段')
+        return
+      }
+      if (syncVariantTargets.value.length === 0) {
+        ElMessage.warning('请至少选择一个目标变体')
+        return
+      }
+
+      syncVariantSubmitLoading.value = true
+      try {
+        const response = await syncAmazonListingToVariants(listingDetail.value.sku, {
+          shop_id: selectedShopId.value,
+          target_skus: syncVariantTargets.value,
+          fields: syncVariantFields.value
+        })
+
+        if (response.data.status === 'success') {
+          const result = response.data.data || {}
+          ElMessage.success(response.data.message || `已同步 ${result.updated_count || 0} 个变体`)
+          syncVariantDialogVisible.value = false
+
+          // 刷新当前 listing 详情
+          const resp = await getAmazonListing(listingDetail.value.sku, selectedShopId.value)
+          if (resp.data.status === 'success') {
+            listingDetail.value = resp.data.data || null
+            updateListingLanguageTag()
+          }
+          await fetchListings()
+        } else {
+          ElMessage.error(response.data.message || '同步失败')
+        }
+      } catch (error) {
+        console.error('同步字段到变体失败:', error)
+        ElMessage.error('同步失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        syncVariantSubmitLoading.value = false
+      }
+    }
+
     // Issues 图标颜色
     const getIssuesIconColor = (issues) => {
       if (!issues || issues.length === 0) return ''
@@ -1455,7 +1621,16 @@ export default {
       languageDialogVisible,
       languageDialogSelected,
       openLanguageDialog,
-      confirmLanguageChange
+      confirmLanguageChange,
+      syncVariantDialogVisible,
+      syncVariantLoading,
+      syncVariantSubmitLoading,
+      syncVariantOptions,
+      syncVariantFields,
+      syncVariantTargets,
+      syncVariantFieldOptions,
+      openSyncVariantDialog,
+      submitSyncVariant
     }
   }
 }
