@@ -70,22 +70,23 @@
           <thead>
             <tr>
               <th width="40"><el-checkbox v-model="selectAll" @change="toggleSelectAll" /></th>
-              <th width="220">广告活动</th>
+              <th width="180">广告活动</th>
               <th width="60">有效</th>
               <th width="60">类型</th>
               <th width="120">竞价策略</th>
-              <th width="70">预算</th>
+              <th width="100">开始日期</th>
+              <th width="100">结束日期</th>
+              <th width="60">预算</th>
               <th width="80">曝光量 <span class="sort-arrows" @click="sortBy('impressions')">↕</span></th>
               <th width="80">点击次数 <span class="sort-arrows" @click="sortBy('clicks')">↕</span></th>
               <th width="80">点击率 <span class="sort-arrows" @click="sortBy('ctr')">↕</span></th>
               <th width="70">花费 <span class="sort-arrows" @click="sortBy('cost')">↕</span></th>
-              <th width="60">CPC <span class="sort-arrows" @click="sortBy('cpc')">↕</span></th>
               <th width="60">订单 <span class="sort-arrows" @click="sortBy('purchases_7d')">↕</span></th>
-              <th width="70">CVR <span class="sort-arrows" @click="sortBy('cvr')">↕</span></th>
-              <th width="60">CPA <span class="sort-arrows" @click="sortBy('cpa')">↕</span></th>
               <th width="80">销售额 <span class="sort-arrows" @click="sortBy('sales_7d')">↕</span></th>
-              <th width="80">ACOS <span class="sort-arrows" @click="sortBy('acos')">↕</span></th>
-              <th width="100">开始日期</th>
+              <th width="80">CPC <el-tooltip content="每次点击成本（Cost Per Click）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('cpc')">↕</span></th>
+              <th width="90">CVR <el-tooltip content="转化率（Conversion Rate）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('cvr')">↕</span></th>
+              <th width="80">CPA <el-tooltip content="单次获客成本（Cost Per Acquisition）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('cpa')">↕</span></th>
+              <th width="100">ACOS <el-tooltip content="广告销售成本比（Advertising Cost of Sales）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('acos')">↕</span></th>
               <th width="100">操作</th>
             </tr>
           </thead>
@@ -111,6 +112,23 @@
               </td>
               <td align="center">{{ row.targeting_type === 'AUTO' ? '自动' : '手动' }}</td>
               <td align="center">{{ row.bidding_strategy_label || row.bidding_strategy || '--' }}</td>
+              <td align="center">{{ row.start_date || '-' }}</td>
+              <td align="center">
+                <span v-if="!row._editingEndDate" class="editable-cell" @click="startEditEndDate(row)">{{ row.end_date || '-' }}</span>
+                <el-date-picker
+                  v-else
+                  v-model="row._editEndDate"
+                  type="date"
+                  placeholder="结束日期"
+                  value-format="YYYY-MM-DD"
+                  clearable
+                  :disabled="row._endDateSaving"
+                  size="small"
+                  style="width:130px"
+                  @change="saveEndDate(row)"
+                  @blur="saveEndDate(row)"
+                />
+              </td>
               <td align="right">
                 <span v-if="!row._editingBudget" class="editable-cell" @click="startEditBudget(row)">{{ formatNum(row.daily_budget) }}</span>
                 <el-input-number
@@ -126,13 +144,12 @@
               <td align="right">{{ fmtInt(row.clicks) }}</td>
               <td align="right">{{ fmtPct(row.ctr) }}</td>
               <td align="right">{{ formatNum(row.cost) }}</td>
-              <td align="right">{{ formatNum(row.cpc) }}</td>
               <td align="right">{{ fmtInt(row.purchases_7d) }}</td>
+              <td align="right">{{ formatNum(row.sales_7d) }}</td>
+              <td align="right">{{ formatNum(row.cpc) }}</td>
               <td align="right">{{ fmtPct(row.cvr) }}</td>
               <td align="right">{{ formatNum(row.cpa) }}</td>
-              <td align="right">{{ formatNum(row.sales_7d) }}</td>
               <td align="right">{{ fmtPct(row.acos) }}</td>
-              <td align="center">{{ row.start_date || '-' }}</td>
               <td align="center">
                 <el-button size="small" type="primary" @click="openAnalysis(row)">查看每日数据</el-button>
               </td>
@@ -174,7 +191,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Warning } from '@element-plus/icons-vue'
 import CpcLayout from '@/components/cpc/CpcLayout.vue'
 import AnalysisDialog from '@/components/cpc/AnalysisDialog.vue'
 import { getCpcCampaigns, updateCpcCampaign, syncCpcEntities, syncAllCpcEntities } from '@/services/cpc'
@@ -334,6 +351,9 @@ const fetchData = async () => {
         _editingBudget: false,
         _editBudget: Number(item.daily_budget) || 0,
         _budgetSaving: false,
+        _editingEndDate: false,
+        _editEndDate: item.end_date || '',
+        _endDateSaving: false,
         state: (item.state || '').toUpperCase()
       }))
       total.value = res.data.data.total || 0
@@ -407,6 +427,34 @@ const saveBudget = async (row) => {
   }
 }
 
+const startEditEndDate = (row) => {
+  row._editEndDate = row.end_date || ''
+  row._editingEndDate = true
+}
+
+const saveEndDate = async (row) => {
+  const newEndDate = row._editEndDate || ''
+  if (newEndDate === (row.end_date || '')) {
+    row._editingEndDate = false
+    return
+  }
+  row._endDateSaving = true
+  try {
+    await updateCpcCampaign(row.campaign_id, {
+      shop_id: shopId.value,
+      endDate: newEndDate || null
+    })
+    row.end_date = newEndDate || null
+    ElMessage.success('结束日期更新成功')
+    row._editingEndDate = false
+  } catch {
+    ElMessage.error('结束日期更新失败')
+    row._editEndDate = row.end_date || ''
+  } finally {
+    row._endDateSaving = false
+  }
+}
+
 const goCreate = () => {
   router.push({ name: 'CpcCreateCampaign' })
 }
@@ -423,18 +471,19 @@ const handleExport = () => {
     { key: 'state', label: '状态' },
     { key: 'targeting_type', label: '类型' },
     { key: 'bidding_strategy_label', label: '竞价策略' },
+    { key: 'start_date', label: '开始日期' },
+    { key: 'end_date', label: '结束日期' },
     { key: 'daily_budget', label: '预算' },
     { key: 'impressions', label: '曝光量' },
     { key: 'clicks', label: '点击次数' },
     { key: 'ctr', label: '点击率' },
     { key: 'cost', label: '花费' },
-    { key: 'cpc', label: 'CPC' },
     { key: 'purchases_7d', label: '订单' },
+    { key: 'sales_7d', label: '销售额' },
+    { key: 'cpc', label: 'CPC' },
     { key: 'cvr', label: 'CVR' },
     { key: 'cpa', label: 'CPA' },
-    { key: 'sales_7d', label: '销售额' },
-    { key: 'acos', label: 'ACOS' },
-    { key: 'start_date', label: '开始日期' }
+    { key: 'acos', label: 'ACOS' }
   ]
   const ok = exportToCSV('广告活动列表', columns, tableData.value, (val, col, row) => {
     if (col.key === 'state') return row.state === 'ENABLED' ? '启用' : (row.state === 'PAUSED' ? '暂停' : '归档')
@@ -570,6 +619,16 @@ onMounted(() => {
 }
 .sort-arrows:hover {
   color: #009688;
+}
+.header-tip-icon {
+  color: #909399;
+  font-size: 12px;
+  vertical-align: middle;
+  margin-left: 2px;
+  cursor: pointer;
+}
+.header-tip-icon:hover {
+  color: #409eff;
 }
 .editable-cell { cursor: pointer; color: #409eff; }
 .editable-cell:hover { text-decoration: underline; }
