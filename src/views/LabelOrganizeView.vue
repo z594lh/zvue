@@ -39,19 +39,25 @@
             <el-form-item label="入库计划" prop="inbound_plan_id" style="width:550px;margin-bottom:0;">
               <el-select
                 v-model="taskForm.inbound_plan_id"
-                placeholder="请选择入库计划"
+                placeholder="请选择入库计划（可多选）"
                 clearable
                 filterable
+                :filter-method="filterInboundPlans"
+                multiple
                 style="width:100%"
                 :disabled="!taskForm.shop_id || inboundPlansLoading"
                 :loading="inboundPlansLoading"
               >
                 <el-option
-                  v-for="plan in inboundPlans"
+                  v-for="plan in filteredInboundPlans"
                   :key="plan.inbound_plan_id"
-                  :label="plan.inbound_plan_id + (plan.name ? ' - ' + plan.name : '')"
+                  :label="formatShortPlanId(plan.inbound_plan_id)"
                   :value="plan.inbound_plan_id"
-                />
+                >
+                  <span :title="plan.inbound_plan_id + (plan.name ? ' - ' + plan.name : '')">
+                    {{ plan.inbound_plan_id + (plan.name ? ' - ' + plan.name : '') }}
+                  </span>
+                </el-option>
               </el-select>
             </el-form-item>
 
@@ -120,6 +126,21 @@
 
           <!-- 右侧提交按钮 -->
           <div class="task-form-submit">
+            <el-tooltip
+              v-if="taskForm.inbound_plan_id.length > 1"
+              effect="dark"
+              placement="top"
+              content="开启：多个入库计划合并为一个任务，导出 1 个 ZIP；关闭：每个入库计划各自创建独立任务，分别导出 ZIP"
+            >
+              <div class="merge-switch-wrap">
+                <el-switch
+                  v-model="taskForm.merge_tasks"
+                  active-text="合并"
+                  inactive-text="拆分"
+                  inline-prompt
+                />
+              </div>
+            </el-tooltip>
             <el-button
               type="primary"
               :loading="submitting"
@@ -347,6 +368,7 @@ export default {
     const taskFormRef = ref(null)
     const pollTimers = ref(new Map())
     const inboundPlans = ref([])
+    const filteredInboundPlans = ref([])
     const inboundPlansLoading = ref(false)
     const logisticsProviders = ref([])
     const logisticsProvidersLoading = ref(false)
@@ -355,14 +377,18 @@ export default {
 
     const taskForm = reactive({
       shop_id: null,
-      inbound_plan_id: '',
+      inbound_plan_id: [],
       crop_preset: 'default',
-      logistics_provider_id: null
+      logistics_provider_id: null,
+      merge_tasks: true
     })
 
     const taskRules = {
       shop_id: [{ required: true, message: '请选择店铺', trigger: 'change' }],
-      inbound_plan_id: [{ required: true, message: '请输入入库计划ID', trigger: 'blur' }]
+      inbound_plan_id: [
+        { required: true, message: '请选择入库计划', trigger: 'change' },
+        { type: 'array', min: 1, message: '至少选择一个入库计划', trigger: 'change' }
+      ]
     }
 
     const pagination = reactive({
@@ -381,13 +407,31 @@ export default {
       try {
         const response = await getInboundPlanOptions()
         if (response.data.status === 'success') {
-          inboundPlans.value = response.data.data || []
+          const plans = (response.data.data || []).map(plan => ({
+            ...plan,
+            inbound_plan_id: (plan.inbound_plan_id || '').trim()
+          }))
+          inboundPlans.value = plans
+          filteredInboundPlans.value = plans
         }
       } catch (error) {
         console.error('获取入库计划列表失败:', error)
       } finally {
         inboundPlansLoading.value = false
       }
+    }
+
+    // 自定义搜索过滤（基于完整 ID / name，不受 :label 缩短影响）
+    const filterInboundPlans = (query) => {
+      if (!query) {
+        filteredInboundPlans.value = inboundPlans.value
+        return
+      }
+      const lowerQuery = query.toLowerCase()
+      filteredInboundPlans.value = inboundPlans.value.filter(plan => {
+        const fullText = (plan.inbound_plan_id || '') + (plan.name ? ' ' + plan.name : '')
+        return fullText.toLowerCase().includes(lowerQuery)
+      })
     }
 
     // 获取货代列表
@@ -534,9 +578,13 @@ export default {
             return
           }
 
+          const planIds = taskForm.inbound_plan_id
+            .map(id => String(id).trim())
+            .filter(id => id)
+
           const formData = new FormData()
           formData.append('shop_id', String(taskForm.shop_id))
-          formData.append('inbound_plan_id', taskForm.inbound_plan_id.trim())
+          formData.append('inbound_plan_id', planIds.join(','))
 
           const cropConfig = taskForm.crop_preset === 'default'
             ? { x_ratio: [0, 1], y_ratio: [0, 0.667] }
@@ -551,11 +599,21 @@ export default {
             formData.append('logistics_provider_id', String(taskForm.logistics_provider_id))
           }
 
+          formData.append('merge_tasks', taskForm.merge_tasks ? 'true' : 'false')
+
           const response = await createLabelOrganizeTask(formData)
           if (response.data.status === 'success') {
-            ElMessage.success(response.data.message || '任务已提交')
-            taskForm.inbound_plan_id = ''
+            const data = response.data.data || {}
+            const taskIds = data.task_ids || (data.task_id ? [data.task_id] : [])
+            if (taskIds.length > 1) {
+              ElMessage.success(`已创建 ${taskIds.length} 个任务`)
+            } else {
+              ElMessage.success(response.data.message || '任务已提交')
+            }
+            taskIds.forEach(id => startPolling(id))
+            taskForm.inbound_plan_id = []
             taskForm.logistics_provider_id = null
+            taskForm.merge_tasks = true
             clearCargoAgentFile()
             pagination.page = 1
             fetchTasks()
@@ -579,7 +637,8 @@ export default {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `${row.inbound_plan_id}_labels.zip`
+        const taskIdPrefix = (row.id || '').toString().slice(0, 8)
+        a.download = `labels_${taskIdPrefix}.zip`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -710,8 +769,9 @@ export default {
         await refreshShopList()
         taskForm.shop_id = defaultShopId()
       }
-      taskForm.inbound_plan_id = ''
+      taskForm.inbound_plan_id = []
       taskForm.logistics_provider_id = null
+      taskForm.merge_tasks = true
       filterInboundPlanId.value = ''
       pagination.page = 1
       await fetchInboundPlans()
@@ -722,6 +782,12 @@ export default {
     const formatDate = (dateString) => {
       if (!dateString) return '-'
       return dateString.replace('T', ' ')
+    }
+
+    // 缩短显示入库计划 ID（前 3 位 + ... + 后 3 位）
+    const formatShortPlanId = (planId) => {
+      if (!planId || planId.length <= 8) return planId || ''
+      return planId.slice(0, 3) + '...' + planId.slice(-3)
     }
 
     onMounted(async () => {
@@ -767,7 +833,10 @@ export default {
       getStatusText,
       getProgressStatus,
       formatDate,
+      formatShortPlanId,
       fetchInboundPlans,
+      filterInboundPlans,
+      filteredInboundPlans,
       fetchLogisticsProviders,
       cargoAgentFileList,
       uploadRef,
@@ -838,6 +907,12 @@ export default {
   align-items: center;
   padding-top: 32px;
   flex-shrink: 0;
+  gap: 12px;
+}
+
+.merge-switch-wrap {
+  display: flex;
+  align-items: center;
 }
 
 .section-title {
