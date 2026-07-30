@@ -145,6 +145,15 @@
               <el-tooltip content="复制" placement="top">
                 <el-icon style="cursor:pointer;color:#909399;flex-shrink:0;" @click="copyText(scope.row.inbound_plan_id)"><DocumentCopy /></el-icon>
               </el-tooltip>
+              <el-tooltip content="同步该入库计划" placement="top">
+                <el-icon
+                  style="cursor:pointer;color:#409eff;flex-shrink:0;"
+                  :class="{ 'is-loading': syncingPlanId === scope.row.inbound_plan_id }"
+                  @click="syncInboundPlanById(scope.row.inbound_plan_id)"
+                >
+                  <RefreshRight />
+                </el-icon>
+              </el-tooltip>
             </div>
           </template>
         </el-table-column>
@@ -504,6 +513,7 @@ import {
   getInboundShipmentDetail,
   syncInboundShipments,
   syncInboundShipmentDetail,
+  syncInboundPlan,
   getAmazonShipmentLabels,
   getWarehouseOptions,
   getAmazonInboundPlanBoxes,
@@ -529,6 +539,7 @@ export default {
   setup() {
     const loading = ref(false)
     const syncLoading = ref(false)
+    const syncingPlanId = ref('')
     const labelsLoading = ref(false)
     const shipments = ref([])
     const warehouses = ref([])
@@ -544,7 +555,7 @@ export default {
       shipment_name: '',
       amazon_reference_id: '',
       destination_warehouse_id: '',
-      status: ''
+      status: 'WORKING'
     })
 
     // 分页状态
@@ -680,7 +691,7 @@ export default {
       searchForm.shipment_name = ''
       searchForm.amazon_reference_id = ''
       searchForm.destination_warehouse_id = ''
-      searchForm.status = ''
+      searchForm.status = 'WORKING'
       pagination.page = 1
       pagination.page_size = 20
       fetchShipments()
@@ -727,6 +738,35 @@ export default {
         ElMessage.error('同步数据失败: ' + (error.response?.data?.message || error.message))
       } finally {
         syncLoading.value = false
+      }
+    }
+
+    // 同步单个入库计划
+    const syncInboundPlanById = async (planId) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+      if (!planId) {
+        ElMessage.warning('缺少入库计划ID')
+        return
+      }
+      if (syncingPlanId.value === planId) return
+
+      syncingPlanId.value = planId
+      try {
+        const response = await syncInboundPlan(planId, { shop_id: selectedShopId.value })
+        if (response.data.status === 'success') {
+          ElMessage.success(response.data.message || '同步完成')
+          await fetchShipments()
+        } else {
+          ElMessage.error(response.data.message || '同步失败')
+        }
+      } catch (error) {
+        console.error('同步入库计划失败:', error)
+        ElMessage.error('同步入库计划失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        syncingPlanId.value = ''
       }
     }
 
@@ -1100,6 +1140,7 @@ export default {
       currentShipment,
       shipmentDetailData,
       syncLoading,
+      syncingPlanId,
       labelsLoading,
       shopList,
       selectedShopId,
@@ -1109,6 +1150,7 @@ export default {
       resetSearch,
       refreshData,
       syncAllData,
+      syncInboundPlanById,
       handlePageChange,
       handleSizeChange,
       handleShopChange,
@@ -1231,6 +1273,14 @@ export default {
   border-radius: 4px;
 }
 :deep(.shipment-row:hover) { background-color: #fafbff !important; }
+
+.is-loading {
+  animation: rotating 1s linear infinite;
+}
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 .sku-items {
   display: flex;

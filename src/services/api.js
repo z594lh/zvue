@@ -458,6 +458,15 @@ export const syncAmazonInboundPlanBoxes = (plan_id, data = {}) => {
   return api.post(`/amazon/sync/inbound-plans/${plan_id}/boxes`, data);
 };
 
+/**
+ * 同步单个入库计划（全量）
+ * @param {string} plan_id 入库计划ID
+ * @param {Object} data {shop_id}
+ */
+export const syncInboundPlan = (plan_id, data = {}) => {
+  return api.post(`/amazon/sync/inbound-plans/${plan_id}`, data);
+};
+
 
 // ==================== 亚马逊入库计划相关接口 ====================
 
