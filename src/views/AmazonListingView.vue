@@ -126,7 +126,7 @@
         style="width: 100%"
         height="calc(100vh - 340px)"
         :row-class-name="getRowClassName"
-        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
+        :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600,textAlign:'center'}"
         :cell-style="{padding:'10px 0'}"
       >
         <el-table-column label="店铺名称" width="140" show-overflow-tooltip fixed="left">
@@ -239,6 +239,33 @@
               </span>
             </template>
             <span v-else style="color:#bbb;">-</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="BSR 排名" width="260" align="left" header-align="center">
+          <template #default="scope">
+            <div v-if="scope.row.bsr_rank" class="bsr-cell" @click="openBsrTrendDialog(scope.row)">
+              <div class="bsr-badges">
+                <span class="bsr-badge bsr-badge-main">
+                  <span class="bsr-rank">#{{ formatNumber(scope.row.bsr_rank) }}</span>
+                  <span class="bsr-in">in</span>
+                  <span class="bsr-category" :title="scope.row.bsr_category">{{ scope.row.bsr_category }}</span>
+                </span>
+                <span v-if="scope.row.bsr_sub_rank" class="bsr-badge bsr-badge-sub">
+                  <span class="bsr-rank">#{{ formatNumber(scope.row.bsr_sub_rank) }}</span>
+                  <span class="bsr-in">in</span>
+                  <span class="bsr-category" :title="scope.row.bsr_sub_category">{{ scope.row.bsr_sub_category }}</span>
+                </span>
+              </div>
+              <div v-if="scope.row.bsr_trend === 'up'" class="bsr-trend bsr-up">
+                <el-icon><ArrowUp /></el-icon> {{ formatBsrPct(scope.row.bsr_change_pct) }}% <span class="bsr-prev">({{ formatNumber(scope.row.bsr_prev_rank) }})</span>
+              </div>
+              <div v-else-if="scope.row.bsr_trend === 'down'" class="bsr-trend bsr-down">
+                <el-icon><ArrowDown /></el-icon> {{ formatBsrPct(scope.row.bsr_change_pct) }}% <span class="bsr-prev">({{ formatNumber(scope.row.bsr_prev_rank) }})</span>
+              </div>
+              <div v-else-if="scope.row.bsr_trend === 'new'" class="bsr-trend bsr-new">新</div>
+            </div>
+            <div v-else style="text-align:center;color:#bbb;">—</div>
           </template>
         </el-table-column>
 
@@ -395,6 +422,31 @@
               <el-descriptions-item label="市场ID">{{ listingDetail.marketplace_id || '-' }}</el-descriptions-item>
               <el-descriptions-item label="商品类型">{{ listingDetail.product_type || '-' }}</el-descriptions-item>
               <el-descriptions-item label="状况">{{ listingDetail.condition_type || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="BSR 排名">
+                <div v-if="listingDetail.bsr_rank" class="bsr-detail-cell" @click="openBsrTrendDialog(listingDetail)">
+                  <div class="bsr-badges">
+                    <span class="bsr-badge bsr-badge-main">
+                      <span class="bsr-rank">#{{ formatNumber(listingDetail.bsr_rank) }}</span>
+                      <span class="bsr-in">in</span>
+                      <span class="bsr-category" :title="listingDetail.bsr_category">{{ listingDetail.bsr_category }}</span>
+                    </span>
+                    <span v-if="listingDetail.bsr_sub_rank" class="bsr-badge bsr-badge-sub">
+                      <span class="bsr-rank">#{{ formatNumber(listingDetail.bsr_sub_rank) }}</span>
+                      <span class="bsr-in">in</span>
+                      <span class="bsr-category" :title="listingDetail.bsr_sub_category">{{ listingDetail.bsr_sub_category }}</span>
+                    </span>
+                  </div>
+                  <div v-if="listingDetail.bsr_trend === 'up'" class="bsr-trend bsr-up">
+                    <el-icon><ArrowUp /></el-icon> {{ formatBsrPct(listingDetail.bsr_change_pct) }}% ({{ formatNumber(listingDetail.bsr_prev_rank) }})
+                  </div>
+                  <div v-else-if="listingDetail.bsr_trend === 'down'" class="bsr-trend bsr-down">
+                    <el-icon><ArrowDown /></el-icon> {{ formatBsrPct(listingDetail.bsr_change_pct) }}% ({{ formatNumber(listingDetail.bsr_prev_rank) }})
+                  </div>
+                  <div v-else-if="listingDetail.bsr_trend === 'new'" class="bsr-trend bsr-new">新</div>
+                  <el-icon style="margin-left:4px;color:#909399;"><TrendCharts /></el-icon>
+                </div>
+                <span v-else style="color:#bbb;">—</span>
+              </el-descriptions-item>
               <el-descriptions-item label="状态">
                 <div class="status-tags">
                   <el-tag
@@ -737,17 +789,56 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- BSR 趋势弹框 -->
+    <el-dialog
+      v-model="bsrTrendDialogVisible"
+      :title="`BSR 趋势 - ${bsrTrendTarget?.sku || ''}`"
+      width="820px"
+      align-center
+      :destroy-on-close="true"
+      @close="closeBsrTrendDialog"
+    >
+      <div v-loading="bsrTrendLoading" style="min-height:320px;">
+        <div v-if="bsrTrendData && bsrTrendData.trend && bsrTrendData.trend.dates && bsrTrendData.trend.dates.length > 0">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+            <div class="bsr-badges">
+              <span v-if="bsrTrendData.current?.bsr_rank" class="bsr-badge bsr-badge-main">
+                <span class="bsr-rank">#{{ formatNumber(bsrTrendData.current.bsr_rank) }}</span>
+                <span class="bsr-in">in</span>
+                <span class="bsr-category" :title="bsrTrendData.current.bsr_category">{{ bsrTrendData.current.bsr_category }}</span>
+              </span>
+              <span v-if="bsrTrendData.current?.bsr_sub_rank" class="bsr-badge bsr-badge-sub">
+                <span class="bsr-rank">#{{ formatNumber(bsrTrendData.current.bsr_sub_rank) }}</span>
+                <span class="bsr-in">in</span>
+                <span class="bsr-category" :title="bsrTrendData.current.bsr_sub_category">{{ bsrTrendData.current.bsr_sub_category }}</span>
+              </span>
+            </div>
+            <div v-if="bsrTrendData.current?.bsr_trend === 'up'" class="bsr-trend bsr-up" style="font-size:16px;">
+              <el-icon><ArrowUp /></el-icon> {{ formatBsrPct(bsrTrendData.current.bsr_change_pct) }}%
+            </div>
+            <div v-else-if="bsrTrendData.current?.bsr_trend === 'down'" class="bsr-trend bsr-down" style="font-size:16px;">
+              <el-icon><ArrowDown /></el-icon> {{ formatBsrPct(bsrTrendData.current.bsr_change_pct) }}%
+            </div>
+            <div v-else-if="bsrTrendData.current?.bsr_trend === 'new'" class="bsr-trend bsr-new" style="font-size:16px;">新</div>
+          </div>
+          <div ref="bsrTrendChartRef" style="width:100%;height:360px;"></div>
+        </div>
+        <el-empty v-else-if="!bsrTrendLoading" description="暂无 BSR 数据" :image-size="80" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
+  getAmazonListingBsrTrend,
   syncAmazonListings,
   syncListingToProduct,
   patchAmazonListing,
@@ -756,6 +847,7 @@ import {
   getAmazonListingVariants,
   syncAmazonListingToVariants
 } from '@/services/api.js'
+import * as echarts from 'echarts'
 import { useShopCache } from '@/composables/useShopCache'
 
 export default {
@@ -773,7 +865,10 @@ export default {
     Plus,
     Switch,
     DocumentCopy,
-    CopyDocument
+    CopyDocument,
+    TrendCharts,
+    ArrowUp,
+    ArrowDown
   },
   setup() {
     const loading = ref(false)
@@ -837,6 +932,15 @@ export default {
     const syncVariantOptions = ref([])
     const syncVariantFields = ref([])
     const syncVariantTargets = ref([])
+
+    // BSR 趋势
+    const bsrTrendDialogVisible = ref(false)
+    const bsrTrendLoading = ref(false)
+    const bsrTrendTarget = ref(null)
+    const bsrTrendData = ref(null)
+    const bsrTrendChartRef = ref(null)
+    let bsrTrendChart = null
+
     const syncVariantFieldOptions = [
       { label: '标题', value: 'item_name' },
       { label: '商品亮点', value: 'title_differentiation' },
@@ -1558,6 +1662,195 @@ export default {
       }
     }
 
+    // 格式化数字（千分位）
+    const formatNumber = (value) => {
+      if (value === undefined || value === null || value === '') return '-'
+      const num = Number(value)
+      if (Number.isNaN(num)) return value
+      return num.toLocaleString('en-US')
+    }
+
+    // 格式化 BSR 百分比：保留 1 位小数，负数取绝对值
+    const formatBsrPct = (value) => {
+      if (value === undefined || value === null) return '-'
+      const num = Number(value)
+      if (Number.isNaN(num)) return value
+      return Math.abs(num).toFixed(1)
+    }
+
+    // 打开 BSR 趋势弹框
+    const openBsrTrendDialog = async (row) => {
+      if (!selectedShopId.value) {
+        ElMessage.warning('请选择店铺')
+        return
+      }
+      if (!row || !row.sku) return
+
+      bsrTrendTarget.value = row
+      bsrTrendDialogVisible.value = true
+      bsrTrendLoading.value = true
+      bsrTrendData.value = null
+
+      try {
+        const response = await getAmazonListingBsrTrend(row.sku, selectedShopId.value)
+        if (response.data.status === 'success') {
+          bsrTrendData.value = response.data.data || null
+          nextTick(() => {
+            buildBsrTrendChart()
+          })
+        } else {
+          ElMessage.error(response.data.message || '获取 BSR 趋势失败')
+        }
+      } catch (error) {
+        console.error('获取 BSR 趋势失败:', error)
+        ElMessage.error('获取 BSR 趋势失败: ' + (error.response?.data?.message || error.message))
+      } finally {
+        bsrTrendLoading.value = false
+      }
+    }
+
+    // 构建 BSR 趋势折线图（两条线：大类目 + 子类目）
+    const buildBsrTrendChart = () => {
+      if (!bsrTrendChartRef.value) return
+      const trend = bsrTrendData.value?.trend
+      if (!trend || !trend.dates || trend.dates.length === 0) return
+
+      if (bsrTrendChart) {
+        bsrTrendChart.dispose()
+      }
+      bsrTrendChart = echarts.init(bsrTrendChartRef.value)
+
+      const dates = trend.dates
+      const parentName = trend.categories?.parent || '大类目'
+      const subName = trend.categories?.sub || '子类目'
+      const parentData = (trend.parent || []).map(item => item?.rank ?? null)
+      const subData = (trend.sub || []).map(item => item?.rank ?? null)
+      const hasSubData = subData.some(v => v !== null && v !== undefined)
+
+      // 分别计算两条线的 Y 轴范围
+      const parentRanks = parentData.filter(v => v !== null && v !== undefined)
+      const subRanks = subData.filter(v => v !== null && v !== undefined)
+      const parentMin = parentRanks.length ? Math.min(...parentRanks) : 0
+      const parentMax = parentRanks.length ? Math.max(...parentRanks) : 0
+      const subMin = subRanks.length ? Math.min(...subRanks) : 0
+      const subMax = subRanks.length ? Math.max(...subRanks) : 0
+      const parentPadding = Math.max(Math.round((parentMax - parentMin) * 0.1), 1)
+      const subPadding = Math.max(Math.round((subMax - subMin) * 0.1), 1)
+
+      const series = []
+
+      series.push({
+        name: parentName,
+        type: 'line',
+        yAxisIndex: 0,
+        data: parentData,
+        smooth: true,
+        connectNulls: false,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { width: 2.5, color: '#667eea', type: 'dashed' },
+        itemStyle: { color: '#667eea', borderWidth: 1, borderColor: '#fff' }
+      })
+
+      if (hasSubData) {
+        series.push({
+          name: subName,
+          type: 'line',
+          yAxisIndex: 1,
+          data: subData,
+          smooth: true,
+          connectNulls: false,
+          symbol: 'emptyCircle',
+          symbolSize: 8,
+          lineStyle: { width: 3, color: '#67c23a' },
+          itemStyle: { color: '#67c23a', borderWidth: 2, borderColor: '#fff' }
+        })
+      }
+
+      const option = {
+        color: ['#667eea', '#67c23a'],
+        tooltip: {
+          trigger: 'axis',
+          formatter: (params) => {
+            let html = `<div style="font-weight:600;margin-bottom:4px;">${params[0]?.name || ''}</div>`
+            params.forEach(param => {
+              const rank = param.value
+              const color = param.color
+              const name = param.seriesName
+              html += `<div style="display:flex;align-items:center;gap:6px;">`
+              html += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};"></span>`
+              if (rank !== null && rank !== undefined) {
+                html += `<span>${name}: #${formatNumber(rank)}</span>`
+              } else {
+                html += `<span style="color:#999;">${name}: 数据缺失</span>`
+              }
+              html += `</div>`
+            })
+            return html
+          }
+        },
+        legend: {
+          data: series.map(s => s.name),
+          bottom: 0,
+          itemGap: 20
+        },
+        grid: { left: 70, right: hasSubData ? 80 : 24, top: 30, bottom: 50 },
+        xAxis: {
+          type: 'category',
+          data: dates,
+          boundaryGap: false,
+          axisLabel: { color: '#666', rotate: 30, fontSize: 11 }
+        },
+        yAxis: [
+          {
+            type: 'value',
+            inverse: true,
+            name: parentName,
+            min: Math.max(parentMin - parentPadding, 0),
+            max: parentMax + parentPadding,
+            position: 'left',
+            axisLine: { show: true, lineStyle: { color: '#667eea' } },
+            axisLabel: {
+              color: '#667eea',
+              formatter: (value) => formatNumber(value)
+            },
+            splitLine: { lineStyle: { color: '#f0f0f0' } }
+          },
+          hasSubData ? {
+            type: 'value',
+            inverse: true,
+            name: subName,
+            min: Math.max(subMin - subPadding, 0),
+            max: subMax + subPadding,
+            position: 'right',
+            offset: 0,
+            axisLine: { show: true, lineStyle: { color: '#67c23a' } },
+            axisLabel: {
+              color: '#67c23a',
+              formatter: (value) => formatNumber(value)
+            },
+            splitLine: { show: false }
+          } : null
+        ].filter(Boolean),
+        series
+      }
+
+      bsrTrendChart.setOption(option)
+    }
+
+    const closeBsrTrendDialog = () => {
+      if (bsrTrendChart) {
+        bsrTrendChart.dispose()
+        bsrTrendChart = null
+      }
+      bsrTrendTarget.value = null
+      bsrTrendData.value = null
+    }
+
+    const resizeBsrTrendChart = () => {
+      bsrTrendChart?.resize()
+    }
+
     onMounted(async () => {
       await fetchShopList()
       if (shopList.value.length > 0) {
@@ -1565,6 +1858,15 @@ export default {
       }
       initFromQuery()
       fetchListings()
+      window.addEventListener('resize', resizeBsrTrendChart)
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('resize', resizeBsrTrendChart)
+      if (bsrTrendChart) {
+        bsrTrendChart.dispose()
+        bsrTrendChart = null
+      }
     })
 
     watchQuery(() => fetchListings())
@@ -1630,7 +1932,16 @@ export default {
       syncVariantTargets,
       syncVariantFieldOptions,
       openSyncVariantDialog,
-      submitSyncVariant
+      submitSyncVariant,
+      bsrTrendDialogVisible,
+      bsrTrendLoading,
+      bsrTrendTarget,
+      bsrTrendData,
+      bsrTrendChartRef,
+      openBsrTrendDialog,
+      closeBsrTrendDialog,
+      formatNumber,
+      formatBsrPct
     }
   }
 }
@@ -1741,6 +2052,107 @@ export default {
   bottom: 0;
   width: 3px;
   background: #e6a23c;
+}
+
+/* BSR 排名 */
+.bsr-cell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.bsr-cell:hover {
+  background: #f5f7fa;
+}
+.bsr-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.bsr-detail-cell .bsr-badges {
+  flex-direction: row;
+}
+.bsr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  line-height: 1.5;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.bsr-badge-main {
+  background: #f0f9eb;
+  color: #67c23a;
+  border: 1px solid #d9f0c9;
+}
+.bsr-badge-sub {
+  background: #e8f5e9;
+  color: #52c41a;
+  border: 1px solid #c8e6c9;
+}
+.bsr-badge .bsr-rank {
+  font-family: monospace;
+  font-weight: 600;
+}
+.bsr-badge .bsr-in {
+  font-size: 11px;
+  opacity: 0.8;
+  font-weight: 400;
+}
+.bsr-badge .bsr-category {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+  font-weight: 500;
+}
+.bsr-trend {
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.bsr-trend .el-icon {
+  font-size: 12px;
+}
+.bsr-prev {
+  font-weight: 400;
+  color: #999;
+  font-size: 11px;
+}
+.bsr-up {
+  color: #67c23a;
+}
+.bsr-down {
+  color: #f56c6c;
+}
+.bsr-new {
+  color: #909399;
+}
+
+.bsr-detail-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.bsr-detail-cell:hover {
+  background: #f5f7fa;
+}
+.bsr-detail-cell .bsr-badge .bsr-category {
+  max-width: 260px;
 }
 
 /* ASIN 链接 */

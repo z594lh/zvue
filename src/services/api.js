@@ -928,6 +928,20 @@ export const getAmazonListing = (sku, shop_id) => {
 };
 
 /**
+ * 获取 Amazon Listing 的 BSR 历史趋势
+ * @param {string} sku 卖家 SKU
+ * @param {number} shop_id 店铺ID（必填）
+ * @param {number|null} days 最近 N 天，默认全部历史
+ */
+export const getAmazonListingBsrTrend = (sku, shop_id, days = null) => {
+  const params = { shop_id };
+  if (days !== null && days !== undefined) {
+    params.days = days;
+  }
+  return api.get(`/amazon/listings/${encodeURIComponent(sku)}/bsr-trend`, { params });
+};
+
+/**
  * 手动触发 Listing 同步
  * @param {Object} data {shop_id, included_data, page_size}
  */

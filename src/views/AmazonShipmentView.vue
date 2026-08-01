@@ -20,7 +20,7 @@
             同步最新数据
           </el-button>
         </el-tooltip>
-        <el-button type="primary" @click="refreshData" :loading="loading">
+        <el-button type="primary" @click="refreshData" :loading="refreshLoading">
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
@@ -109,7 +109,7 @@
           <el-option label="已删除" value="DELETED" />
           <el-option label="已取消" value="CANCELLED" />
         </el-select>
-        <el-button type="primary" @click="handleSearch" :loading="loading">
+        <el-button type="primary" @click="handleSearch" :loading="searchLoading">
           <el-icon><Search /></el-icon> 搜索
         </el-button>
         <el-button plain @click="resetSearch">
@@ -148,7 +148,7 @@
               <el-tooltip content="同步该入库计划" placement="top">
                 <el-icon
                   style="cursor:pointer;color:#409eff;flex-shrink:0;"
-                  :class="{ 'is-loading': syncingPlanId === scope.row.inbound_plan_id }"
+                  :class="{ 'plan-sync-loading': syncingPlanId === scope.row.inbound_plan_id }"
                   @click="syncInboundPlanById(scope.row.inbound_plan_id)"
                 >
                   <RefreshRight />
@@ -538,6 +538,8 @@ export default {
   },
   setup() {
     const loading = ref(false)
+    const searchLoading = ref(false)
+    const refreshLoading = ref(false)
     const syncLoading = ref(false)
     const syncingPlanId = ref('')
     const labelsLoading = ref(false)
@@ -679,13 +681,16 @@ export default {
     }
 
     // 搜索
-    const handleSearch = () => {
+    const handleSearch = async () => {
+      searchLoading.value = true
       pagination.page = 1
-      fetchShipments()
+      await fetchShipments()
+      searchLoading.value = false
     }
 
     // 重置搜索
-    const resetSearch = () => {
+    const resetSearch = async () => {
+      searchLoading.value = true
       searchForm.inbound_plan_id = ''
       searchForm.shipment_confirmation_id = ''
       searchForm.shipment_name = ''
@@ -694,12 +699,15 @@ export default {
       searchForm.status = 'WORKING'
       pagination.page = 1
       pagination.page_size = 20
-      fetchShipments()
+      await fetchShipments()
+      searchLoading.value = false
     }
 
     // 刷新数据
-    const refreshData = () => {
-      fetchShipments()
+    const refreshData = async () => {
+      refreshLoading.value = true
+      await fetchShipments()
+      refreshLoading.value = false
     }
 
     // 切换店铺
@@ -1141,6 +1149,8 @@ export default {
       shipmentDetailData,
       syncLoading,
       syncingPlanId,
+      searchLoading,
+      refreshLoading,
       labelsLoading,
       shopList,
       selectedShopId,
@@ -1274,10 +1284,10 @@ export default {
 }
 :deep(.shipment-row:hover) { background-color: #fafbff !important; }
 
-.is-loading {
-  animation: rotating 1s linear infinite;
+.plan-sync-loading {
+  animation: plan-rotating 1s linear infinite;
 }
-@keyframes rotating {
+@keyframes plan-rotating {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
