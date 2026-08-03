@@ -422,7 +422,7 @@
               <el-descriptions-item label="市场ID">{{ listingDetail.marketplace_id || '-' }}</el-descriptions-item>
               <el-descriptions-item label="商品类型">{{ listingDetail.product_type || '-' }}</el-descriptions-item>
               <el-descriptions-item label="状况">{{ listingDetail.condition_type || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="BSR 排名">
+              <el-descriptions-item label="BSR 排名" :span="3">
                 <div v-if="listingDetail.bsr_rank" class="bsr-detail-cell" @click="openBsrTrendDialog(listingDetail)">
                   <div class="bsr-badges">
                     <span class="bsr-badge bsr-badge-main">
