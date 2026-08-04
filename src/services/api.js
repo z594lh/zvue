@@ -1239,6 +1239,14 @@ export const generateSkuSalesForSku = (sku, data = {}) => {
 };
 
 /**
+ * 获取 SKU 销售趋势数据（按天）
+ * @param {Object} params {sku, shop_id, start_date, end_date, days}
+ */
+export const getSkuSalesTrend = (params = {}) => {
+  return api.get('/reports/sku-sales/trend', { params });
+};
+
+/**
  * 获取库存周转列表
  * @param {Object} params {status, keyword, sku, shop_id, page, page_size}
  */

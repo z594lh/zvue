@@ -133,7 +133,14 @@
               <div class="product-cell">
                 <div class="product-name" :title="scope.row.product_name">{{ scope.row.product_name || '-' }}</div>
                 <div class="product-code">{{ scope.row.asin || '-' }} / {{ scope.row.sku || '-' }}</div>
-                <div class="product-date">{{ scope.row.report_date || '-' }}</div>
+                <div class="product-meta">
+                  <span class="product-date">{{ scope.row.report_date || '-' }}</span>
+                  <el-tooltip content="查看趋势图" placement="top">
+                    <el-button type="primary" link size="small" class="trend-btn" @click="handleOpenTrend(scope.row)">
+                      <el-icon><TrendCharts /></el-icon>
+                    </el-button>
+                  </el-tooltip>
+                </div>
               </div>
             </template>
           </el-table-column>
@@ -279,28 +286,53 @@
         />
       </div>
     </div>
+
+    <!-- SKU 趋势图弹窗 -->
+    <el-dialog
+      v-model="trendVisible"
+      :title="trendProductName ? `SKU 趋势图 - ${trendSku || ''} - ${trendProductName}` : `SKU 趋势图 - ${trendSku || ''}`"
+      width="900px"
+      destroy-on-close
+      :close-on-click-modal="false"
+      @opened="handleTrendDialogOpened"
+      @closed="handleTrendDialogClosed"
+    >
+      <div class="trend-header">
+        <el-radio-group v-model="trendDays" size="small" @change="handleTrendDaysChange">
+          <el-radio-button :label="7">近7天</el-radio-button>
+          <el-radio-button :label="14">近14天</el-radio-button>
+          <el-radio-button :label="30">近30天</el-radio-button>
+          <el-radio-button :label="60">近60天</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div v-loading="trendLoading" class="trend-chart-wrapper">
+        <div ref="trendChartRef" class="trend-chart"></div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import * as echarts from 'echarts'
 import {
   ShoppingCart, Box, OfficeBuilding, Coin, Wallet, Money,
-  Search, Refresh, Download, CircleClose
+  Search, Refresh, Download, CircleClose, TrendCharts
 } from '@element-plus/icons-vue'
 import {
   getShopOptions,
   getSkuSalesList,
   generateSkuSales,
-  generateSkuSalesForSku
+  generateSkuSalesForSku,
+  getSkuSalesTrend
 } from '@/services/api.js'
 
 export default {
   name: 'SkuSalesReportView',
   components: {
     ShoppingCart, Box, OfficeBuilding, Coin, Wallet, Money,
-    Search, Refresh, Download, CircleClose
+    Search, Refresh, Download, CircleClose, TrendCharts
   },
   setup() {
     const selectedShop = ref(null)
@@ -315,6 +347,18 @@ export default {
     const list = ref([])
     const loading = ref(false)
     const generating = ref(false)
+
+    // 趋势图相关
+    const trendVisible = ref(false)
+    const trendLoading = ref(false)
+    const trendSku = ref('')
+    const trendProductName = ref('')
+    const trendShopId = ref(null)
+    const trendDays = ref(30)
+    const trendData = ref([])
+    const trendChartRef = ref(null)
+    let trendChartInstance = null
+
     const allWindows = ['1d', '3d', '7d', '14d', '30d']
     const selectedWindows = ref(['1d', '7d', '30d'])
     const displayWindows = computed(() => allWindows.filter(w => selectedWindows.value.includes(w)))
@@ -552,6 +596,193 @@ export default {
       fetchSkuSalesData()
     }
 
+    // 趋势图：根据天数计算起止日期
+    const getTrendDateRange = (days) => {
+      const end = new Date()
+      end.setHours(0, 0, 0, 0)
+      const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000)
+      const pad = (n) => String(n).padStart(2, '0')
+      const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      return { start_date: fmt(start), end_date: fmt(end) }
+    }
+
+    const handleOpenTrend = (row) => {
+      trendSku.value = row.sku || ''
+      trendProductName.value = row.product_name || ''
+      trendShopId.value = selectedShop.value
+      trendDays.value = 30
+      trendVisible.value = true
+      fetchTrendData()
+    }
+
+    const fetchTrendData = async () => {
+      if (!trendSku.value) return
+      trendLoading.value = true
+      try {
+        const { start_date, end_date } = getTrendDateRange(trendDays.value)
+        const params = {
+          sku: trendSku.value,
+          start_date,
+          end_date
+        }
+        if (trendShopId.value) {
+          params.shop_id = trendShopId.value
+        }
+        const res = await getSkuSalesTrend(params)
+        if (res.data.status === 'success') {
+          trendData.value = res.data.data?.list || []
+        } else {
+          trendData.value = []
+        }
+      } catch (e) {
+        console.error(e)
+        ElMessage.error('获取趋势数据失败')
+        trendData.value = []
+      } finally {
+        trendLoading.value = false
+        nextTick(() => renderTrendChart())
+      }
+    }
+
+    const handleTrendDaysChange = () => {
+      fetchTrendData()
+    }
+
+    const handleTrendDialogOpened = () => {
+      nextTick(() => renderTrendChart())
+    }
+
+    const handleTrendDialogClosed = () => {
+      if (trendChartInstance) {
+        trendChartInstance.dispose()
+        trendChartInstance = null
+      }
+      trendData.value = []
+      trendSku.value = ''
+      trendProductName.value = ''
+      trendShopId.value = null
+    }
+
+    const renderTrendChart = () => {
+      if (!trendChartRef.value) return
+      if (!trendChartInstance) {
+        trendChartInstance = echarts.init(trendChartRef.value)
+      }
+      const dates = trendData.value.map(item => item.date)
+      const sales = trendData.value.map(item => Number(item.sales || 0))
+      const adCost = trendData.value.map(item => Number(item.ad_cost || 0))
+      const profit = trendData.value.map(item => Number(item.profit || 0))
+      const pct = (val) => {
+        const n = Number(val || 0) * 100
+        return Math.round(n * 100) / 100
+      }
+      const acos = trendData.value.map(item => pct(item.acos))
+      const tacos = trendData.value.map(item => pct(item.tacos))
+
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' },
+          formatter: (params) => {
+            const date = params[0]?.axisValue || ''
+            let html = `<div style="font-weight:600;margin-bottom:4px">${date}</div>`
+            params.forEach(p => {
+              const isPct = p.seriesName === 'ACOS' || p.seriesName === 'TACOS'
+              const isSales = p.seriesName === '销量'
+              let val = p.value
+              if (isPct) val = `${val.toFixed(2)}%`
+              else if (isSales) val = Number(val).toLocaleString('en-US')
+              else val = Number(val).toFixed(2)
+              html += `<div style="display:flex;align-items:center;gap:6px">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
+                <span style="flex:1">${p.seriesName}</span>
+                <span style="font-weight:600">${val}</span>
+              </div>`
+            })
+            return html
+          }
+        },
+        legend: {
+          data: ['销量', '广告费', '利润', 'ACOS', 'TACOS'],
+          bottom: 0
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '15%',
+          top: '12%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          data: dates,
+          axisLabel: { rotate: 30, fontSize: 11 }
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '数量 / 金额',
+            position: 'left',
+            axisLabel: {
+              formatter: (value) => {
+                if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1) + 'k'
+                return Number(value).toFixed(value % 1 === 0 ? 0 : 2)
+              }
+            }
+          },
+          {
+            type: 'value',
+            name: '百分比',
+            position: 'right',
+            axisLabel: {
+              formatter: (value) => `${Number(value).toFixed(2)}%`
+            }
+          }
+        ],
+        series: [
+          {
+            name: '销量',
+            type: 'bar',
+            data: sales,
+            itemStyle: { color: '#f97316' }
+          },
+          {
+            name: '广告费',
+            type: 'line',
+            data: adCost,
+            itemStyle: { color: '#ef4444' },
+            smooth: true
+          },
+          {
+            name: '利润',
+            type: 'line',
+            data: profit,
+            itemStyle: { color: '#10b981' },
+            smooth: true
+          },
+          {
+            name: 'ACOS',
+            type: 'line',
+            yAxisIndex: 1,
+            data: acos,
+            itemStyle: { color: '#8b5cf6' },
+            smooth: true
+          },
+          {
+            name: 'TACOS',
+            type: 'line',
+            yAxisIndex: 1,
+            data: tacos,
+            itemStyle: { color: '#6366f1' },
+            smooth: true
+          }
+        ]
+      }
+
+      trendChartInstance.setOption(option, true)
+      trendChartInstance.resize()
+    }
+
     watch([page, pageSize], () => {
       fetchSkuSalesData()
     })
@@ -570,7 +801,9 @@ export default {
       formatNumber, formatPercent, getProfitRateTagType, getAcosClass, getAdRatio,
       headerCellStyle,
       fetchSkuSalesData, handleSearch, handleSortChange,
-      handleGenerateAll, handleGenerateSingle, handleExport, handleReset
+      handleGenerateAll, handleGenerateSingle, handleExport, handleReset,
+      trendVisible, trendLoading, trendSku, trendProductName, trendDays, trendChartRef,
+      handleOpenTrend, handleTrendDaysChange, handleTrendDialogOpened, handleTrendDialogClosed
     }
   }
 }
@@ -767,6 +1000,36 @@ export default {
   font-size: 11px;
   color: #9ca3af;
   margin-top: 2px;
+}
+
+.product-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.trend-btn {
+  padding: 0;
+  height: auto;
+  font-size: 14px;
+}
+
+/* 趋势图弹窗 */
+.trend-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.trend-chart-wrapper {
+  width: 100%;
+  height: 420px;
+}
+
+.trend-chart {
+  width: 100%;
+  height: 100%;
 }
 
 /* 迷你卡片：核心样式 */
