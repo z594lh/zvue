@@ -124,82 +124,116 @@
       align-center
       @closed="resetCalculator"
     >
-      <div class="calc-header">
-        <div class="calc-dates">
-          <el-date-picker
-            v-model="calcStartDate"
-            type="date"
-            placeholder="开始日期"
-            value-format="YYYY-MM-DD"
-            clearable
-            style="width: 150px"
-          />
-          <span class="calc-date-sep">~</span>
-          <el-date-picker
-            v-model="calcEndDate"
-            type="date"
-            placeholder="结束日期"
-            value-format="YYYY-MM-DD"
-            clearable
-            style="width: 150px"
-          />
-          <el-button type="primary" :icon="Refresh" @click="loadCalcSummary" :loading="calcLoading">
-            加载金额
-          </el-button>
-        </div>
-        <div class="calc-total">
-          总计：<span :class="calcTotal >= 0 ? 'calc-positive' : 'calc-negative'">¥{{ formatNumber(calcTotal) }}</span>
+      <!-- 类别筛选区域 -->
+      <div class="calc-category-filter">
+        <div
+          v-for="group in calcCategoryGroups"
+          :key="group.type"
+          class="calc-category-group"
+        >
+          <div class="calc-category-group-label" :style="{ color: getTransactionTypeColor(group.type) }">
+            {{ group.label }}
+          </div>
+          <div class="calc-category-tags">
+            <el-check-tag
+              v-for="cat in group.categories"
+              :key="cat.code"
+              :checked="isCalcSelected(cat.code)"
+              class="calc-category-tag"
+              :class="{ 'calc-category-tag--selected': isCalcSelected(cat.code) }"
+              :style="isCalcSelected(cat.code) ? { background: cat.color || '#95a5a6', borderColor: cat.color || '#95a5a6', color: '#fff' } : {}"
+              @change="toggleCalcCategory(cat)"
+            >
+              {{ cat.name }}
+              <span v-if="isCalcSummaryLoaded" class="calc-tag-amount">¥{{ formatNumber(calcAmount(cat.code)) }}</span>
+            </el-check-tag>
+          </div>
         </div>
       </div>
 
-      <div class="calc-rows">
-        <div v-for="(row, index) in calcRows" :key="index" class="calc-row">
-          <el-select
-            v-model="row.type"
-            placeholder="全部类型"
-            clearable
-            style="width: 130px"
-            @change="handleCalcTypeChange(row)"
-          >
-            <el-option label="支出" value="expense" />
-            <el-option label="收入" value="income" />
-            <el-option label="盘盈冲正" value="adjustment" />
-          </el-select>
-          <el-select
-            v-model="row.category"
-            placeholder="选择类别"
-            clearable
-            filterable
-            style="flex: 1"
-          >
-            <el-option
-              v-for="cat in calcCategoriesByType(row.type)"
-              :key="cat.code"
-              :label="cat.name"
-              :value="cat.code"
-            >
-              <span class="calc-option">
-                <span class="calc-option-dot" :style="{ background: cat.color || '#95a5a6' }"></span>
-                {{ cat.name }}（{{ getTransactionTypeLabel(cat.type) }}）
-              </span>
-            </el-option>
-          </el-select>
-          <el-radio-group v-model="row.sign" size="small">
-            <el-radio-button label="+">加</el-radio-button>
-            <el-radio-button label="-">减</el-radio-button>
-          </el-radio-group>
-          <div class="calc-row-amount" :class="calcAmount(row.category) >= 0 ? 'calc-positive' : 'calc-negative'">
-            ¥{{ formatNumber(calcAmount(row.category)) }}
-          </div>
-          <el-button type="danger" text size="small" @click="removeCalcRow(index)">删除</el-button>
-        </div>
-        <el-button type="primary" plain :icon="Plus" @click="addCalcRow">
-          添加类别
+      <!-- 日期范围 -->
+      <div class="calc-dates">
+        <el-date-picker
+          v-model="calcStartDate"
+          type="date"
+          placeholder="开始日期"
+          value-format="YYYY-MM-DD"
+          clearable
+          style="width: 150px"
+        />
+        <span class="calc-date-sep">~</span>
+        <el-date-picker
+          v-model="calcEndDate"
+          type="date"
+          placeholder="结束日期"
+          value-format="YYYY-MM-DD"
+          clearable
+          style="width: 150px"
+        />
+        <el-button type="primary" :icon="Refresh" @click="loadCalcSummary" :loading="calcLoading">
+          加载金额
         </el-button>
       </div>
 
+      <!-- 加减分区 -->
+      <div class="calc-zones">
+        <!-- 加项区 -->
+        <div
+          class="calc-zone calc-zone--positive"
+          @dragover.prevent
+          @drop="handleCalcDrop($event, 'positive')"
+        >
+          <div class="calc-zone-header">
+            <span class="calc-zone-title">加项区</span>
+            <span class="calc-zone-total">合计 ¥{{ formatNumber(positiveTotal) }}</span>
+          </div>
+          <div class="calc-zone-body">
+            <div v-if="calcPositiveItems.length === 0" class="calc-zone-empty">拖动类别到此处，或点击上方标签默认加入</div>
+            <div
+              v-for="code in calcPositiveItems"
+              :key="code"
+              class="calc-zone-item"
+              draggable="true"
+              @dragstart="handleCalcDragStart($event, code)"
+            >
+              <span class="calc-zone-item-name">{{ getCategoryName(code) }}</span>
+              <span class="calc-zone-item-amount">¥{{ formatNumber(calcAmount(code)) }}</span>
+              <el-button type="danger" link size="small" @click="removeCalcCategory(code)">×</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 减项区 -->
+        <div
+          class="calc-zone calc-zone--negative"
+          @dragover.prevent
+          @drop="handleCalcDrop($event, 'negative')"
+        >
+          <div class="calc-zone-header">
+            <span class="calc-zone-title">减项区</span>
+            <span class="calc-zone-total">合计 ¥{{ formatNumber(negativeTotal) }}</span>
+          </div>
+          <div class="calc-zone-body">
+            <div v-if="calcNegativeItems.length === 0" class="calc-zone-empty">拖动类别到此处，作为被减项</div>
+            <div
+              v-for="code in calcNegativeItems"
+              :key="code"
+              class="calc-zone-item"
+              draggable="true"
+              @dragstart="handleCalcDragStart($event, code)"
+            >
+              <span class="calc-zone-item-name">{{ getCategoryName(code) }}</span>
+              <span class="calc-zone-item-amount">¥{{ formatNumber(calcAmount(code)) }}</span>
+              <el-button type="danger" link size="small" @click="removeCalcCategory(code)">×</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="calc-summary">
-        <div class="calc-summary-tip">已选 {{ calcRows.length }} 项，可继续添加类别并切换“加/减”进行汇总</div>
+        <div class="calc-summary-formula">
+          加项区合计 ¥{{ formatNumber(positiveTotal) }} － 减项区合计 ¥{{ formatNumber(negativeTotal) }}
+        </div>
         <div class="calc-total-big" :class="calcTotal >= 0 ? 'calc-positive' : 'calc-negative'">
           ¥{{ formatNumber(calcTotal) }}
         </div>
@@ -483,6 +517,7 @@ const transactionTypeMeta = {
 
 const getTransactionTypeLabel = (type) => transactionTypeMeta[type]?.label || type
 const getTransactionTypeTag = (type) => transactionTypeMeta[type]?.tagType || 'info'
+const getTransactionTypeColor = (type) => transactionTypeMeta[type]?.amountColor || '#666'
 const getAmountColor = (row) => transactionTypeMeta[row.transaction_type]?.amountColor || '#333'
 
 const formatNumber = (num) => {
@@ -519,7 +554,8 @@ export default {
     const calcLoading = ref(false)
     const calcStartDate = ref('')
     const calcEndDate = ref('')
-    const calcRows = ref([])
+    const calcPositiveItems = ref([])
+    const calcNegativeItems = ref([])
 
     const usersList = ref([])
     const categories = ref([])
@@ -873,34 +909,51 @@ export default {
     // 类别金额计算器
     const calcSummary = ref({})
 
-    const calcCategoriesByType = (type) => {
-      if (!type) return categories.value
-      return categories.value.filter(cat => cat.type === type || cat.type === 'all')
-    }
+    const isCalcSummaryLoaded = computed(() => Object.keys(calcSummary.value).length > 0)
 
-    const handleCalcTypeChange = (row) => {
-      const valid = calcCategoriesByType(row.type).some(cat => cat.code === row.category)
-      if (!valid) {
-        row.category = ''
-      }
+    const calcCategoryGroups = computed(() => {
+      const groups = {}
+      const typeOrder = ['income', 'expense', 'adjustment']
+      categories.value.forEach(cat => {
+        if (!cat.type || cat.type === 'all') return
+        if (!groups[cat.type]) groups[cat.type] = []
+        groups[cat.type].push(cat)
+      })
+      return typeOrder
+        .filter(type => groups[type] && groups[type].length > 0)
+        .map(type => ({
+          type,
+          label: transactionTypeMeta[type]?.label || type,
+          categories: groups[type].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        }))
+    })
+
+    const isCalcSelected = (code) => {
+      return calcPositiveItems.value.includes(code) || calcNegativeItems.value.includes(code)
     }
 
     const calcAmount = (code) => {
       return Number(calcSummary.value[code]?.amount || 0)
     }
 
+    const positiveTotal = computed(() => {
+      return calcPositiveItems.value.reduce((sum, code) => sum + calcAmount(code), 0)
+    })
+
+    const negativeTotal = computed(() => {
+      return calcNegativeItems.value.reduce((sum, code) => sum + calcAmount(code), 0)
+    })
+
     const calcTotal = computed(() => {
-      return calcRows.value.reduce((sum, row) => {
-        const amount = calcAmount(row.category)
-        return row.sign === '-' ? sum - amount : sum + amount
-      }, 0)
+      return positiveTotal.value - negativeTotal.value
     })
 
     const resetCalculator = () => {
       calcStartDate.value = filterStartDate.value || ''
       calcEndDate.value = filterEndDate.value || ''
       calcSummary.value = {}
-      calcRows.value = [{ type: '', category: '', sign: '+' }]
+      calcPositiveItems.value = []
+      calcNegativeItems.value = []
     }
 
     const openCalculator = async () => {
@@ -909,15 +962,36 @@ export default {
       await loadCalcSummary()
     }
 
-    const addCalcRow = () => {
-      calcRows.value.push({ type: '', category: '', sign: '+' })
+    const toggleCalcCategory = (cat) => {
+      if (isCalcSelected(cat.code)) {
+        removeCalcCategory(cat.code)
+      } else {
+        calcPositiveItems.value.push(cat.code)
+      }
     }
 
-    const removeCalcRow = (index) => {
-      calcRows.value.splice(index, 1)
-      if (calcRows.value.length === 0) {
-        addCalcRow()
+    const removeCalcCategory = (code) => {
+      calcPositiveItems.value = calcPositiveItems.value.filter(c => c !== code)
+      calcNegativeItems.value = calcNegativeItems.value.filter(c => c !== code)
+    }
+
+    const moveCalcToZone = (code, zone) => {
+      calcPositiveItems.value = calcPositiveItems.value.filter(c => c !== code)
+      calcNegativeItems.value = calcNegativeItems.value.filter(c => c !== code)
+      if (zone === 'positive') {
+        calcPositiveItems.value.push(code)
+      } else {
+        calcNegativeItems.value.push(code)
       }
+    }
+
+    const handleCalcDragStart = (event, code) => {
+      event.dataTransfer.setData('text/plain', code)
+    }
+
+    const handleCalcDrop = (event, zone) => {
+      const code = event.dataTransfer.getData('text/plain')
+      if (code) moveCalcToZone(code, zone)
     }
 
     const loadCalcSummary = async () => {
@@ -930,7 +1004,6 @@ export default {
         if (res.data.status === 'success') {
           const byCategory = (res.data.data?.by_category || [])
           calcSummary.value = Object.fromEntries(byCategory.map(item => [item.category, item]))
-          ElMessage.success('金额已加载')
         } else {
           ElMessage.warning(res.data.message || '加载金额失败')
         }
@@ -1340,15 +1413,22 @@ export default {
       calcLoading,
       calcStartDate,
       calcEndDate,
-      calcRows,
-      calcCategoriesByType,
+      calcPositiveItems,
+      calcNegativeItems,
+      calcCategoryGroups,
+      isCalcSelected,
+      isCalcSummaryLoaded,
       calcAmount,
+      positiveTotal,
+      negativeTotal,
       calcTotal,
-      handleCalcTypeChange,
+      toggleCalcCategory,
+      removeCalcCategory,
+      moveCalcToZone,
+      handleCalcDragStart,
+      handleCalcDrop,
       resetCalculator,
       openCalculator,
-      addCalcRow,
-      removeCalcRow,
       loadCalcSummary,
       accountTypeLabel,
       dialogTitle,
@@ -1363,6 +1443,7 @@ export default {
       getCategoryColor,
       getTransactionTypeLabel,
       getTransactionTypeTag,
+      getTransactionTypeColor,
       getAmountColor,
       formatNumber,
       applyFilter,
@@ -1858,29 +1939,57 @@ export default {
 }
 
 /* 类别金额计算器 */
-.calc-header {
+.calc-category-filter {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 16px;
   margin-bottom: 18px;
   padding-bottom: 16px;
   border-bottom: 1px solid #f0f0f0;
 }
+.calc-category-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.calc-category-group-label {
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 72px;
+  padding-top: 6px;
+}
+.calc-category-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1;
+}
+.calc-category-tag {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+.calc-category-tag:hover {
+  transform: translateY(-1px);
+}
+.calc-category-tag .calc-tag-amount {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.9;
+  font-family: monospace;
+}
+
 .calc-dates {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 .calc-date-sep {
   color: #999;
-}
-.calc-total {
-  font-size: 16px;
-  color: #555;
-  font-weight: 600;
 }
 .calc-positive {
   color: #27ae60;
@@ -1889,39 +1998,89 @@ export default {
   color: #e74c3c;
 }
 
-.calc-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.calc-zones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   margin-bottom: 16px;
 }
-.calc-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: #fafbff;
-  border-radius: 8px;
-  padding: 10px 12px;
+.calc-zone {
+  border: 1px dashed #dcdfe6;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fafbfc;
+  min-height: 120px;
 }
-.calc-row-amount {
-  min-width: 100px;
-  text-align: right;
-  font-weight: 700;
+.calc-zone--positive {
+  border-color: #67c23a;
+  background: #f6ffed;
+}
+.calc-zone--negative {
+  border-color: #f56c6c;
+  background: #fff2f0;
+}
+.calc-zone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.calc-zone-title {
   font-size: 15px;
+  font-weight: 600;
+}
+.calc-zone--positive .calc-zone-title {
+  color: #67c23a;
+}
+.calc-zone--negative .calc-zone-title {
+  color: #f56c6c;
+}
+.calc-zone-total {
+  font-size: 13px;
+  font-weight: 600;
   font-family: monospace;
 }
-
-.calc-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.calc-zone-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.calc-option-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
+.calc-zone-empty {
+  font-size: 13px;
+  color: #bbb;
+  padding: 8px 0;
+}
+.calc-zone-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  cursor: move;
+  transition: transform 0.15s;
+}
+.calc-zone-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.calc-zone-item-name {
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calc-zone-item-amount {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: monospace;
+  color: #666;
 }
 
 .calc-summary {
@@ -1933,14 +2092,21 @@ export default {
   padding-top: 16px;
   border-top: 1px solid #f0f0f0;
 }
-.calc-summary-tip {
-  font-size: 12px;
-  color: #999;
+.calc-summary-formula {
+  font-size: 13px;
+  color: #666;
+  font-family: monospace;
 }
 .calc-total-big {
   font-size: 28px;
   font-weight: 700;
   font-family: monospace;
+}
+
+@media (max-width: 640px) {
+  .calc-zones {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 响应式 */
