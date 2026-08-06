@@ -70,39 +70,23 @@
         <el-input v-model="filterSourceNo" placeholder="搜索单号" clearable style="width: 180px" @keyup.enter="fetchRecords" />
         <el-button type="primary" @click="fetchRecords"><el-icon><Search /></el-icon> 查询</el-button>
         <el-button @click="resetFilter">重置</el-button>
+        <el-button type="warning" :icon="Histogram" @click="openCalculator">类别计算器</el-button>
       </div>
     </div>
 
     <!-- 统计卡片 -->
     <div class="stats-cards">
-      <div class="stat-card clickable" @click="applyFilter({})">
+      <div class="stat-card clickable" :class="{ 'active-card': selectedCategoryType === '' }" @click="applyFilter({})">
         <div class="stat-label">净收支</div>
         <div class="stat-value" :style="{ color: summary.net_amount >= 0 ? '#27ae60' : '#e74c3c' }">¥{{ formatNumber(summary.net_amount) }}</div>
         <div class="stat-sub">共 {{ summary.total_count || 0 }} 条记录</div>
       </div>
-      <div class="stat-card clickable stat-card-income" @click="applyFilter({ transaction_type: 'income' })">
-        <div class="income-card-header">
-          <div>
-            <div class="stat-label">收入总计</div>
-            <div class="stat-value" style="color: #27ae60;">¥{{ formatNumber(typeStats.income?.amount || 0) }}</div>
-            <div class="stat-sub">共 {{ typeStats.income?.count || 0 }} 条</div>
-          </div>
-        </div>
-        <div v-if="incomeCategoryItems.length > 0" class="income-category-treemap">
-          <div
-            v-for="item in incomeCategoryItems"
-            :key="item.category"
-            class="income-treemap-item"
-            :style="{ flex: item.flex, background: item.color }"
-            :title="`${item.name}: ¥${formatNumber(item.value)} (${item.percent}%)`"
-          >
-            <div class="income-treemap-name">{{ item.name }}</div>
-            <div class="income-treemap-value">¥{{ formatNumber(item.value) }}</div>
-            <div class="income-treemap-percent">{{ item.percent }}%</div>
-          </div>
-        </div>
+      <div class="stat-card clickable" :class="{ 'active-card': selectedCategoryType === 'income' }" @click="applyFilter({ transaction_type: 'income' })">
+        <div class="stat-label">收入总计</div>
+        <div class="stat-value" style="color: #27ae60;">¥{{ formatNumber(typeStats.income?.amount || 0) }}</div>
+        <div class="stat-sub">共 {{ typeStats.income?.count || 0 }} 条</div>
       </div>
-      <div class="stat-card clickable" @click="applyFilter({ transaction_type: 'expense' })">
+      <div class="stat-card clickable" :class="{ 'active-card': selectedCategoryType === 'expense' }" @click="applyFilter({ transaction_type: 'expense' })">
         <div class="stat-label">支出总计</div>
         <div class="stat-value" style="color: #e74c3c;">¥{{ formatNumber(typeStats.expense?.amount || 0) }}</div>
         <div class="stat-sub">共 {{ typeStats.expense?.count || 0 }} 条</div>
@@ -113,6 +97,114 @@
         <div class="stat-sub">共 {{ unreimbursedSummary.total_count || 0 }} 条</div>
       </div>
     </div>
+
+    <!-- 分类占比子卡片 -->
+    <div v-if="categoryItems.length > 0" class="category-sub-cards">
+      <div
+        v-for="item in categoryItems"
+        :key="item.category"
+        class="category-sub-card clickable"
+        :style="{ borderColor: item.color }"
+        @click="applyCategoryFilter(item)"
+      >
+        <div class="category-sub-card-name">{{ item.name }}</div>
+        <div class="category-sub-card-percent" :style="{ color: item.color }">{{ item.percent }}%</div>
+        <div class="category-sub-card-amount">¥{{ formatNumber(item.value) }}</div>
+        <div class="category-sub-card-bar" :style="{ width: item.percent + '%', background: item.color }"></div>
+      </div>
+    </div>
+
+    <!-- 类别金额计算器 -->
+    <el-dialog
+      v-model="calcDialogVisible"
+      title="类别金额计算器"
+      width="760px"
+      :destroy-on-close="true"
+      :close-on-click-modal="false"
+      align-center
+      @closed="resetCalculator"
+    >
+      <div class="calc-header">
+        <div class="calc-dates">
+          <el-date-picker
+            v-model="calcStartDate"
+            type="date"
+            placeholder="开始日期"
+            value-format="YYYY-MM-DD"
+            clearable
+            style="width: 150px"
+          />
+          <span class="calc-date-sep">~</span>
+          <el-date-picker
+            v-model="calcEndDate"
+            type="date"
+            placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            clearable
+            style="width: 150px"
+          />
+          <el-button type="primary" :icon="Refresh" @click="loadCalcSummary" :loading="calcLoading">
+            加载金额
+          </el-button>
+        </div>
+        <div class="calc-total">
+          总计：<span :class="calcTotal >= 0 ? 'calc-positive' : 'calc-negative'">¥{{ formatNumber(calcTotal) }}</span>
+        </div>
+      </div>
+
+      <div class="calc-rows">
+        <div v-for="(row, index) in calcRows" :key="index" class="calc-row">
+          <el-select
+            v-model="row.type"
+            placeholder="全部类型"
+            clearable
+            style="width: 130px"
+            @change="handleCalcTypeChange(row)"
+          >
+            <el-option label="支出" value="expense" />
+            <el-option label="收入" value="income" />
+            <el-option label="盘盈冲正" value="adjustment" />
+          </el-select>
+          <el-select
+            v-model="row.category"
+            placeholder="选择类别"
+            clearable
+            filterable
+            style="flex: 1"
+          >
+            <el-option
+              v-for="cat in calcCategoriesByType(row.type)"
+              :key="cat.code"
+              :label="cat.name"
+              :value="cat.code"
+            >
+              <span class="calc-option">
+                <span class="calc-option-dot" :style="{ background: cat.color || '#95a5a6' }"></span>
+                {{ cat.name }}（{{ getTransactionTypeLabel(cat.type) }}）
+              </span>
+            </el-option>
+          </el-select>
+          <el-radio-group v-model="row.sign" size="small">
+            <el-radio-button label="+">加</el-radio-button>
+            <el-radio-button label="-">减</el-radio-button>
+          </el-radio-group>
+          <div class="calc-row-amount" :class="calcAmount(row.category) >= 0 ? 'calc-positive' : 'calc-negative'">
+            ¥{{ formatNumber(calcAmount(row.category)) }}
+          </div>
+          <el-button type="danger" text size="small" @click="removeCalcRow(index)">删除</el-button>
+        </div>
+        <el-button type="primary" plain :icon="Plus" @click="addCalcRow">
+          添加类别
+        </el-button>
+      </div>
+
+      <div class="calc-summary">
+        <div class="calc-summary-tip">已选 {{ calcRows.length }} 项，可继续添加类别并切换“加/减”进行汇总</div>
+        <div class="calc-total-big" :class="calcTotal >= 0 ? 'calc-positive' : 'calc-negative'">
+          ¥{{ formatNumber(calcTotal) }}
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 数据表格 -->
     <el-table
@@ -377,7 +469,7 @@
 <script>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Histogram } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTransactionList, getTransactionSummary, createTransaction, updateTransaction, deleteTransaction, toggleReimburseStatus, getTransactionLogs, getUserOptions, getTransactionCategories } from '@/services/api.js'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
@@ -385,7 +477,8 @@ import { useListQuerySync } from '@/composables/useListQuerySync.js'
 const transactionTypeMeta = {
   expense: { label: '支出', tagType: 'danger', amountColor: '#e74c3c' },
   income: { label: '收入', tagType: 'success', amountColor: '#27ae60' },
-  adjustment: { label: '盘盈冲正', tagType: 'primary', amountColor: '#3498db' }
+  adjustment: { label: '盘盈冲正', tagType: 'primary', amountColor: '#3498db' },
+  all: { label: '通用', tagType: 'info', amountColor: '#95a5a6' }
 }
 
 const getTransactionTypeLabel = (type) => transactionTypeMeta[type]?.label || type
@@ -420,6 +513,14 @@ export default {
     const filterReimbursed = ref('')
     const filterCreatedBy = ref('')
     const filterSourceNo = ref('')
+
+    // 类别金额计算器
+    const calcDialogVisible = ref(false)
+    const calcLoading = ref(false)
+    const calcStartDate = ref('')
+    const calcEndDate = ref('')
+    const calcRows = ref([])
+
     const usersList = ref([])
     const categories = ref([])
     const categoriesLoading = ref(false)
@@ -694,24 +795,27 @@ export default {
       return result
     })
 
-    // 收入分类汇总（用于收入总计卡片内部分类展示）
-    const incomeCategoryItems = computed(() => {
+    // 当前选中用于展示分类占比的交易类型（默认支出）
+    const selectedCategoryType = ref('expense')
+
+    // 选中交易类型的分类占比卡片数据
+    const categoryItems = computed(() => {
+      const t = selectedCategoryType.value
       const items = (summary.value.by_category || [])
-        .filter(item => item.transaction_type === 'income' && item.amount > 0)
+        .filter(item => item.transaction_type === t && item.amount > 0)
         .map(item => {
           const cat = categories.value.find(c => c.code === item.category)
           return {
             category: item.category,
             name: cat?.name || item.category,
             value: Number(item.amount || 0),
-            color: cat?.color || '#27ae60'
+            color: cat?.color || (t === 'income' ? '#27ae60' : '#e74c3c')
           }
         })
         .sort((a, b) => b.value - a.value)
-      const total = Math.max(typeStats.value.income?.amount || 0, 0.01)
+      const total = Math.max(typeStats.value[t]?.amount || 0, 0.01)
       return items.map(i => ({
         ...i,
-        flex: Math.max(i.value / total, 0.05),
         percent: ((i.value / total) * 100).toFixed(1)
       }))
     })
@@ -749,6 +853,92 @@ export default {
       filterCategory.value = filters.category || ''
       filterAccountType.value = filters.account_type || ''
       filterReimbursed.value = filters.reimbursed !== undefined ? filters.reimbursed : ''
+      if (filters.transaction_type === 'income' || filters.transaction_type === 'expense') {
+        selectedCategoryType.value = filters.transaction_type
+      }
+    }
+
+    // 点击分类占比子卡片，加载该分类的数据
+    const applyCategoryFilter = (item) => {
+      filterTransactionType.value = selectedCategoryType.value
+      filterCategory.value = item.category
+      filterAccountType.value = ''
+      filterReimbursed.value = ''
+      filterCreatedBy.value = ''
+      filterSourceNo.value = ''
+      currentPage.value = 1
+      fetchRecords()
+    }
+
+    // 类别金额计算器
+    const calcSummary = ref({})
+
+    const calcCategoriesByType = (type) => {
+      if (!type) return categories.value
+      return categories.value.filter(cat => cat.type === type || cat.type === 'all')
+    }
+
+    const handleCalcTypeChange = (row) => {
+      const valid = calcCategoriesByType(row.type).some(cat => cat.code === row.category)
+      if (!valid) {
+        row.category = ''
+      }
+    }
+
+    const calcAmount = (code) => {
+      return Number(calcSummary.value[code]?.amount || 0)
+    }
+
+    const calcTotal = computed(() => {
+      return calcRows.value.reduce((sum, row) => {
+        const amount = calcAmount(row.category)
+        return row.sign === '-' ? sum - amount : sum + amount
+      }, 0)
+    })
+
+    const resetCalculator = () => {
+      calcStartDate.value = filterStartDate.value || ''
+      calcEndDate.value = filterEndDate.value || ''
+      calcSummary.value = {}
+      calcRows.value = [{ type: '', category: '', sign: '+' }]
+    }
+
+    const openCalculator = async () => {
+      calcDialogVisible.value = true
+      resetCalculator()
+      await loadCalcSummary()
+    }
+
+    const addCalcRow = () => {
+      calcRows.value.push({ type: '', category: '', sign: '+' })
+    }
+
+    const removeCalcRow = (index) => {
+      calcRows.value.splice(index, 1)
+      if (calcRows.value.length === 0) {
+        addCalcRow()
+      }
+    }
+
+    const loadCalcSummary = async () => {
+      calcLoading.value = true
+      try {
+        const params = {}
+        if (calcStartDate.value) params.start_date = calcStartDate.value
+        if (calcEndDate.value) params.end_date = calcEndDate.value
+        const res = await getTransactionSummary(params)
+        if (res.data.status === 'success') {
+          const byCategory = (res.data.data?.by_category || [])
+          calcSummary.value = Object.fromEntries(byCategory.map(item => [item.category, item]))
+          ElMessage.success('金额已加载')
+        } else {
+          ElMessage.warning(res.data.message || '加载金额失败')
+        }
+      } catch (err) {
+        handleApiError(err)
+      } finally {
+        calcLoading.value = false
+      }
     }
 
     // 获取用户列表（创建人筛选用）
@@ -1144,7 +1334,22 @@ export default {
       summary,
       unreimbursedSummary,
       typeStats,
-      incomeCategoryItems,
+      selectedCategoryType,
+      categoryItems,
+      calcDialogVisible,
+      calcLoading,
+      calcStartDate,
+      calcEndDate,
+      calcRows,
+      calcCategoriesByType,
+      calcAmount,
+      calcTotal,
+      handleCalcTypeChange,
+      resetCalculator,
+      openCalculator,
+      addCalcRow,
+      removeCalcRow,
+      loadCalcSummary,
       accountTypeLabel,
       dialogTitle,
       showReimbursed,
@@ -1161,6 +1366,7 @@ export default {
       getAmountColor,
       formatNumber,
       applyFilter,
+      applyCategoryFilter,
       resetFilter,
       handleSizeChange,
       openAddDialog,
@@ -1182,6 +1388,8 @@ export default {
       exportData,
       Plus,
       Search,
+      Refresh,
+      Histogram,
       router
     }
   }
@@ -1240,6 +1448,10 @@ export default {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
+.stat-card.active-card {
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.4), 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
 .stat-label {
   font-size: 14px;
   color: #999;
@@ -1257,61 +1469,59 @@ export default {
   margin-top: 6px;
 }
 
-/* 收入总计卡片 */
-.stat-card-income {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+/* 分类占比子卡片 */
+.category-sub-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
 }
 
-.income-category-treemap {
-  display: flex;
-  width: 100%;
-  height: 56px;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-top: 14px;
-}
-
-.income-treemap-item {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-width: 42px;
-  padding: 4px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-  font-size: 11px;
-  line-height: 1.2;
-  transition: opacity 0.2s;
+.category-sub-card {
+  position: relative;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid #e74c3c;
   cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
 }
 
-.income-treemap-item:hover {
-  opacity: 0.85;
+.category-sub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
 }
 
-.income-treemap-name {
+.category-sub-card-name {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
-  font-weight: 500;
 }
 
-.income-treemap-value {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  font-size: 10px;
-  margin-top: 2px;
+.category-sub-card-percent {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
 }
 
-.income-treemap-percent {
-  font-size: 10px;
-  opacity: 0.9;
+.category-sub-card-amount {
+  font-size: 12px;
+  color: #999;
+}
+
+.category-sub-card-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  opacity: 0.5;
+  border-radius: 0 2px 0 0;
 }
 
 /* 分类统计 */
@@ -1645,6 +1855,92 @@ export default {
   word-break: break-all;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* 类别金额计算器 */
+.calc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.calc-dates {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.calc-date-sep {
+  color: #999;
+}
+.calc-total {
+  font-size: 16px;
+  color: #555;
+  font-weight: 600;
+}
+.calc-positive {
+  color: #27ae60;
+}
+.calc-negative {
+  color: #e74c3c;
+}
+
+.calc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.calc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fafbff;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.calc-row-amount {
+  min-width: 100px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: monospace;
+}
+
+.calc-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.calc-option-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.calc-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+.calc-summary-tip {
+  font-size: 12px;
+  color: #999;
+}
+.calc-total-big {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: monospace;
 }
 
 /* 响应式 */

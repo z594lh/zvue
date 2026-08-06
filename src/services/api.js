@@ -340,6 +340,49 @@ export const getTransactionCategories = (params = {}) => {
   return api.get('/options/transactions/categories', { params });
 };
 
+// ==================== 记账分类管理 ====================
+
+/**
+ * 获取记账分类管理列表
+ * @param {Object} params {type, page, page_size}
+ */
+export const getTransactionCategoryList = (params = {}) => {
+  return api.get('/transactions/categories', { params });
+};
+
+/**
+ * 获取记账分类详情
+ * @param {number|string} id
+ */
+export const getTransactionCategoryDetail = (id) => {
+  return api.get(`/transactions/categories/${id}`);
+};
+
+/**
+ * 新增记账分类
+ * @param {Object} data {code, name, type, color, sort_order}
+ */
+export const createTransactionCategory = (data) => {
+  return api.post('/transactions/categories', data);
+};
+
+/**
+ * 更新记账分类
+ * @param {number|string} id
+ * @param {Object} data
+ */
+export const updateTransactionCategory = (id, data) => {
+  return api.put(`/transactions/categories/${id}`, data);
+};
+
+/**
+ * 删除记账分类
+ * @param {number|string} id
+ */
+export const deleteTransactionCategory = (id) => {
+  return api.delete(`/transactions/categories/${id}`);
+};
+
 export const getWarehouseOptions = (shop_id) => {
   return api.get('/options/amazon/warehouses', { params: { shop_id } });
 };

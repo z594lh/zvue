@@ -5,6 +5,7 @@ import AiImageView from '../views/AiImageView.vue'
 import ImageGallery from '../views/ImageGallery.vue'
 import LoginView from '../views/LoginView.vue'
 import TransactionView from '../views/TransactionView.vue'
+import TransactionCategoryView from '../views/TransactionCategoryView.vue'
 import PricingView from '../views/PricingView.vue'
 import FbaLabelView from '../views/FbaLabelView.vue'
 import LabelOrganizeView from '../views/LabelOrganizeView.vue'
@@ -81,6 +82,12 @@ const routes = [
     name: 'Transactions',
     component: TransactionView,
     meta: { title: '收支记账', componentName: 'TransactionView' }
+  },
+  {
+    path: '/transaction-categories',
+    name: 'TransactionCategories',
+    component: TransactionCategoryView,
+    meta: { title: '账目类别管理', componentName: 'TransactionCategoryView' }
   },
   {
     path: '/expense',

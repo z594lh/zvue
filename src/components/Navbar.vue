@@ -127,6 +127,7 @@ const fallbackNavGroups = [
     label: '财务',
     children: [
       { label: '支出记账', path: '/expense' },
+      { label: '账目类别管理', path: '/transaction-categories' },
       { label: '计算售价', path: '/pricing' }
     ]
   },
