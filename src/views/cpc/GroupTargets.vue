@@ -20,7 +20,6 @@
           </template>
         </el-dropdown>
         <div class="toolbar-right">
-          <el-date-picker v-model="filter.dateRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width:180px" @change="fetchData" />
           <el-button @click="handleExport">导出</el-button>
         </div>
       </div>
@@ -32,13 +31,16 @@
               <th width="40"><el-checkbox v-model="selectAll" @change="toggleSelectAll" /></th>
               <th>投放类型</th>
               <th>状态</th>
-              <th>建议竞价</th>
               <th>竞价</th>
               <th>曝光</th>
               <th>点击</th>
               <th>花费</th>
-              <th>CPC</th>
-              <th>CTR</th>
+              <th>订单数</th>
+              <th>销售额</th>
+              <th>CPC <el-tooltip content="每次点击成本（Cost Per Click）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip></th>
+              <th>CTR <el-tooltip content="点击率（Click-Through Rate）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip></th>
+              <th>CVR <el-tooltip content="转化率（Conversion Rate）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip></th>
+              <th>CPA <el-tooltip content="单次获客成本（Cost Per Acquisition）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip></th>
             </tr>
           </thead>
           <tbody>
@@ -51,7 +53,6 @@
               <td align="center">
                 <el-switch :model-value="row.state === 'ENABLED'" inline-prompt :disabled="row._loading" :loading="row._loading" @change="(val) => toggleState(row, val)" />
               </td>
-              <td align="right">--</td>
               <td align="right">
                 <span v-if="!row._editing" class="editable-cell" @click="startEditBid(row)">${{ formatNum(row.bid) }}</span>
                 <el-input-number
@@ -66,8 +67,12 @@
               <td align="right">{{ fmtInt(row.impressions) }}</td>
               <td align="right">{{ fmtInt(row.clicks) }}</td>
               <td align="right">${{ formatNum(row.cost) }}</td>
+              <td align="right">{{ fmtInt(row.purchases_7d) }}</td>
+              <td align="right">${{ formatNum(row.sales_7d) }}</td>
               <td align="right">${{ formatNum(row.cpc) }}</td>
               <td align="right">{{ fmtPct(row.ctr) }}</td>
+              <td align="right">{{ fmtPct(row.cvr) }}</td>
+              <td align="right">${{ formatNum(row.cpa) }}</td>
             </tr>
           </tbody>
         </table>
@@ -95,7 +100,6 @@
           </template>
         </el-dropdown>
         <div class="toolbar-right">
-          <el-date-picker v-model="filter.dateRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width:180px" @change="fetchData" />
           <el-button @click="handleExport">导出</el-button>
         </div>
       </div>
@@ -307,6 +311,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, ArrowDown, Edit, Delete, InfoFilled, UploadFilled, Warning } from '@element-plus/icons-vue'
+import { useCpcDateRange } from '@/composables/useCpcDateRange'
 import {
   getCpcTargetsAuto,
   updateCpcTarget,
@@ -327,6 +332,8 @@ const props = defineProps({
 
 const isAuto = computed(() => props.targetingType === 'AUTO')
 
+const { startDate, endDate } = useCpcDateRange()
+
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
@@ -334,7 +341,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const selectAll = ref(false)
 const batchLoading = ref(false)
-const filter = reactive({ search: '', state: '', dateRange: [] })
+const filter = reactive({ search: '', state: '' })
 
 const expressionMap = {
   'QUERY_HIGH_REL_MATCHES': '紧密匹配',
@@ -371,8 +378,8 @@ const fetchData = async () => {
         shop_id: props.shopId,
         page: page.value,
         page_size: pageSize.value,
-        start_date: filter.dateRange?.[0] || '',
-        end_date: filter.dateRange?.[1] || '',
+        start_date: startDate.value || '',
+        end_date: endDate.value || '',
         search: filter.search,
         state: filter.state
       })
@@ -390,8 +397,8 @@ const fetchData = async () => {
         shop_id: props.shopId,
         page: page.value,
         page_size: pageSize.value,
-        start_date: filter.dateRange?.[0] || '',
-        end_date: filter.dateRange?.[1] || '',
+        start_date: startDate.value || '',
+        end_date: endDate.value || '',
         search: filter.search,
         state: filter.state
       })
@@ -416,7 +423,11 @@ watch(() => props.targetingType, () => {
   page.value = 1
   filter.search = ''
   filter.state = ''
-  filter.dateRange = []
+  fetchData()
+})
+
+watch([startDate, endDate], () => {
+  page.value = 1
   fetchData()
 })
 
@@ -500,15 +511,19 @@ const handleExport = () => {
       { key: 'impressions', label: '曝光' },
       { key: 'clicks', label: '点击' },
       { key: 'cost', label: '花费' },
+      { key: 'purchases_7d', label: '订单数' },
+      { key: 'sales_7d', label: '销售额' },
       { key: 'cpc', label: 'CPC' },
-      { key: 'ctr', label: 'CTR' }
+      { key: 'ctr', label: 'CTR' },
+      { key: 'cvr', label: 'CVR' },
+      { key: 'cpa', label: 'CPA' }
     ]
     const ok = exportToCSV('自动投放列表', columns, tableData.value, (val, col, row) => {
       if (col.key === 'target') return row.resolved_expression_label || row.resolved_expression
       if (col.key === 'state') return row.state === 'ENABLED' ? '启用' : (row.state === 'PAUSED' ? '暂停' : '归档')
-      if (col.key === 'ctr') return fmtPct(val)
-      if (['cost', 'cpc', 'bid'].includes(col.key)) return formatNum(val)
-      if (['impressions', 'clicks'].includes(col.key)) return fmtInt(val)
+      if (['ctr', 'cvr'].includes(col.key)) return fmtPct(val)
+      if (['cost', 'cpc', 'bid', 'cpa', 'sales_7d'].includes(col.key)) return formatNum(val)
+      if (['impressions', 'clicks', 'purchases_7d'].includes(col.key)) return fmtInt(val)
       return val
     })
     if (!ok) ElMessage.warning('暂无数据可导出')
@@ -769,6 +784,8 @@ watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true }
 .editable-cell:hover { text-decoration: underline; }
 .sub-text { color: #909399; font-size: 11px; }
 .pagination-wrap { margin-top: 12px; display: flex; justify-content: flex-end; }
+.header-tip-icon { color: #909399; font-size: 12px; vertical-align: middle; margin-left: 2px; cursor: pointer; }
+.header-tip-icon:hover { color: #409eff; }
 
 .keyword-cell { line-height: 1.4; }
 .keyword-text { color: #303133; font-weight: 500; }

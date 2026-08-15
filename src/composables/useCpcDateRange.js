@@ -59,10 +59,18 @@ export function useCpcDateRange() {
     sessionStorage.setItem(CPC_DATE_KEY, JSON.stringify({ startDate: s, endDate: e }))
   })
 
+  const resetDateRange = () => {
+    const { startDate: s, endDate: e } = getLast30Days()
+    startDate.value = s
+    endDate.value = e
+    sessionStorage.setItem(CPC_DATE_KEY, JSON.stringify({ startDate: s, endDate: e }))
+  }
+
   return {
     startDate,
     endDate,
     setStartDate,
-    setEndDate
+    setEndDate,
+    resetDateRange
   }
 }

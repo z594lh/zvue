@@ -7,7 +7,6 @@
 
     <div class="toolbar">
       <div class="toolbar-right">
-        <el-date-picker v-model="filter.dateRange" type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width:180px" @change="fetchData" />
         <el-button @click="handleExport">导出</el-button>
       </div>
     </div>
@@ -68,15 +67,18 @@
 
 <script setup>
 /* eslint-disable no-undef */
-import { ref, reactive, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getCpcPlacements, updateCpcPlacement, getCpcCampaign } from '@/services/cpc'
 import { exportToCSV } from '@/utils/export'
+import { useCpcDateRange } from '@/composables/useCpcDateRange'
 
 const props = defineProps({
   shopId: { type: [Number, String], default: null },
   campaignId: { type: [Number, String], required: true }
 })
+
+const { startDate, endDate } = useCpcDateRange()
 
 const loading = ref(false)
 const tableData = ref([])
@@ -84,7 +86,6 @@ const campaignBiddingLabel = ref('--')
 const bidVisible = ref(false)
 const bidSaving = ref(false)
 const bidForm = ref({ placement: '', percentage: 0 })
-const filter = reactive({ dateRange: [] })
 
 const placementMap = {
   'Top of Search on-Amazon': '搜索结果顶部（首页）',
@@ -113,8 +114,8 @@ const fetchData = async () => {
       getCpcPlacements({
         campaign_id: props.campaignId,
         shop_id: props.shopId,
-        start_date: filter.dateRange?.[0] || '',
-        end_date: filter.dateRange?.[1] || ''
+        start_date: startDate.value || '',
+        end_date: endDate.value || ''
       }),
       getCpcCampaign(props.campaignId, { shop_id: props.shopId })
     ])
@@ -182,6 +183,7 @@ const fmtInt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleS
 const fmtPct = (val) => val != null && Number(val) !== 0 ? Number(val).toFixed(2) + '%' : '--'
 
 watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true })
+watch([startDate, endDate], () => { if (props.shopId) fetchData() })
 </script>
 
 <style scoped>

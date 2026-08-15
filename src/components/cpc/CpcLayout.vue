@@ -27,11 +27,19 @@
             :value="shop.id"
           />
         </el-select>
-        <div class="date-range-pickers">
-          <el-date-picker v-model="startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" class="date-start-picker" @change="setStartDate" />
-          <span class="date-separator">~</span>
-          <el-date-picker v-model="endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" class="date-end-picker" @change="setEndDate" />
-        </div>
+        <el-tooltip content="筛选所有 CPC 报表的时间范围，默认最近 30 天" placement="bottom">
+          <div class="date-range-pickers">
+            <el-date-picker v-model="startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" class="date-start-picker" @change="setStartDate" />
+            <span class="date-separator">~</span>
+            <el-date-picker v-model="endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" class="date-end-picker" @change="setEndDate" />
+          </div>
+        </el-tooltip>
+        <el-button size="small" @click="resetDateRange">重置日期</el-button>
+        <el-button size="small" :loading="latestDateLoading" @click="fetchLatestDate">最新一天数据</el-button>
+        <template v-if="isSingleDay">
+          <el-button size="small" :icon="ArrowLeft" @click="shiftDate(-1)">前一天</el-button>
+          <el-button size="small" @click="shiftDate(1)">后一天<el-icon class="el-icon--right"><ArrowRight /></el-icon></el-button>
+        </template>
         <slot name="tab-extra" />
       </div>
     </div>
@@ -48,8 +56,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { useShopCache } from '@/composables/useShopCache'
 import { useCpcDateRange } from '@/composables/useCpcDateRange'
+import { getCpcLatestReportDate } from '@/services/cpc'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,7 +73,10 @@ const emit = defineEmits(['shopChange'])
 
 const selectedShopId = ref(null)
 const CPC_SHOP_KEY = 'cpc_shop_id'
-const { startDate, endDate, setStartDate, setEndDate } = useCpcDateRange()
+const { startDate, endDate, setStartDate, setEndDate, resetDateRange } = useCpcDateRange()
+const latestDateLoading = ref(false)
+
+const isSingleDay = computed(() => startDate.value && endDate.value && startDate.value === endDate.value)
 
 const tabs = [
   { key: 'campaigns', label: 'SP广告活动', routeName: 'CpcCampaigns' }
@@ -90,6 +103,47 @@ const switchTab = (tab) => {
     return
   }
   router.push({ name: tab.routeName, params: { id: campaignId }, query: { ...route.query } })
+}
+
+const fetchLatestDate = async () => {
+  if (!selectedShopId.value) {
+    ElMessage.warning('请先选择店铺')
+    return
+  }
+  latestDateLoading.value = true
+  try {
+    const res = await getCpcLatestReportDate({
+      shop_id: selectedShopId.value,
+      report_type: 'spCampaigns'
+    })
+    if (res.data.status === 'success') {
+      const latest = res.data.data?.latest_date
+      if (!latest) {
+        ElMessage.warning('暂无报告数据')
+        return
+      }
+      setStartDate(latest)
+      setEndDate(latest)
+      ElMessage.success(`已切换至最新报告日期：${latest}`)
+    } else {
+      ElMessage.warning(res.data.message || '获取最新日期失败')
+    }
+  } catch (err) {
+    const msg = err?.response?.data?.message || err?.message || '获取最新日期失败'
+    ElMessage.error(msg)
+  } finally {
+    latestDateLoading.value = false
+  }
+}
+
+const shiftDate = (days) => {
+  if (!startDate.value) return
+  const date = new Date(startDate.value)
+  date.setDate(date.getDate() + days)
+  const fmt = (d) => d.toISOString().split('T')[0]
+  const newDate = fmt(date)
+  setStartDate(newDate)
+  setEndDate(newDate)
 }
 
 onMounted(async () => {

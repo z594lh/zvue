@@ -10,8 +10,6 @@
         <el-option label="同类商品" value="同类商品" />
         <el-option label="关联商品" value="关联商品" />
       </el-select>
-      <el-date-picker v-model="filter.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width:120px" @change="fetchData" />
-      <el-date-picker v-model="filter.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width:120px" @change="fetchData" />
       <el-button type="primary" @click="fetchData">
         <el-icon><Search /></el-icon> 搜索
       </el-button>
@@ -52,17 +50,17 @@
           <tr>
             <th width="200">顾客搜索词</th>
             <th width="80">投放类型</th>
-            <th width="70">曝光量</th>
-            <th width="60">点击</th>
-            <th width="70">点击率</th>
-            <th width="70">花费</th>
-            <th width="60">CPC</th>
-            <th width="60">购买量</th>
-            <th width="70">销售额</th>
-            <th width="70">ACOS</th>
-            <th width="60">ROAS</th>
-            <th width="60">CPA</th>
-            <th width="60">CVR</th>
+            <th width="90">曝光量 <span class="sort-arrows" @click="sortBy('impressions')">↕</span></th>
+            <th width="80">点击 <span class="sort-arrows" @click="sortBy('clicks')">↕</span></th>
+            <th width="90">点击率 <el-tooltip content="点击率（Click-Through Rate）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('ctr')">↕</span></th>
+            <th width="80">花费 <span class="sort-arrows" @click="sortBy('cost')">↕</span></th>
+            <th width="90">CPC <el-tooltip content="每次点击成本（Cost Per Click）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('cpc')">↕</span></th>
+            <th width="80">购买量 <span class="sort-arrows" @click="sortBy('purchases_7d')">↕</span></th>
+            <th width="90">销售额 <span class="sort-arrows" @click="sortBy('sales_7d')">↕</span></th>
+            <th width="100">ACOS <el-tooltip content="广告销售成本比（Advertising Cost of Sales）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('acos')">↕</span></th>
+            <th width="90">ROAS <el-tooltip content="广告支出回报率（Return on Ad Spend）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('roas')">↕</span></th>
+            <th width="90">CPA <el-tooltip content="单次获客成本（Cost Per Acquisition）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('cpa')">↕</span></th>
+            <th width="90">CVR <el-tooltip content="转化率（Conversion Rate）" placement="top"><el-icon class="header-tip-icon"><Warning /></el-icon></el-tooltip> <span class="sort-arrows" @click="sortBy('cvr')">↕</span></th>
           </tr>
         </thead>
         <tbody>
@@ -106,8 +104,10 @@
 /* eslint-disable no-undef */
 import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Warning } from '@element-plus/icons-vue'
 import { getCpcSearchTerms } from '@/services/cpc'
 import { exportToCSV } from '@/utils/export'
+import { useCpcDateRange } from '@/composables/useCpcDateRange'
 
 const props = defineProps({
   shopId: { type: [Number, String], default: null },
@@ -115,11 +115,14 @@ const props = defineProps({
   adGroupId: { type: [Number, String], required: true }
 })
 
+const { startDate, endDate } = useCpcDateRange()
+
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
+const sort = reactive({ by: '', dir: 'desc' })
 
 const metricFilters = [
   { field: 'impressions', label: '曝光量', precision: 0, step: 1 },
@@ -139,8 +142,12 @@ const buildFilter = () => {
   const base = {
     search: filter.search,
     targeting_type_label: filter.targetingType,
-    start_date: filter.startDate || '',
-    end_date: filter.endDate || ''
+    start_date: startDate.value || '',
+    end_date: endDate.value || ''
+  }
+  if (sort.by) {
+    base.sort_by = sort.by
+    base.sort_dir = sort.dir
   }
   metricFilters.forEach(item => {
     const gte = filter[`${item.field}_gte`]
@@ -154,8 +161,6 @@ const buildFilter = () => {
 const getDefaultFilter = () => ({
   search: '',
   targetingType: '',
-  startDate: '',
-  endDate: '',
   ...metricFilters.reduce((acc, item) => {
     acc[`${item.field}_gte`] = undefined
     acc[`${item.field}_lte`] = undefined
@@ -165,8 +170,26 @@ const getDefaultFilter = () => ({
 
 const filter = reactive(getDefaultFilter())
 
+watch([startDate, endDate], () => {
+  page.value = 1
+  fetchData()
+})
+
 const resetFilter = () => {
   Object.assign(filter, getDefaultFilter())
+  sort.by = ''
+  sort.dir = 'desc'
+  page.value = 1
+  fetchData()
+}
+
+const sortBy = (field) => {
+  if (sort.by === field) {
+    sort.dir = sort.dir === 'desc' ? 'asc' : 'desc'
+  } else {
+    sort.by = field
+    sort.dir = 'desc'
+  }
   page.value = 1
   fetchData()
 }
@@ -275,4 +298,8 @@ watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true }
   color: #c62828;
 }
 .pagination-wrap { margin-top: 8px; display: flex; justify-content: flex-end; }
+.sort-arrows { color: #909399; font-size: 12px; cursor: pointer; margin-left: 2px; }
+.sort-arrows:hover { color: #409eff; }
+.header-tip-icon { color: #909399; font-size: 12px; vertical-align: middle; margin-left: 2px; cursor: pointer; }
+.header-tip-icon:hover { color: #409eff; }
 </style>

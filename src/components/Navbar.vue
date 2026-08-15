@@ -145,7 +145,8 @@ const fallbackNavGroups = [
     label: '报表',
     children: [
       { label: '店铺报表', path: '/reports' },
-      { label: '广告报表', path: '/reports/advertising' }
+      { label: '广告报表', path: '/reports/advertising' },
+      { label: 'FBA仓储费', path: '/reports/fba-storage-fees' }
     ]
   },
   {

@@ -131,6 +131,10 @@ export const getCpcSearchTerms = (params = {}) => {
   return api.get('/search-terms', { params })
 }
 
+export const getCpcLatestReportDate = (params = {}) => {
+  return api.get('/reports/latest-date', { params })
+}
+
 // ==================== 广告位 ====================
 export const getCpcPlacements = (params = {}) => {
   return api.get('/placements', { params })

@@ -1497,6 +1497,64 @@ export const getAdvertisingProducts = (params = {}) => {
   return api.get('/reports/advertising/products', { params });
 };
 
+// ==================== FBA 月度仓储费报表接口 ====================
+
+/**
+ * 获取 FBA 月度仓储费列表
+ * @param {Object} params {shop_id, month_of_charge, search, country_code, fulfillment_center, product_size_tier, page, page_size}
+ */
+export const getFbaStorageFees = (params = {}) => {
+  return api.get('/reports/fba-storage-fees', { params });
+};
+
+/**
+ * 获取 FBA 月度仓储费筛选下拉选项
+ * @param {Object} params {shop_id}
+ */
+export const getFbaStorageFeeFilters = (params = {}) => {
+  return api.get('/options/reports/fba-storage-fees/filters', { params });
+};
+
+/**
+ * 导出 FBA 月度仓储费报表
+ * @param {Object} params 同列表接口（无分页）
+ */
+export const exportFbaStorageFees = (params = {}) => {
+  return api.get('/reports/fba-storage-fees/export', { params, responseType: 'blob' });
+};
+
+/**
+ * 获取 FBA 月度仓储费 SKU 维度透视表
+ * @param {Object} params {shop_id, months, search, country_code, fulfillment_center, product_size_tier, page, page_size}
+ */
+export const getFbaStorageFeesBySku = (params = {}) => {
+  return api.get('/reports/fba-storage-fees/by-sku', { params });
+};
+
+/**
+ * 获取单 SKU FBA 月度仓储费按仓库明细
+ * @param {Object} params {shop_id, seller_sku, months}
+ */
+export const getFbaStorageFeeSkuDetail = (params = {}) => {
+  return api.get('/reports/fba-storage-fees/by-sku/detail', { params });
+};
+
+/**
+ * 导出 FBA 月度仓储费 SKU 维度透视表
+ * @param {Object} params 同 by-sku 接口（无分页）
+ */
+export const exportFbaStorageFeesBySku = (params = {}) => {
+  return api.get('/reports/fba-storage-fees/by-sku/export', { params, responseType: 'blob' });
+};
+
+/**
+ * 手动同步 FBA 月度仓储费数据
+ * @param {Object} data {shop_id}
+ */
+export const syncFbaStorageFees = (data = {}) => {
+  return api.post('/amazon/fba-storage-fees/sync', data);
+};
+
 // ==================== 货代运单管理相关接口 ====================
 
 /**

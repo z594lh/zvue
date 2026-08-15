@@ -29,10 +29,10 @@
             <th width="40"><el-checkbox v-model="selectAll" @change="toggleSelectAll" /></th>
             <th>广告组名称</th>
             <th>状态</th>
-            <th>预算状态</th>
             <th>默认出价</th>
             <th>曝光量</th>
             <th>点击次数</th>
+            <th>订单数</th>
             <th>花费</th>
             <th>CPC</th>
             <th>点击率</th>
@@ -51,9 +51,6 @@
             <td align="center">
               <el-switch :model-value="row.state === 'ENABLED'" inline-prompt :disabled="row._loading" :loading="row._loading" @change="(val) => toggleState(row, val)" />
             </td>
-            <td align="center">
-              <span class="budget-status">{{ row.serving_status || '预算状态暂时无法获取' }}</span>
-            </td>
             <td align="right">
               <span v-if="!row._editing" class="editable-cell" @click="startEditBid(row)">${{ formatNum(row.default_bid) }}</span>
               <el-input-number
@@ -67,6 +64,7 @@
             </td>
             <td align="right">{{ fmtInt(row.impressions) }}</td>
             <td align="right">{{ fmtInt(row.clicks) }}</td>
+            <td align="right">{{ fmtInt(row.purchases_7d) }}</td>
             <td align="right">{{ formatNum(row.cost) }}</td>
             <td align="right">{{ formatNum(row.cpc) }}</td>
             <td align="right">{{ fmtPct(row.ctr) }}</td>
@@ -214,10 +212,10 @@ const handleExport = () => {
     { key: 'name', label: '广告组名称' },
     { key: 'ad_group_id', label: '广告组ID' },
     { key: 'state', label: '状态' },
-    { key: 'serving_status', label: '预算状态' },
     { key: 'default_bid', label: '默认出价' },
     { key: 'impressions', label: '曝光量' },
     { key: 'clicks', label: '点击次数' },
+    { key: 'purchases_7d', label: '订单数' },
     { key: 'cost', label: '花费' },
     { key: 'cpc', label: 'CPC' },
     { key: 'ctr', label: '点击率' },
@@ -227,10 +225,9 @@ const handleExport = () => {
   ]
   const ok = exportToCSV('广告组列表', columns, tableData.value, (val, col, row) => {
     if (col.key === 'state') return row.state === 'ENABLED' ? '启用' : (row.state === 'PAUSED' ? '暂停' : '归档')
-    if (col.key === 'serving_status') return val || '预算状态暂时无法获取'
     if (['ctr', 'cvr', 'acos'].includes(col.key)) return fmtPct(val)
     if (['default_bid', 'cost', 'cpc', 'sales_7d'].includes(col.key)) return formatNum(val)
-    if (['impressions', 'clicks'].includes(col.key)) return fmtInt(val)
+    if (['impressions', 'clicks', 'purchases_7d'].includes(col.key)) return fmtInt(val)
     return val
   })
   if (!ok) ElMessage.warning('暂无数据可导出')
@@ -259,6 +256,5 @@ watch([startDate, endDate], () => { page.value = 1; fetchData() })
 .group-id { color: #909399; font-size: 11px; margin-top: 2px; }
 .editable-cell { cursor: pointer; color: #409eff; }
 .editable-cell:hover { text-decoration: underline; }
-.budget-status { color: #909399; font-size: 12px; }
 .pagination-wrap { margin-top: 12px; display: flex; justify-content: flex-end; }
 </style>

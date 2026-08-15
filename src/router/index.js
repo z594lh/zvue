@@ -26,6 +26,7 @@ import ProductBoardView from '../views/ProductBoardView.vue'
 import ReportView from '../views/ReportView.vue'
 import AdvertisingReportView from '../views/AdvertisingReportView.vue'
 import SkuSalesReportView from '../views/SkuSalesReportView.vue'
+import FbaStorageFeesView from '../views/FbaStorageFeesView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ForbiddenView from '../views/ForbiddenView.vue'
 import SystemPermissionsView from '../views/SystemPermissionsView.vue'
@@ -212,6 +213,12 @@ const routes = [
     name: 'AdvertisingReports',
     component: AdvertisingReportView,
     meta: { title: '广告报表', componentName: 'AdvertisingReportView' }
+  },
+  {
+    path: '/reports/fba-storage-fees',
+    name: 'FbaStorageFeesReports',
+    component: FbaStorageFeesView,
+    meta: { title: 'FBA仓储费报表', componentName: 'FbaStorageFeesView' }
   },
   {
     path: '/cpc',
