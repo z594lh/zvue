@@ -128,7 +128,8 @@ const fallbackNavGroups = [
     children: [
       { label: '支出记账', path: '/expense' },
       { label: '账目类别管理', path: '/transaction-categories' },
-      { label: '计算售价', path: '/pricing' }
+      { label: '计算售价', path: '/pricing' },
+      { label: '人员绩效', path: '/performance' }
     ]
   },
   {
@@ -137,6 +138,7 @@ const fallbackNavGroups = [
       { label: '店铺管理', path: '/shops' },
       { label: '订单列表', path: '/amazon-orders' },
       { label: 'Listing列表', path: '/amazon-listings' },
+      { label: 'Listing 负责人分配', path: '/amazon-listing-assignments' },
       { label: '货件列表', path: '/amazon-shipments' },
       { label: '库存列表', path: '/amazon-inventory' }
     ]
@@ -208,7 +210,7 @@ export default {
 
     // 将后端扁平菜单转成树形结构
     const buildMenuTree = (flatMenus) => {
-      if (!flatMenus || !flatMenus.length) return []
+      flatMenus = flatMenus || []
       const groups = []
       const groupMap = {}
 
@@ -242,6 +244,27 @@ export default {
         }
       })
 
+      // 兼容已安装的旧菜单：只移动接口已授权返回的入口，不增加权限。
+      const performanceItems = groups.flatMap(g => g.children.filter(item => item.path === '/performance'))
+      if (performanceItems.length) {
+        groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/performance') })
+        let finance = groups.find(g => g.label === '财务')
+        if (!finance) {
+          finance = { label: '财务', children: [] }
+          groups.push(finance)
+        }
+        finance.children.push(performanceItems[0])
+      }
+      // 旧安装尚无新菜单记录时，按已有分配权限补齐独立入口。
+      if (getUserPermissions().includes('amazon_listings:assign') &&
+          !groups.some(g => g.children.some(item => item.path === '/amazon-listing-assignments'))) {
+        let amazon = groups.find(g => g.label === '亚马逊')
+        if (!amazon) {
+          amazon = { label: '亚马逊', children: [] }
+          groups.push(amazon)
+        }
+        amazon.children.push({ label: 'Listing 负责人分配', path: '/amazon-listing-assignments' })
+      }
       return groups.filter((g) => g.children.length > 0)
     }
 

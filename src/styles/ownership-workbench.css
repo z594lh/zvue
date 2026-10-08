@@ -1,0 +1,70 @@
+.ownership-workbench { max-width:1680px; margin:auto; padding:26px 28px 108px; color:#243247; }
+.workbench-heading { display:flex; justify-content:space-between; gap:20px; align-items:center; margin-bottom:22px; }
+.workbench-heading h1 { font-size:25px; font-weight:700; letter-spacing:-.5px; margin:0 0 7px; }
+.workbench-heading p { color:#8290a2; font-size:13px; line-height:1.7; margin:0; }
+.workbench-eyebrow { color:#477ce8; font-size:11px; font-weight:700; letter-spacing:1.7px; margin-bottom:8px; }
+.workbench-header-actions { display:flex; gap:10px; align-items:center; flex-shrink:0; }
+.workbench-card { background:white; border:1px solid #e8edf3; border-radius:14px; box-shadow:0 3px 14px #28385205; overflow:hidden; margin-top:18px; }
+.workbench-card-heading { display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between; padding:19px 22px; border-bottom:1px solid #eef1f6; }
+.workbench-card-heading h2 { font-size:15px; margin:0; font-weight:650; }
+.workbench-card-heading small,.workbench-muted { color:#8b98aa; font-size:12px; }
+.workbench-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px; padding:20px 22px; }
+.workbench-field { display:flex; flex-direction:column; gap:7px; }
+.workbench-field label { color:#778499; font-size:12px; }
+.workbench-table { --el-table-header-bg-color:#f7f9fc; --el-table-header-text-color:#7c899e; --el-table-border-color:#eef2f7; --el-table-row-hover-bg-color:#f7faff; font-size:13px; }
+.workbench-table .el-table__cell { padding:14px 0; }
+.workbench-table .el-table__header .el-table__cell { padding:12px 0; font-size:12px; font-weight:600; }
+.workbench-sku { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; color:#516784; margin-top:5px; }
+.workbench-product { font-weight:600; color:#304158; white-space:normal; line-height:1.5; }
+.workbench-avatar { width:31px; height:31px; border-radius:10px; background:#eef3ff; color:#5477c2; display:inline-flex; align-items:center; justify-content:center; margin-right:9px; font-size:12px; font-weight:600; flex-shrink:0; }
+.workbench-owner { display:flex; align-items:center; }
+.workbench-row-actions { display:flex; gap:6px; align-items:center; }
+.workbench-row-actions .el-button { border-radius:8px; padding:7px 10px; }
+.workbench-pagination { display:flex; justify-content:space-between; gap:16px; align-items:center; padding:18px 22px; }
+.workbench-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin:20px 0; }
+.workbench-stat { background:white; border:1px solid #e8edf3; padding:19px 22px; border-radius:13px; }
+.workbench-stat-label { color:#8290a2; font-size:12px; display:flex; gap:8px; align-items:center; }
+.workbench-stat-value { font-size:27px; font-weight:650; letter-spacing:-1px; color:#2b3c55; margin:11px 0 6px; }
+.workbench-stat-note { color:#95a0af; font-size:11px; }
+.workbench-stat-value.is-green { color:#249782; }
+.workbench-selection-bar { position:fixed; z-index:100; bottom:18px; left:50%; transform:translateX(-50%); width:calc(100% - 70px); max-width:1594px; background:#fff; box-shadow:0 5px 30px #233c6b22; border:1px solid #dfe8f4; border-radius:13px; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; gap:15px; }
+.workbench-selection-info { display:flex; align-items:center; gap:12px; color:#8290a2; font-size:13px; }
+.workbench-selection-count { color:#477ce8; background:#edf3ff; border-radius:8px; padding:7px 10px; font-weight:650; }
+.workbench-demo-banner { margin-bottom:16px; }
+.workbench-chart { padding:12px 22px 20px; }
+.workbench-chart svg { width:100%; height:190px; display:block; }
+.workbench-chart-days { display:flex; justify-content:space-between; color:#9aa5b5; font-size:11px; padding-top:4px; }
+.workbench-chart-legend { display:flex; gap:18px; color:#8290a2; font-size:12px; margin-bottom:8px; }
+.workbench-chart-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+.workbench-empty { padding:38px; }
+.ownership-dialog { border-radius:16px !important; }
+.ownership-dialog .el-dialog__header { padding:20px 22px 14px; border-bottom:1px solid #eef2f7; }
+.ownership-dialog .el-dialog__body { padding:22px; }
+.ownership-dialog .el-dialog__footer { padding:16px 22px; border-top:1px solid #eef2f7; }
+.performance-action-cell .cell { overflow:visible; text-overflow:clip; white-space:normal; }
+.performance-actions { display:flex; align-items:center; justify-content:center; gap:8px; }
+.performance-actions .el-button { margin-left:0; flex-shrink:0; }
+.performance-sku-dialog .el-dialog__body { padding:16px; }
+.performance-sku-dialog .workbench-table .cell { padding-left:8px; padding-right:8px; }
+.performance-sku-dialog .workbench-table .el-table__cell { padding:12px 0; }
+.ownership-workbench.performance-page { max-width:none; }
+.performance-data-range,.performance-sku-range { font-size:12px; line-height:1.7; }
+.performance-missing { color:#b7791f; font-size:12px; }
+.performance-ratios { font-size:12px; line-height:1.8; white-space:nowrap; }
+.performance-ratios small { color:#8b98aa; display:inline-block; width:43px; }
+.performance-summary { padding:15px 18px; background:#f7f9fc; border:1px solid #eef2f7; border-top:0; }
+.performance-summary-values { display:flex; flex-wrap:wrap; align-items:center; gap:12px 24px; margin-top:10px; color:#516784; font-size:12px; }
+.performance-summary-values b { color:#304158; font-weight:600; margin-left:5px; }
+.performance-daily-filter { display:flex; flex-wrap:wrap; align-items:center; gap:15px; margin-bottom:15px; }
+.performance-range-tooltip { max-width:560px; white-space:normal; line-height:1.8; }
+@media(max-width:800px) {
+ .ownership-workbench { padding:18px 14px 130px; }
+ .workbench-heading { align-items:flex-start; flex-direction:column; gap:12px; }
+ .workbench-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+ .workbench-stat { padding:15px; }
+ .workbench-stat-value { font-size:23px; }
+ .workbench-selection-bar { width:calc(100% - 24px); bottom:12px; padding:12px; }
+ .workbench-selection-info > span:not(.workbench-selection-count) { display:none; }
+ .workbench-pagination { flex-direction:column; align-items:flex-start; }
+ .workbench-filters { padding:16px; gap:12px; }
+}

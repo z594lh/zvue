@@ -15,6 +15,22 @@ export const getConfig = () => {
   return api.get('/config');
 };
 
+// ERP内部负责人分配与绩效查询，不修改Amazon Listing，也不生成人员报表任务。
+export const getListingPerformanceConfig = () => api.get('/performance/config');
+// 人员绩效专用筛选选项，后台按查看权限返回历史负责人，不要求分配权限。
+export const getPerformanceOwners = (params) => api.get('/performance/owners', { params });
+export const getAssignmentListings = (params) => api.get('/amazon/listing-assignments/listings', { params });
+export const getListingOwners = () => api.get('/amazon/listing-owners');
+export const previewListingAssignments = (data) => api.post('/amazon/listing-assignments/preview', data);
+export const applyListingAssignments = (data) => api.post('/amazon/listing-assignments', data);
+export const cancelListingAssignments = (data) => api.post('/amazon/listing-assignments/cancel', data);
+export const getListingAssignmentHistory = (params) => api.get('/amazon/listing-assignments/history', { params });
+export const getListingOperationHistory = (params) => api.get('/amazon/listing-assignments/operations', { params });
+export const getMyPerformance = (params) => api.get('/performance/me', { params });
+export const getUsersPerformance = (params) => api.get('/performance/users', { params });
+export const getPerformanceSkus = (params) => api.get('/performance/skus', { params });
+export const getPerformanceSkuDaily = (params) => api.get('/performance/sku-daily', { params });
+
 // 文本翻译
 export const translateText = (text, source = 'auto', target = 'zh') => {
   return api.post('/translate', { text, source, target });
@@ -1866,6 +1882,7 @@ export const retryInvoiceOrganizeTask = (taskId) => {
 export const getAdminMenus = () => {
   return api.get('/menus/admin');
 };
+
 
 /**
  * 创建菜单

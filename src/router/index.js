@@ -37,6 +37,18 @@ const CronTasksView = () => import('../views/CronTasksView.vue')
 
 const routes = [
   {
+    path: '/amazon-listing-assignments',
+    name: 'AmazonListingAssignments',
+    component: () => import('../views/ListingAssignmentView.vue'),
+    meta: { title: 'Listing 负责人分配', componentName: 'ListingAssignmentView' }
+  },
+  {
+    path: '/performance',
+    name: 'Performance',
+    component: () => import('../views/PerformanceView.vue'),
+    meta: { title: '人员绩效', componentName: 'PerformanceView' }
+  },
+  {
     path: '/',
     name: 'Home',
     component: CompanyView,
@@ -314,6 +326,13 @@ router.beforeEach((to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if (to.path === '/amazon-listing-assignments' && !getUserPermissions().includes('amazon_listings:assign')) {
+    return next('/403')
+  }
+  if (to.path === '/performance' && !getUserPermissions().some(code => ['performance:view_self', 'performance:view_all'].includes(code))) {
+    next('/403')
+    return
+  }
   if (isAuthenticated()) {
     const needed = findPermissionCodeByPath(to.path)
     if (needed) {

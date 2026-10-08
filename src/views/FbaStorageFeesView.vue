@@ -397,13 +397,15 @@ const handleSync = async () => {
   try {
     const res = await syncFbaStorageFees({ shop_id: selectedShop.value })
     if (res.data.status === 'success') {
-      ElMessage.success(res.data.message || '同步任务已提交')
+      const result=res.data.data || {}
+      const months=result.months?.join('、')
+      ElMessage.success(months ? `同步完成：${months}，处理 ${result.saved} 条；这是计费月份，不是报告创建月份` : (res.data.message || '同步完成（无可用月报数据）'))
       await fetchFilters()
       await fetchData()
     } else {
       ElMessage.warning(res.data.message || '同步失败')
     }
-  } catch { ElMessage.error('同步失败') }
+  } catch (error) { ElMessage.error(error.response?.data?.message || '同步失败，请检查后端仓储费日志') }
   finally { syncing.value = false }
 }
 
