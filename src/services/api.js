@@ -30,6 +30,29 @@ export const getMyPerformance = (params) => api.get('/performance/me', { params 
 export const getUsersPerformance = (params) => api.get('/performance/users', { params });
 export const getPerformanceSkus = (params) => api.get('/performance/skus', { params });
 export const getPerformanceSkuDaily = (params) => api.get('/performance/sku-daily', { params });
+// 独立 SKU 经营分析：保存关注清单/指标，只读原日报，不生成任务、不调用 AI。
+export const getPerformanceAnalysisConfig = (params) => api.get('/performance/analysis/config', { params });
+export const savePerformanceAnalysisConfig = (data) => api.put('/performance/analysis/config', data);
+export const getPerformanceAnalysisCandidates = (params) => api.get('/performance/analysis/candidates', { params });
+export const getPerformanceAnalysisData = (params) => api.get('/performance/analysis/data', { params });
+// 仅下载固定窗口的单SKU资料，不调用付费AI；错误响应也是Blob，由组件解析业务提示。
+export const exportPerformanceAnalysisMarkdown = (params) => api.get('/performance/analysis/export', { params, responseType: 'blob', timeout: 90000 });
+// 独立确认的收费AI调用；不自动重试，不上传浏览器自定义文档/模型。
+export const analyzePerformanceSkuWithAI = (data) => api.post('/performance/analysis/ai', data, { timeout: 105000 });
+// AI结果历史只读接口：查看列表/最近记录/详情均不调用模型，不传配置版本或当前报表日期。
+export const getPerformanceAIHistory = (params) => api.get('/performance/analysis/ai/history', { params });
+export const getLatestPerformanceAIResult = (params) => api.get('/performance/analysis/ai/latest', { params });
+export const getPerformanceAIHistoryResult = (id, params) => api.get(`/performance/analysis/ai/history/${id}`, { params });
+
+// 工具栏运营日报：独立权限、本人填写；保存统计快照，不调用AI或调整广告。
+export const getDailyReportConfig = () => api.get('/daily-reports/config');
+export const getDailyReports = (params) => api.get('/daily-reports', { params });
+export const getCurrentDailyReport = (params) => api.get('/daily-reports/current', { params });
+export const getDailyReport = (id, params) => api.get(`/daily-reports/${id}`, { params });
+export const previewDailyReport = (params) => api.get('/daily-reports/preview', { params });
+export const saveDailyReport = (data) => api.put('/daily-reports', data);
+// 删除仅针对已确认的存档版本，不自动重试，也不影响SKU来源报表。
+export const deleteDailyReport = (id, data) => api.delete(`/daily-reports/${id}`, { data });
 
 // 文本翻译
 export const translateText = (text, source = 'auto', target = 'zh') => {

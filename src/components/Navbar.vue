@@ -174,6 +174,7 @@ const fallbackNavGroups = [
       { label: 'FBA标签', path: '/fba-label' },
       { label: '箱唛助手', path: '/label-organize' },
       { label: '发票助手', path: '/invoice-export' },
+      { label: '运营日报', path: '/daily-reports' },
       { label: 'PDF工具', path: '/pdf-tools' }
     ]
   },
@@ -265,6 +266,13 @@ export default {
         }
         amazon.children.push({ label: 'Listing 负责人分配', path: '/amazon-listing-assignments' })
       }
+      // 已授权但菜单缓存未刷新时补日报入口；不为无日报查看权用户新增入口。
+      if (getUserPermissions().includes('daily_reports:view') &&
+          !groups.some(g => g.children.some(item => item.path === '/daily-reports'))) {
+        let tools = groups.find(g => g.label === '工具')
+        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
+        tools.children.push({ label: '运营日报', path: '/daily-reports' })
+      }
       return groups.filter((g) => g.children.length > 0)
     }
 
@@ -274,10 +282,9 @@ export default {
         return buildMenuTree(dynamicMenus.value)
       }
       const permissions = getUserPermissions()
-      if (permissions.length === 0) {
-        return fallbackNavGroups
-      }
-      return fallbackNavGroups
+      // 保持旧兜底项行为，新日报入口仍须具备独立查看权限。
+      return fallbackNavGroups.map(group => ({ ...group, children: group.children.filter(item =>
+        item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) }))
     })
 
     const isGroupActive = (group) => {

@@ -25,7 +25,17 @@
     </div>
     <section class="workbench-card"><div class="workbench-card-heading"><h2>人员经营表现 <small> · {{ rows.length }} 个负责人 / 币种组合</small></h2><span class="workbench-muted">不同币种单独统计，不直接相加</span></div>
     <el-table class="workbench-table" :data="rows" v-loading="loading" stripe>
-      <el-table-column label="负责人" min-width="110" fixed="left"><template #default="{row}"><div class="workbench-owner"><span class="workbench-avatar">{{ (row.owner_name || '?').slice(0,1) }}</span>{{ row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人') }}</div></template></el-table-column>
+      <el-table-column label="负责人" width="320" fixed="left"><template #default="{row}"><div class="performance-owner-analysis">
+        <div class="workbench-owner"><span class="workbench-avatar">{{ (row.owner_name || '?').slice(0,1) }}</span><span class="performance-owner-name" :title="row.owner_name">{{ row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人') }}</span></div>
+        <div class="performance-analysis-actions">
+          <el-tooltip :content="canAnalyze(row) ? '分析配置：选择关注 SKU 和指标' : '需要本人或全员 SKU 经营分析权限，授权后刷新页面'" placement="top"><span><el-button size="small" plain circle :icon="Setting" :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="分析配置" @click="openAnalysisConfig(row)" /></span></el-tooltip>
+          <el-button-group><el-button size="small" plain :icon="DataAnalysis" :disabled="loading || !loadedParams || !canAnalyze(row)" @click="openAnalysis(row, 1)">分析数据</el-button>
+            <el-dropdown trigger="hover" :disabled="loading || !loadedParams || !canAnalyze(row)" @command="days => openAnalysis(row, days)"><el-button size="small" plain :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="选择分析周期"><el-icon><ArrowDown /></el-icon></el-button>
+              <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="days in [3,7,14,30]" :key="days" :command="days">最近 {{ days }} 天 · 对比前 {{ days }} 天</el-dropdown-item></el-dropdown-menu></template>
+            </el-dropdown>
+          </el-button-group>
+        </div>
+      </div></template></el-table-column>
       <el-table-column label="数据范围" min-width="190"><template #header><el-tooltip content="各SKU有负责人且有日报的日期并集；不是所有SKU都负责整段时间。悬停查看实际日期分段。" placement="top"><span>数据范围 <el-icon><QuestionFilled /></el-icon></span></el-tooltip></template><template #default="{row}">
         <el-tooltip v-if="row.data_day_count" :content="rangeDescription(row)" placement="top"><div class="performance-data-range"><div>{{ row.data_from }} ～ {{ row.data_to }}</div><small class="workbench-muted">实际计入 {{ row.data_day_count }} 天<span v-if="row.data_ranges.length > 1"> · {{ row.data_ranges.length }} 段，有断档</span></small></div></el-tooltip>
         <span v-else class="workbench-muted">期间负责，但无日报数据</span>
@@ -57,15 +67,17 @@
       <template #footer><el-button @click="closeOwnerTrend">关闭</el-button></template>
     </el-dialog>
     <PerformanceSkuDetails ref="skuDetails" />
+    <PerformanceSkuAnalysis ref="skuAnalysis" :can-export="!!analysisAccess.ads" :can-ai="!!analysisAccess.ai" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Search, Document, TrendCharts, QuestionFilled } from '@element-plus/icons-vue'
+import { ArrowDown, DataAnalysis, Search, Setting, Document, TrendCharts, QuestionFilled } from '@element-plus/icons-vue'
 import PerformanceSkuDetails from '@/components/PerformanceSkuDetails.vue'
 import PerformanceTrendChart from '@/components/PerformanceTrendChart.vue'
+import PerformanceSkuAnalysis from '@/components/PerformanceSkuAnalysis.vue'
 import { aggregatePerformanceDays, ownerPerformanceDays } from '@/services/performanceCharts.js'
 import { recentPerformanceDates } from '@/services/performanceDates.js'
 import { getUserPermissions, getMyPerformance, getUsersPerformance, getListingPerformanceConfig, getPerformanceOwners } from '@/services/api.js'
@@ -78,6 +90,7 @@ const shopId = ref(null), dates = ref([]), ownerFilter = ref(canAll ? 0 : 'me')
 const ownerList = ref([]), ownersLoading = ref(false)
 const loading = ref(false), error = ref(''), result = ref(null)
 const skuDetails=ref(null), loadedParams=ref(null)
+const skuAnalysis=ref(null), analysisAccess=ref({user_id:null,self:false,all:false})
 const ownerTrendVisible=ref(false), ownerTrendRows=ref([]), ownerTrendMeta=ref({}), ownerTrendMetrics=ref([])
 const closeOwnerTrend=()=>{ownerTrendVisible.value=false;ownerTrendRows.value=[];ownerTrendMeta.value={};ownerTrendMetrics.value=[]}
 const rows = computed(() => result.value?.list || [])
@@ -93,7 +106,7 @@ const rangeDescription = row => (row.data_ranges || []).map(range=>`${range.date
 const money = value => value === null || value === undefined ? '—' : Number(value).toLocaleString('zh-CN', { minimumFractionDigits:2, maximumFractionDigits:2 })
 const percent = value => value === null || value === undefined ? '—' : `${(Number(value)*100).toFixed(2)}%`
 const errorMessage = err => err.response?.data?.message || err.message
-const resetResults = () => { requestVersion++; loading.value = false; result.value = null; loadedParams.value=null; error.value = ''; skuDetails.value?.close();closeOwnerTrend() }
+const resetResults = () => { requestVersion++; loading.value = false; result.value = null; loadedParams.value=null; error.value = ''; skuDetails.value?.close();skuAnalysis.value?.close();closeOwnerTrend() }
 const params = () => {
   if (!shopId.value || dates.value?.length !== 2) throw new Error('请选择店铺和日期范围')
   const shop = shopList.value.find(s => s.id === shopId.value)
@@ -120,6 +133,7 @@ const changeShop = async () => {
 const load = async () => {
   const version = ++requestVersion
   closeOwnerTrend()
+  skuAnalysis.value?.close()
   loading.value = true; error.value = ''
   try {
     const method = canAll ? getUsersPerformance : getMyPerformance
@@ -131,6 +145,10 @@ const load = async () => {
   finally { if (version===requestVersion) loading.value = false }
 }
 const openSkus=row=>{if(loadedParams.value)skuDetails.value?.open(row,{...loadedParams.value})}
+// 当前负责人分析是独立授权；只传店铺/站点，不把绩效筛选日期带入分析窗口。
+const canAnalyze=row=>!!row.owner_user_id && (analysisAccess.value.all || (analysisAccess.value.self && row.owner_user_id===analysisAccess.value.user_id))
+const openAnalysisConfig=row=>{if(loadedParams.value && canAnalyze(row))skuAnalysis.value?.openConfig(row,{...loadedParams.value})}
+const openAnalysis=(row,days)=>{if(loadedParams.value && canAnalyze(row))skuAnalysis.value?.openData(row,{...loadedParams.value},Number(days))}
 const openOwnerTrend=row=>{
   if(!loadedParams.value || loading.value)return
   const query=loadedParams.value
@@ -148,6 +166,7 @@ onMounted(async () => {
   try {
     const response = await getListingPerformanceConfig()
     shopList.value = response.data.data.shops
+    analysisAccess.value = response.data.data.analysis_access || {user_id:null,self:false,all:false}
     shopId.value = shopList.value[0]?.id || null
     dates.value=recentPerformanceDates(shopList.value[0]?.sku_report_date_to,response.data.data.markets[shopList.value[0]?.marketplace_id]?.timezone)
     if(/^\d{4}-\d{2}-\d{2}$/.test(route.query.date_from || '') && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date_to || '')) dates.value=[route.query.date_from,route.query.date_to]
@@ -158,3 +177,12 @@ onMounted(async () => {
 </script>
 
 <style src="../styles/ownership-workbench.css"></style>
+<style scoped>
+.performance-owner-analysis { display:flex; align-items:center; gap:16px; }
+.performance-owner-analysis .workbench-owner { min-width:0; }
+.performance-owner-name { max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.performance-analysis-actions { display:flex; flex-shrink:0; align-items:center; gap:6px; margin-left:auto; }
+.performance-analysis-actions .el-button { margin-left:0; }
+.performance-analysis-actions .el-button-group { display:inline-flex; align-items:center; }
+.performance-analysis-actions :deep(.el-dropdown .el-button) { border-left:0; border-top-left-radius:0; border-bottom-left-radius:0; }
+</style>

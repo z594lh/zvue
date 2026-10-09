@@ -37,6 +37,12 @@ const CronTasksView = () => import('../views/CronTasksView.vue')
 
 const routes = [
   {
+    path: '/daily-reports',
+    name: 'DailyReports',
+    component: () => import('../views/DailyReportsView.vue'),
+    meta: { title: '运营日报', componentName: 'DailyReportsView' }
+  },
+  {
     path: '/amazon-listing-assignments',
     name: 'AmazonListingAssignments',
     component: () => import('../views/ListingAssignmentView.vue'),
@@ -326,6 +332,9 @@ router.beforeEach((to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if (to.path === '/daily-reports' && !getUserPermissions().includes('daily_reports:view')) {
+    return next('/403')
+  }
   if (to.path === '/amazon-listing-assignments' && !getUserPermissions().includes('amazon_listings:assign')) {
     return next('/403')
   }
