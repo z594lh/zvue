@@ -3,6 +3,7 @@
     <div class="workbench-filters" style="margin-bottom:16px">
       <div class="workbench-field"><label>查询日期（默认继承绩效页）</label><el-date-picker v-model="dates" type="daterange" value-format="YYYY-MM-DD" :clearable="false" start-placeholder="开始日期" end-placeholder="结束日期" @change="changeDates" /></div>
       <el-button type="primary" :icon="Search" :loading="loading" @click="reload">查询 SKU</el-button>
+      <el-tooltip :content="performanceColorGuide" placement="top" popper-class="performance-color-tooltip"><span class="performance-color-guide" tabindex="0">颜色参考 <i class="is-green" />正常 <i class="is-yellow" />关注 <i class="is-red" />重点关注 <el-icon><QuestionFilled /></el-icon></span></el-tooltip>
     </div>
     <p class="workbench-muted">仅统计该人员历史归属下的数据，包含期间负责但没有来源记录的 SKU。广告占比＝广告销售额÷销售额；ACOS＝广告费÷广告销售额；TACOS＝广告费÷销售额。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
@@ -19,20 +20,20 @@
         </div></el-tooltip>
       </template></el-table-column>
       <el-table-column prop="currency" label="币种" width="65" sortable="custom" />
-      <el-table-column prop="sales_qty" label="销量" width="80" align="right" sortable="custom"><template #default="{row}">{{ row.sales_qty ?? '—' }}</template></el-table-column>
-      <el-table-column prop="ad_share" label="广告占比" width="105" align="right" sortable="custom"><template #default="{row}">{{ percent(row.ad_share) }}</template></el-table-column>
+      <el-table-column prop="sales_qty" label="销量" width="80" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('sales_qty',row,row.data_day_count)">{{ row.sales_qty ?? '—' }}</span></template></el-table-column>
+      <el-table-column prop="ad_share" label="广告占比" width="105" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('ad_share',row)">{{ percent(row.ad_share) }}</span></template></el-table-column>
       <el-table-column prop="sales_amount" label="销售额" width="105" align="right" sortable="custom"><template #default="{row}">{{ money(row.sales_amount) }}</template></el-table-column>
-      <el-table-column prop="ad_cost" label="广告费" width="105" align="right" sortable="custom"><template #default="{row}">{{ money(row.ad_cost) }}</template></el-table-column>
+      <el-table-column prop="ad_cost" label="广告费" width="105" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('ad_cost',row)">{{ money(row.ad_cost) }}</span></template></el-table-column>
       <el-table-column prop="refund_loss" label="报表退款" width="110" align="right" sortable="custom"><template #default="{row}">{{ money(row.refund_loss) }}</template></el-table-column>
-      <el-table-column prop="profit" label="利润" width="105" align="right" sortable="custom"><template #default="{row}"><span :style="{color:row.profit < 0 ? '#e05252' : '#219787'}">{{ money(row.profit) }}</span></template></el-table-column>
-      <el-table-column prop="acos" label="ACOS" width="100" align="right" sortable="custom"><template #default="{row}">{{ percent(row.acos) }}</template></el-table-column>
-      <el-table-column prop="tacos" label="TACOS" width="100" align="right" sortable="custom"><template #default="{row}">{{ percent(row.tacos) }}</template></el-table-column>
+      <el-table-column prop="profit" label="利润" width="105" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('profit',row)">{{ money(row.profit) }}</span></template></el-table-column>
+      <el-table-column prop="acos" label="ACOS" width="100" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('acos',row)">{{ percent(row.acos) }}</span></template></el-table-column>
+      <el-table-column prop="tacos" label="TACOS" width="100" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('tacos',row)">{{ percent(row.tacos) }}</span></template></el-table-column>
       <el-table-column label="详情" width="190" class-name="performance-action-cell"><template #default="{row}"><div class="performance-actions"><el-button size="small" plain :icon="TrendCharts" :disabled="loading || !row.seller_sku" @click="openTrend(row)">趋势</el-button><el-button size="small" plain :icon="Calendar" :disabled="loading || !row.seller_sku" @click="openDaily(row)">每日数据</el-button></div></template></el-table-column>
     </el-table>
     <div v-if="coverage" class="performance-summary">
       <div class="workbench-muted">全量合计 · {{ total }} 个 SKU / 币种组合（不是当前页）· {{ coverage.date_from }} ～ {{ coverage.date_to }} · 退款已包含在利润中，不再另扣</div>
       <div v-for="summary in coverage.summary" :key="`${summary.owner_user_id}-${summary.currency}`" class="performance-summary-values">
-        <strong>{{ summary.currency }}</strong><span>销量 <b>{{ summary.sales_qty }}</b></span><span>销售额 <b>{{ money(summary.sales_amount) }}</b></span><span>广告费 <b>{{ money(summary.ad_cost) }}</b></span><span>报表退款 <b>{{ money(summary.refund_loss) }}</b></span><span>利润 <b>{{ money(summary.profit) }}</b></span><span>ACOS <b>{{ percent(summary.acos) }}</b></span><span>TACOS <b>{{ percent(summary.tacos) }}</b></span>
+        <strong>{{ summary.currency }}</strong><span>销量 <b>{{ summary.sales_qty }}</b></span><span>销售额 <b>{{ money(summary.sales_amount) }}</b></span><span>广告费 <b v-bind="performanceMetricAttrs('ad_cost',summary)">{{ money(summary.ad_cost) }}</b></span><span>报表退款 <b>{{ money(summary.refund_loss) }}</b></span><span>利润 <b v-bind="performanceMetricAttrs('profit',summary)">{{ money(summary.profit) }}</b></span><span>ACOS <b v-bind="performanceMetricAttrs('acos',summary)">{{ percent(summary.acos) }}</b></span><span>TACOS <b v-bind="performanceMetricAttrs('tacos',summary)">{{ percent(summary.tacos) }}</b></span>
       </div>
       <div v-if="!coverage.summary?.length" class="workbench-muted">没有可汇总的已归属日报数据，金额未知，不计为零。</div>
     </div>
@@ -42,17 +43,18 @@
     <el-dialog v-model="dailyVisible" :title="`${dailySku?.product_name || dailySku?.seller_sku || ''} · 每日经营数据`" width="min(1240px, 96vw)" class="ownership-dialog" append-to-body @close="invalidateDaily">
       <div class="workbench-muted" style="margin-bottom:14px">{{ ownerName }} · {{ dailySku?.seller_sku }} · {{ dailyDates[0] }} 至 {{ dailyDates[1] }} · {{ dailySku?.currency }}。只计该人员归属下的数据。</div>
       <div class="performance-daily-filter"><el-switch v-model="showAllDaily" active-text="显示完整查询区间" @change="resizeDaily" /><span class="workbench-muted">默认只列负责日期；缺日报显示空值，已有日报的真实零值正常显示0。</span></div>
+      <el-tooltip :content="performanceColorGuide" placement="top" popper-class="performance-color-tooltip"><span class="performance-color-guide" tabindex="0">颜色参考 <i class="is-green" />正常 <i class="is-yellow" />关注 <i class="is-red" />重点关注 <el-icon><QuestionFilled /></el-icon></span></el-tooltip>
       <el-alert v-if="dailyError" :title="dailyError" type="error" :closable="false" show-icon />
       <el-table :data="dailyRows" v-loading="dailyLoading" stripe max-height="520">
         <el-table-column prop="business_date" label="日期" width="125" fixed="left" />
         <el-table-column label="日报情况" width="135"><template #default="{row}"><span :class="row.source_state==='missing_report' ? 'performance-missing' : 'workbench-muted'">{{ sourceLabels[row.source_state] || '—' }}</span></template></el-table-column>
-        <el-table-column label="销量" width="80" align="right"><template #default="{row}">{{ row.sales_qty ?? '—' }}</template></el-table-column>
-        <el-table-column label="广告占比" width="110" align="right"><template #default="{row}">{{ percent(row.ad_share) }}</template></el-table-column>
+        <el-table-column label="销量" width="80" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('sales_qty',row,row.source_state==='available' ? 1 : null)">{{ row.sales_qty ?? '—' }}</span></template></el-table-column>
+        <el-table-column label="广告占比" width="110" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('ad_share',row)">{{ percent(row.ad_share) }}</span></template></el-table-column>
         <el-table-column label="销售额" width="125" align="right"><template #default="{row}">{{ money(row.sales_amount) }}</template></el-table-column>
-        <el-table-column label="广告费" width="115" align="right"><template #default="{row}">{{ money(row.ad_cost) }}</template></el-table-column>
-        <el-table-column label="利润" width="120" align="right"><template #default="{row}">{{ money(row.profit) }}</template></el-table-column>
-        <el-table-column label="ACOS" width="105" align="right"><template #default="{row}">{{ percent(row.acos) }}</template></el-table-column>
-        <el-table-column label="TACOS" width="105" align="right"><template #default="{row}">{{ percent(row.tacos) }}</template></el-table-column>
+        <el-table-column label="广告费" width="115" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('ad_cost',row)">{{ money(row.ad_cost) }}</span></template></el-table-column>
+        <el-table-column label="利润" width="120" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('profit',row)">{{ money(row.profit) }}</span></template></el-table-column>
+        <el-table-column label="ACOS" width="105" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('acos',row)">{{ percent(row.acos) }}</span></template></el-table-column>
+        <el-table-column label="TACOS" width="105" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('tacos',row)">{{ percent(row.tacos) }}</span></template></el-table-column>
       </el-table>
       <div class="workbench-pagination"><span class="workbench-muted">最新日期在前 · 共 {{ dailyTotal }} 行</span><el-pagination v-model:current-page="dailyPage" v-model:page-size="dailyPageSize" :page-sizes="[10,20,50,100]" :total="dailyTotal" layout="total,sizes,prev,pager,next,jumper" @current-change="loadDaily" @size-change="resizeDaily" /></div>
       <template #footer><el-button @click="dailyVisible=false">返回 SKU 列表</el-button></template>
@@ -73,6 +75,7 @@ import { computed, ref, onUnmounted } from 'vue'
 import { Search, Calendar, TrendCharts, QuestionFilled } from '@element-plus/icons-vue'
 import PerformanceTrendChart from '@/components/PerformanceTrendChart.vue'
 import { getPerformanceSkus, getPerformanceSkuDaily } from '@/services/api.js'
+import { performanceColorGuide, performanceMetricAttrs } from '@/utils/performanceMetricTone.js'
 
 const visible=ref(false), ownerName=ref(''), base=ref({}), dates=ref([])
 const originalDates=ref([])

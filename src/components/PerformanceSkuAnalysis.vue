@@ -4,7 +4,7 @@
     <el-alert v-if="configError" :title="configError" type="error" :closable="false" show-icon />
     <div v-loading="configLoading" class="analysis-config-body">
       <div class="analysis-section-heading"><h3>关注 SKU</h3><span>已选 {{ selectedSkus.length }} / {{ maxSelected }} · 当前负责 {{ candidateCount }} 个</span></div>
-      <p class="analysis-help">从当前负责的 SKU 中选择关注项。经营分析可查看接手前历史，不改变个人绩效归属。</p>
+      <p class="analysis-help">选择你需要关注的SKU和指标。后续每次分析数据就只会展示你关注的SKU和指标，当然，随时可以修改配置</p>
       <el-select v-model="selectedSkus" multiple filterable remote :remote-method="searchCandidates" :loading="candidateLoading" :multiple-limit="maxSelected"
         collapse-tags collapse-tags-tooltip :max-collapse-tags="3" placeholder="搜索 SKU 或产品中文名称添加" class="analysis-sku-select" :disabled="configLoading || saving">
         <el-option v-for="item in dropdownOptions" :key="item.seller_sku" :value="item.seller_sku" :label="`${item.seller_sku} · ${item.product_name || '未维护中文名称'}`" :disabled="!item.eligible">
@@ -69,7 +69,7 @@
         <el-tooltip placement="top" popper-class="analysis-filter-tooltip">
           <template #content><div class="analysis-filter-guide">
             <strong>如何筛出需要关注的 SKU？</strong>
-            <p>先选指标，再选上升或下降，自动查询全部关注 SKU。例如“SKU 报表利润 + 下降”只看本期利润低于上期的商品。</p>
+            <p>先选指标，再选上升或下降，自动查询全部关注 SKU。例如“利润 + 下降”只看本期利润低于上期的商品。</p>
             <p>最新一天对比前一天；最近 N 天合计对比前 N 天合计。筛选、排序后再分页，不只筛当前页。</p>
             <p>按数值判断：利润 -10 → -20 属于下降，-20 → -10 属于上升；ACOS 下降也属于下降，方向不代表经营好坏。</p>
             <p>持平、缺日报或无有效比率不进入涨跌结果；上期为 0 且本期增加仍算上升。清除方向恢复全部，清除指标同时清除方向。</p>
@@ -86,6 +86,10 @@
       <div><span>对比期{{ period > 1 ? '合计' : '' }}</span><strong>{{ dateRange(dataResult.previous_range) }}</strong></div>
       <div><span>报表截止日 / 币种</span><strong>{{ dataResult.report_date }} · {{ dataResult.currency }}</strong></div>
     </div>
+    <div class="analysis-reading-guide">
+      <el-tooltip :content="analysisColorGuide" placement="top" popper-class="performance-color-tooltip"><span class="performance-color-guide" tabindex="0">本期指标参考色 <i class="is-green" />正常 <i class="is-yellow" />关注 <i class="is-red" />重点关注 <el-icon><QuestionFilled /></el-icon></span></el-tooltip>
+      <span class="analysis-direction-guide">对比上期 <b class="is-up">↑ 上升</b><b class="is-down">↓ 下降</b> · 方向仅表示数值变化，不代表经营好坏</span>
+    </div>
     <el-alert v-if="dataError" :title="dataError" type="error" :closable="false" show-icon />
     <el-alert v-if="dataResult?.invalid_skus.length" :title="`有 ${dataResult.invalid_skus.length} 个关注 SKU 已转交或失效，未读取其数据：${dataResult.invalid_skus.join('、')}。请修改配置。`" type="warning" :closable="false" show-icon />
     <el-alert v-if="dataResult?.incomplete_count" :title="`有 ${dataResult.incomplete_count} 个 SKU 本期或对比期缺日报；${changeDirection ? '这些 SKU 不计入当前涨跌筛选。' : '显示已记录小计，暂停涨跌计算，不将缺失当零。'}`" type="warning" :closable="false" show-icon />
@@ -94,7 +98,7 @@
         <template #default="{ row }"><div class="analysis-product-name">{{ row.product_name || '未维护中文名称' }}</div><div class="workbench-sku">{{ row.seller_sku }}</div></template>
       </el-table-column>
       <el-table-column v-for="metric in displayMetrics" :key="metric.key" :prop="metric.key" :label="metric.label" min-width="155" align="right" sortable="custom">
-        <template #default="{ row }"><div class="analysis-metric-value" :class="{ 'is-partial': !row.current.complete }">{{ formatValue(row.current.values[metric.key], metric.kind) }}</div>
+        <template #default="{ row }"><div class="analysis-metric-value" v-bind="analysisMetricAttrs(row, metric)">{{ formatValue(row.current.values[metric.key], metric.kind) }}</div>
           <el-tooltip :content="changeTooltip(row, metric)" placement="top"><div class="analysis-change" :class="`direction-${row.changes[metric.key].direction}`">
             <el-icon v-if="row.changes[metric.key].direction === 'up'"><Top /></el-icon><el-icon v-else-if="row.changes[metric.key].direction === 'down'"><Bottom /></el-icon>
             {{ changeText(row.changes[metric.key], metric) }}
@@ -222,6 +226,7 @@ import { computed, nextTick, onDeactivated, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Bottom, Check, Clock, DataAnalysis, Download, Loading, MagicStick, Plus, QuestionFilled, Rank, Search, Setting, Top, View, WarningFilled } from '@element-plus/icons-vue'
 import { analyzePerformanceSkuWithAI, exportPerformanceAnalysisMarkdown, getPerformanceAIHistory, getPerformanceAIHistoryResult, getLatestPerformanceAIResult, getPerformanceAnalysisCandidates, getPerformanceAnalysisConfig, getPerformanceAnalysisData, savePerformanceAnalysisConfig } from '@/services/api.js'
+import { performanceColorGuide, performanceMetricAttrs } from '@/utils/performanceMetricTone.js'
 
 const analysisProps = defineProps({ canExport: { type: Boolean, default: false }, canAi: { type: Boolean, default: false } })
 
@@ -256,6 +261,14 @@ let contextVersion = 0, configVersion = 0, candidateVersion = 0, dataVersion = 0
 const errorMessage = err => err.response?.data?.message || err.message || '操作失败'
 const metricLabel = key => allMetrics.value.find(item => item.key === key)?.label || key
 const displayMetrics = computed(() => metricKeys.value.map(key => allMetrics.value.find(item => item.key === key)).filter(Boolean))
+const analysisColorGuide = `${performanceColorGuide}\n本期缺日报时，仅展示灰色已记录小计，暂不判断状态；其他绝对金额不设置统一颜色门槛。`
+const coloredMetrics = new Set(['sku_report_profit', 'profit_margin', 'sales_qty', 'ad_cost', 'acos', 'tacos'])
+/** 分析读取完整经营周期，复用指标参考色；不把残缺小计判为完整周期表现。 */
+const analysisMetricAttrs = (row, metric) => {
+  if (!row.current.complete) return { class: 'performance-metric performance-metric--neutral', title: `本期仅有 ${row.current.recorded_days}/${row.current.expected_days} 天日报，显示已记录小计，暂不判断经营状态。` }
+  if (!coloredMetrics.has(metric.key)) return { title: '该指标不设置统一绝对金额/数量门槛，请结合下方对比变化及利润判断。' }
+  return performanceMetricAttrs(metric.key, row.current.values, row.current.recorded_days)
+}
 const dropdownOptions = computed(() => [...new Map([...selectedSkus.value.map(sku => lookup.value[sku] || { seller_sku: sku, eligible: false }), ...candidateRows.value].map(item => [item.seller_sku, item])).values()])
 const dateRange = range => range.date_from === range.date_to ? range.date_from : `${range.date_from} ～ ${range.date_to}`
 
@@ -308,7 +321,7 @@ const prepare = (row, query) => {
 /** 装载服务端配置，原已选值含失效项也保留，交给用户明确移除。 */
 const applyConfig = config => {
   selectedSkus.value = [...config.selected_skus]; metricKeys.value = [...config.metric_keys]
-  allMetrics.value = config.metrics; savedVersion.value = config.version; maxSelected.value = config.max_selected_skus
+  allMetrics.value = config.metrics.map(metric => metric.key === 'sku_report_profit' ? {...metric, label: '利润'} : metric); savedVersion.value = config.version; maxSelected.value = config.max_selected_skus
   candidateCount.value = config.candidate_count
   lookup.value = Object.fromEntries(config.selected_items.map(item => [item.seller_sku, item]))
 }
@@ -689,13 +702,20 @@ defineExpose({ openConfig, openData, close })
 .analysis-period-strip div { display:flex; flex-direction:column; gap:6px; }
 .analysis-period-strip span { color:#8595ac; font-size:12px; }
 .analysis-period-strip strong { color:#3f597c; font-size:13px; font-weight:600; }
+.analysis-reading-guide { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 18px; margin:0 0 14px; }
+.analysis-direction-guide { display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; color:#78879b; font-size:12px; }
+.analysis-direction-guide b { font-weight:600; }
+.analysis-direction-guide .is-up { color:#15803d; }
+.analysis-direction-guide .is-down { color:#dc2626; }
 .analysis-product-name { color:#344b68; font-weight:600; font-size:13px; }
-.analysis-metric-value { color:#2b4263; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
-.analysis-metric-value.is-partial { color:#9b783c; }
-.analysis-change { display:inline-flex; align-items:center; gap:3px; color:#93a0b1; font-size:12px; margin:6px 0 3px; }
-.analysis-change.direction-up { color:#497acb; }
-.analysis-change.direction-down { color:#8e73ba; }
+.analysis-metric-value { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+.analysis-metric-value:not(.performance-metric) { color:#2b4263; }
+.analysis-change { display:inline-flex; align-items:center; gap:4px; color:#718096; font-size:12px; font-weight:500; line-height:20px; padding:1px 7px; border-radius:5px; margin:6px 0 4px; }
+.analysis-change .el-icon { font-size:14px; }
+.analysis-change.direction-up { color:#15803d; background:#edf8f0; font-weight:600; }
+.analysis-change.direction-down { color:#dc2626; background:#fef0f0; font-weight:600; }
 .analysis-previous { color:#9aa6b7; font-size:11px; font-variant-numeric:tabular-nums; }
+.analysis-result-table .analysis-previous { color:#7e8ca0; font-size:12px; }
 .analysis-coverage { display:flex; flex-direction:column; gap:4px; color:#7f91ab; font-size:12px; }
 .analysis-coverage.partial { color:#af843e; }
 .analysis-result-footer { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:16px; margin-top:18px; }

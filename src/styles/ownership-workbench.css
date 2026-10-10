@@ -57,6 +57,19 @@
 .performance-summary-values b { color:#304158; font-weight:600; margin-left:5px; }
 .performance-daily-filter { display:flex; flex-wrap:wrap; align-items:center; gap:15px; margin-bottom:15px; }
 .performance-range-tooltip { max-width:560px; white-space:normal; line-height:1.8; }
+/* 三个绩效表格共用参考色；只强调指标文字，不改变整行底色或数值。 */
+.performance-metric { font-weight:600; font-variant-numeric:tabular-nums; }
+.performance-metric.performance-metric--success { color:#15803d; }
+.performance-metric.performance-metric--warning { color:#a16207; }
+.performance-metric.performance-metric--danger { color:#dc2626; }
+.performance-metric.performance-metric--neutral { color:#8b98aa; font-weight:400; }
+.performance-table-tools { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; }
+.performance-color-guide { display:inline-flex; align-items:center; gap:6px; color:#7c899e; font-size:12px; line-height:24px; cursor:help; }
+.performance-color-guide i { width:6px; height:6px; border-radius:50%; margin-left:5px; }
+.performance-color-guide .is-green { background:#15803d; }
+.performance-color-guide .is-yellow { background:#a16207; }
+.performance-color-guide .is-red { background:#dc2626; }
+.performance-color-tooltip { max-width:min(550px, 88vw); white-space:pre-line; line-height:1.85; }
 @media(max-width:800px) {
  .ownership-workbench { padding:18px 14px 130px; }
  .workbench-heading { align-items:flex-start; flex-direction:column; gap:12px; }

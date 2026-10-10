@@ -23,12 +23,20 @@
       <span v-if="result.data_days < result.expected_days"> · 没有 SKU 日报的日期不计入</span>
       · 所选人员实际计入 {{ result.counted_days }} 天；未分配的 SKU / 日期不计入
     </div>
-    <section class="workbench-card"><div class="workbench-card-heading"><h2>人员经营表现 <small> · {{ rows.length }} 个负责人 / 币种组合</small></h2><span class="workbench-muted">不同币种单独统计，不直接相加</span></div>
+    <section class="workbench-card"><div class="workbench-card-heading"><h2>人员经营表现 <small> · {{ rows.length }} 个负责人 / 币种组合</small></h2><div class="performance-table-tools"><el-tooltip :content="performanceColorGuide" placement="top" popper-class="performance-color-tooltip"><span class="performance-color-guide" tabindex="0">颜色参考 <i class="is-green" />正常 <i class="is-yellow" />关注 <i class="is-red" />重点关注 <el-icon><QuestionFilled /></el-icon></span></el-tooltip><span class="workbench-muted">不同币种单独统计，不直接相加</span></div></div>
     <el-table class="workbench-table" :data="rows" v-loading="loading" stripe>
       <el-table-column label="负责人" width="320" fixed="left"><template #default="{row}"><div class="performance-owner-analysis">
         <div class="workbench-owner"><span class="workbench-avatar">{{ (row.owner_name || '?').slice(0,1) }}</span><span class="performance-owner-name" :title="row.owner_name">{{ row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人') }}</span></div>
         <div class="performance-analysis-actions">
-          <el-tooltip :content="canAnalyze(row) ? '分析配置：选择关注 SKU 和指标' : '需要本人或全员 SKU 经营分析权限，授权后刷新页面'" placement="top"><span><el-button size="small" plain circle :icon="Setting" :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="分析配置" @click="openAnalysisConfig(row)" /></span></el-tooltip>
+          <el-popover :visible="analysisGuideShown(row)" placement="bottom-start" :width="320" popper-class="performance-config-onboarding">
+            <template #reference><span><el-tooltip :disabled="analysisGuideShown(row)" :content="canAnalyze(row) ? '分析配置：选择关注 SKU 和指标' : '需要本人或全员 SKU 经营分析权限，授权后刷新页面'" placement="top"><span><el-button size="small" plain circle :icon="Setting" :class="{'analysis-config-guided': analysisGuideShown(row)}" :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="分析配置" @click="openAnalysisConfig(row)" /></span></el-tooltip></span></template>
+            <div class="analysis-onboarding-content" role="note">
+              <strong>先设置你要关注的 SKU 和指标</strong>
+              <p>点击齿轮 配置你需要关注的SKU和指标。后续每次点击分析数据就只会展示你关注的SKU和指标，当然，随时可以修改配置</p>
+              <el-checkbox v-model="analysisGuideDontRemind" class="analysis-onboarding-optout">不再提醒</el-checkbox>
+              <div class="analysis-onboarding-actions"><el-button size="small" text @click="dismissAnalysisGuide">知道了</el-button><el-button size="small" type="primary" @click="openAnalysisConfig(row)">去配置</el-button></div>
+            </div>
+          </el-popover>
           <el-button-group><el-button size="small" plain :icon="DataAnalysis" :disabled="loading || !loadedParams || !canAnalyze(row)" @click="openAnalysis(row, 1)">分析数据</el-button>
             <el-dropdown trigger="hover" :disabled="loading || !loadedParams || !canAnalyze(row)" @command="days => openAnalysis(row, days)"><el-button size="small" plain :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="选择分析周期"><el-icon><ArrowDown /></el-icon></el-button>
               <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="days in [3,7,14,30]" :key="days" :command="days">最近 {{ days }} 天 · 对比前 {{ days }} 天</el-dropdown-item></el-dropdown-menu></template>
@@ -44,12 +52,12 @@
       <el-table-column prop="current_listing_count" label="当前负责" width="75" />
       <el-table-column prop="period_listing_count" label="期间负责" width="75" />
       <el-table-column label="订单数" width="80"><template #header><el-tooltip content="按SKU日报相同日期统计已发货订单并去重；同单跨SKU/人员不能相加。" placement="top"><span>订单数 <el-icon><QuestionFilled /></el-icon></span></el-tooltip></template><template #default="{row}">{{ row.order_count ?? '待核对' }}</template></el-table-column>
-      <el-table-column label="销量" width="60"><template #default="{row}">{{ row.sales_qty ?? '—' }}</template></el-table-column>
+      <el-table-column label="销量" width="60"><template #default="{row}"><span v-bind="performanceMetricAttrs('sales_qty',row,skuDays.get(JSON.stringify([row.owner_user_id,row.currency])))">{{ row.sales_qty ?? '—' }}</span></template></el-table-column>
       <el-table-column label="销售额" width="105"><template #default="{row}">{{ money(row.sales_amount) }}</template></el-table-column>
-      <el-table-column label="广告费" width="95"><template #default="{row}">{{ money(row.ad_cost) }}</template></el-table-column>
+      <el-table-column label="广告费" width="95"><template #default="{row}"><span v-bind="performanceMetricAttrs('ad_cost',row)">{{ money(row.ad_cost) }}</span></template></el-table-column>
       <el-table-column :label="refundLabel" width="110"><template #default="{row}">{{ money(row.refund_loss) }}</template></el-table-column>
-      <el-table-column :label="profitLabel" width="120"><template #default="{row}">{{ money(row[profitKey]) }}</template></el-table-column>
-      <el-table-column label="TACOS / ACOS" width="130"><template #default="{row}"><div class="performance-ratios"><div><small>TACOS</small> {{ percent(row.tacos) }}</div><div><small>ACOS</small> {{ percent(row.acos) }}</div></div></template></el-table-column>
+      <el-table-column :label="profitLabel" width="120"><template #default="{row}"><span v-bind="performanceMetricAttrs(profitKey,row)">{{ money(row[profitKey]) }}</span></template></el-table-column>
+      <el-table-column label="TACOS / ACOS" width="130"><template #default="{row}"><div class="performance-ratios"><div><small>TACOS</small> <span v-bind="performanceMetricAttrs('tacos',row)">{{ percent(row.tacos) }}</span></div><div><small>ACOS</small> <span v-bind="performanceMetricAttrs('acos',row)">{{ percent(row.acos) }}</span></div></div></template></el-table-column>
       <el-table-column label="明细" width="200" class-name="performance-action-cell"><template #default="{row}"><div class="performance-actions"><el-button size="small" plain :icon="TrendCharts" :disabled="loading || !loadedParams" @click="openOwnerTrend(row)">趋势</el-button><el-button size="small" plain :icon="Document" @click="openSkus(row)">SKU 明细</el-button></div></template></el-table-column>
     </el-table>
     <el-empty v-if="result && !rows.length" description="所选人员在此期间没有已归属的 SKU 日报数据" />
@@ -72,7 +80,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown, DataAnalysis, Search, Setting, Document, TrendCharts, QuestionFilled } from '@element-plus/icons-vue'
 import PerformanceSkuDetails from '@/components/PerformanceSkuDetails.vue'
@@ -80,6 +88,8 @@ import PerformanceTrendChart from '@/components/PerformanceTrendChart.vue'
 import PerformanceSkuAnalysis from '@/components/PerformanceSkuAnalysis.vue'
 import { aggregatePerformanceDays, ownerPerformanceDays } from '@/services/performanceCharts.js'
 import { recentPerformanceDates } from '@/services/performanceDates.js'
+import { performanceColorGuide, performanceMetricAttrs, performanceSkuDays } from '@/utils/performanceMetricTone.js'
+import { useOperationGuide } from '@/utils/operationGuide'
 import { getUserPermissions, getMyPerformance, getUsersPerformance, getListingPerformanceConfig, getPerformanceOwners } from '@/services/api.js'
 
 const codes = getUserPermissions()
@@ -91,11 +101,15 @@ const ownerList = ref([]), ownersLoading = ref(false)
 const loading = ref(false), error = ref(''), result = ref(null)
 const skuDetails=ref(null), loadedParams=ref(null)
 const skuAnalysis=ref(null), analysisAccess=ref({user_id:null,self:false,all:false})
+const pageActive=ref(true)
+const { pending: analysisGuidePending, dontRemind: analysisGuideDontRemind, begin: beginAnalysisGuide, dismiss: dismissAnalysisGuide } = useOperationGuide('performance:analysis-config-guide:v1', () => analysisAccess.value.user_id)
 const ownerTrendVisible=ref(false), ownerTrendRows=ref([]), ownerTrendMeta=ref({}), ownerTrendMetrics=ref([])
 const closeOwnerTrend=()=>{ownerTrendVisible.value=false;ownerTrendRows.value=[];ownerTrendMeta.value={};ownerTrendMetrics.value=[]}
 const rows = computed(() => result.value?.list || [])
+// 使用同一次查询的逐日SKU覆盖，不用当前负责数量推算历史日均销量。
+const skuDays = computed(() => performanceSkuDays(result.value?.trend))
 const profitKey = computed(() => 'sku_report_profit')
-const profitLabel = computed(() => 'SKU 报表利润')
+const profitLabel = computed(() => '利润')
 const refundLabel = computed(() => 'SKU 报表退款')
 const chartCurrencies=computed(()=>[...new Set((result.value?.trend || []).map(row=>row.currency))])
 const chartDays=computed(()=>result.value && loadedParams.value && chartCurrency.value ? aggregatePerformanceDays(result.value.trend || [],chartCurrency.value,profitKey.value,loadedParams.value.date_from,loadedParams.value.date_to) : [])
@@ -144,13 +158,17 @@ const load = async () => {
   } catch (err) { if (version===requestVersion) { error.value = errorMessage(err); result.value = null } }
   finally { if (version===requestVersion) loading.value = false }
 }
-const openSkus=row=>{if(loadedParams.value)skuDetails.value?.open(row,{...loadedParams.value})}
+const openSkus=row=>{if(loadedParams.value){dismissAnalysisGuide();skuDetails.value?.open(row,{...loadedParams.value})}}
 // 当前负责人分析是独立授权；只传店铺/站点，不把绩效筛选日期带入分析窗口。
 const canAnalyze=row=>!!row.owner_user_id && (analysisAccess.value.all || (analysisAccess.value.self && row.owner_user_id===analysisAccess.value.user_id))
-const openAnalysisConfig=row=>{if(loadedParams.value && canAnalyze(row))skuAnalysis.value?.openConfig(row,{...loadedParams.value})}
-const openAnalysis=(row,days)=>{if(loadedParams.value && canAnalyze(row))skuAnalysis.value?.openData(row,{...loadedParams.value},Number(days))}
+// 优先引导本人一行，其次第一条可分析的行；避免多个负责人或币种同时弹提示。
+const analysisGuideRow=computed(()=>rows.value.find(row=>canAnalyze(row) && row.owner_user_id===analysisAccess.value.user_id) || rows.value.find(canAnalyze))
+const analysisGuideShown=row=>pageActive.value && analysisGuidePending.value && !loading.value && !!loadedParams.value && row===analysisGuideRow.value
+const openAnalysisConfig=row=>{if(loadedParams.value && canAnalyze(row)){dismissAnalysisGuide();skuAnalysis.value?.openConfig(row,{...loadedParams.value})}}
+const openAnalysis=(row,days)=>{if(loadedParams.value && canAnalyze(row)){dismissAnalysisGuide();skuAnalysis.value?.openData(row,{...loadedParams.value},Number(days))}}
 const openOwnerTrend=row=>{
   if(!loadedParams.value || loading.value)return
+  dismissAnalysisGuide()
   const query=loadedParams.value
   ownerTrendMeta.value={name:row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人'),
     currency:row.currency,timezone:result.value.timezone,dateFrom:query.date_from,dateTo:query.date_to,
@@ -162,11 +180,15 @@ const openOwnerTrend=row=>{
     {key:'profit',label:profitLabel.value,axis:'amount',color:'#9a77dc'}]
   ownerTrendVisible.value=true
 }
+// 缓存页签失活隐藏Teleport气泡；未勾选“不再提醒”时重新进入仍提供指引。
+onActivated(()=>{pageActive.value=true;if(analysisAccess.value.user_id)beginAnalysisGuide()})
+onDeactivated(()=>{pageActive.value=false})
 onMounted(async () => {
   try {
     const response = await getListingPerformanceConfig()
     shopList.value = response.data.data.shops
     analysisAccess.value = response.data.data.analysis_access || {user_id:null,self:false,all:false}
+    beginAnalysisGuide()
     shopId.value = shopList.value[0]?.id || null
     dates.value=recentPerformanceDates(shopList.value[0]?.sku_report_date_to,response.data.data.markets[shopList.value[0]?.marketplace_id]?.timezone)
     if(/^\d{4}-\d{2}-\d{2}$/.test(route.query.date_from || '') && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date_to || '')) dates.value=[route.query.date_from,route.query.date_to]
@@ -185,4 +207,10 @@ onMounted(async () => {
 .performance-analysis-actions .el-button { margin-left:0; }
 .performance-analysis-actions .el-button-group { display:inline-flex; align-items:center; }
 .performance-analysis-actions :deep(.el-dropdown .el-button) { border-left:0; border-top-left-radius:0; border-bottom-left-radius:0; }
+.analysis-config-guided{background:#eaf2ff;color:#2563eb;border-color:#93b4ec;box-shadow:0 0 0 2px #bfdbfe}
+:global(.performance-config-onboarding.el-popper){background:#fffbeb;border-color:#f3d48a;box-shadow:0 5px 18px #7c570026}
+:global(.performance-config-onboarding .el-popper__arrow::before){background:#fffbeb;border-color:#f3d48a}
+.analysis-onboarding-content{font-size:13px;line-height:1.7;color:#785b25}.analysis-onboarding-content strong{font-size:14px;color:#604716}
+.analysis-onboarding-content p{margin:8px 0 12px}.analysis-onboarding-optout{height:24px;margin-bottom:8px}
+.analysis-onboarding-actions{display:flex;justify-content:flex-end;gap:8px}
 </style>

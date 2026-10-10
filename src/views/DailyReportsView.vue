@@ -28,16 +28,40 @@
       <footer class="pagination"><el-pagination v-model:current-page="page" v-model:page-size="pageSize" :total="total" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next" @current-change="loadList" @size-change="page = 1; loadList()" /></footer>
     </section>
 
-    <el-dialog v-model="editorVisible" :title="`${editForm.version ? '编辑' : '填写'}运营日报 · ${editForm.work_date || ''}`" width="min(1380px, 96vw)" top="4vh" class="daily-editor" :close-on-click-modal="false" :before-close="beforeEditorClose" @closed="invalidateEditor">
+    <el-dialog v-model="editorVisible" :title="`${editForm.version ? '编辑' : '填写'}运营日报 · ${editForm.work_date || ''}`" width="min(1380px, 96vw)" top="4vh" class="daily-editor" :close-on-click-modal="false" :before-close="beforeEditorClose" @opened="editorPositionReady = editorVisible" @close="editorPositionReady = false" @closed="invalidateEditor">
       <div class="editor-scroll" v-loading="opening">
         <template v-if="snapshot">
           <div class="editor-intro"><div><el-tag effect="plain">{{ snapshot.shop_name }}</el-tag><span class="muted">每日一份 · 当前登录人员本人填写 · 工作日期按北京时间</span></div><el-button :icon="Refresh" :disabled="saving || opening" @click="refreshSnapshot">重新整理经营数据</el-button></div>
           <el-alert v-if="!snapshot.report_date || snapshot.stale_days > 1" :title="snapshot.report_date ? `经营数据截至 ${snapshot.report_date}，比工作日期早 ${snapshot.stale_days} 天；请留意同步情况。` : '没有工作日前可用的SKU日报，经营指标显示未知，仍可填写实际工作。'" type="warning" :closable="false" show-icon />
-          <div class="editor-section"><div class="section-heading"><div><h2><span class="step">1</span>当前负责 SKU 是什么状况</h2><p class="muted">整体概况由系统自动汇总；勾选后，日报会额外展开这些 SKU 的数据和关注原因。</p></div><el-tooltip content="单日为截止日对比前一天；推荐参考近7天与前7天，亏损/金额影响优先。缺数据不当零，广告归因可能回补。勾选不改变整体汇总，也不影响绩效归属。" placement="top"><el-button text circle :icon="QuestionFilled" aria-label="重点SKU筛选指引" /></el-tooltip></div>
-            <el-alert class="selection-guide" title="为什么勾选 SKU？勾选之后系统自动生成勾选的SKU数据填写到日报第一部分，无需你去查询。" description="建议选 3～5 个亏损、销量下滑、广告费异常或明显改善的 SKU，可直接采用系统推荐，再按实际工作增删。最多选 10 个；不选也会保留全部负责 SKU 的整体概况。下方“经营判断”可选填，你主要填写第 2、3 部分即可。" type="info" :closable="false" show-icon />
+          <div class="editor-section"><div class="section-heading">
+            <h2><span class="step">1</span><el-popover trigger="hover" placement="bottom-start" :width="380" :show-after="150">
+              <template #reference><button type="button" class="sku-guide-trigger" aria-label="当前负责 SKU 是什么状况：查看勾选说明">当前负责 SKU 是什么状况<el-icon><QuestionFilled /></el-icon></button></template>
+              <div class="sku-guide-content">
+                <strong>为什么勾选 SKU？</strong>
+                <p>勾选之后系统自动生成勾选的SKU数据填写到日报第一部分，无需你去查询。</p>
+                <p>建议选 3～5 个亏损、销量下滑、广告费异常或明显改善的 SKU，可直接采用系统推荐，再按实际工作增删。最多选 10 个；不选也会保留全部负责 SKU 的整体概况。</p>
+                <p>下方“经营判断”可选填，你主要填写第 2、3 部分即可。</p>
+                <p>单日为截止日对比前一天；推荐参考近7天与前7天，亏损/金额影响优先。缺数据不当零，广告归因可能回补。勾选不改变整体汇总，也不影响绩效归属。</p>
+              </div>
+            </el-popover></h2>
+          </div>
+            <div class="overview-grid" aria-label="负责SKU当日概况"><div v-for="metric in overviewMetrics" :key="metric.key"><span class="overview-label">{{ metric.label }}</span><strong :class="{'negative': metric.key === 'sku_report_profit' && Number(snapshot.summaries.day.values[metric.key]) < 0, 'positive': metric.key === 'sku_report_profit' && Number(snapshot.summaries.day.values[metric.key]) > 0}">{{ metric.value }}</strong><span class="overview-change" title="较上一日数据；上升绿色、下降红色，仅表示数值变化方向"><span v-for="(part, partIndex) in dailyReportParts(`（${metric.change}）`)" :key="partIndex" :class="part.direction ? `report-change-${part.direction}` : ''">{{ part.text }}</span></span></div></div>
             <div class="source-strip"><span>数据截至 <b>{{ snapshot.report_date || '暂无' }}</b></span><span>当前负责 <b>{{ snapshot.summaries.day.sku_count }}</b> 个 SKU</span><span>当日有记录 <b>{{ snapshot.summaries.day.recorded_sku_count }}</b> 个</span><span>{{ snapshot.currency }} · 非个人绩效</span></div>
-            <div class="overview-grid"><div v-for="metric in overviewMetrics" :key="metric.key"><span>{{ metric.label }}</span><strong :class="{'negative': metric.key === 'sku_report_profit' && Number(snapshot.summaries.day.values[metric.key]) < 0}">{{ formatMetric(snapshot.summaries.day.values[metric.key], metric.key) }}</strong><small>较前日 {{ dailyChange(snapshot.changes[metric.key], metric.key === 'sales_qty') }}</small></div></div>
             <p v-if="snapshot.summaries.day.incomplete_count" class="warning-text">{{ snapshot.summaries.day.incomplete_count }} 个 SKU 缺少当日来源，金额仅是已记录小计；不展示完整周期涨跌。</p>
+            <el-collapse v-model="skuSections" class="sku-selection-collapse" @change="handleSkuSelectionChange">
+              <el-collapse-item name="selection">
+                <template #title>
+                  <span class="sku-selection-title">勾选汇报 SKU</span><span class="sku-selection-count">已选 {{ editForm.selected_skus.length }}/10</span>
+                  <el-popover :visible="skuGuideVisible" placement="bottom-start" :width="300" popper-class="daily-sku-onboarding">
+                    <template #reference><span :class="['sku-selection-action', {'is-guided': skuGuideVisible}]">{{ skuSections.includes('selection') ? '收起' : '展开选择' }}<el-icon :class="{'is-open': skuSections.includes('selection')}"><ArrowRight /></el-icon></span></template>
+                    <div class="sku-onboarding-content" role="note">
+                      <strong>先选好本次要汇报的 SKU</strong>
+                      <p>点击“展开选择”，查看系统推荐的重点 SKU，可按实际情况增删。勾选后，系统会自动生成对应的运营情况。</p>
+                      <el-checkbox v-model="skuGuideDontRemind" class="sku-onboarding-optout">不再提醒</el-checkbox>
+                      <div class="sku-onboarding-actions"><el-button size="small" text @click.stop="dismissSkuSelectionGuide">知道了</el-button><el-button size="small" type="primary" @click.stop="openSkuSelection">展开选择</el-button></div>
+                    </div>
+                  </el-popover>
+                </template>
             <div class="sku-picker-bar"><div class="inline-controls"><el-select v-model="category" @change="skuPage = 1" style="width:165px"><el-option label="全部负责 SKU" value="" /><el-option label="优先关注" value="attention" /><el-option label="经营下滑" value="decline" /><el-option label="表现改善" value="improved" /><el-option label="数据缺口" value="missing" /></el-select><el-input v-model="skuSearch" clearable placeholder="搜索 SKU / 产品中文名" :prefix-icon="Search" @input="skuPage = 1" /></div><el-button :icon="MagicStick" @click="useRecommended">采用系统推荐</el-button></div>
             <div class="selected-skus"><span>本次重点 {{ editForm.selected_skus.length }}/10</span><el-tag v-for="sku in editForm.selected_skus" :key="sku" closable @close="editForm.selected_skus = editForm.selected_skus.filter(x => x !== sku)">{{ nameFor(sku) }} · {{ sku }}</el-tag><span v-if="!editForm.selected_skus.length" class="muted">建议选 3～5 个，也可只汇报整体概况，不强求凑数。</span></div>
             <el-table :data="candidatePage" size="small" max-height="350" empty-text="无匹配SKU，可更换筛选条件" class="candidate-table">
@@ -50,6 +74,8 @@
               <el-table-column label="关注原因 / 数据提示" min-width="270"><template #default="{row}"><div class="reason-tags"><el-tag v-for="tag in row.recommendation.tags" :key="tag" size="small" :type="row.recommendation.category === 'attention' ? 'warning' : row.recommendation.category === 'improved' ? 'success' : 'info'" effect="plain">{{ tag }}</el-tag></div></template></el-table-column>
             </el-table>
             <div class="sku-pagination"><span class="muted">按金额影响与持续性推荐，不代表必须调广告。可读取接手前数据。</span><el-pagination v-model:current-page="skuPage" :page-size="10" :total="candidates.length" layout="total, prev, pager, next" small /></div>
+              </el-collapse-item>
+            </el-collapse>
             <el-input v-model="editForm.situation_text" type="textarea" :rows="2" maxlength="4000" show-word-limit placeholder="选填：补充你的经营判断，例如异常原因、重点观察方向。不要重复抄表格。" />
           </div>
           <div class="editor-section"><h2><span class="step">2</span>今天进行了什么调整与优化，思路是什么</h2><p class="muted">写清对象 → 动作 → 原因 → 接下来观察什么；没有调整时也请说明实际工作和判断。</p><el-input v-model="editForm.actions_text" type="textarea" :rows="5" maxlength="8000" show-word-limit placeholder="例如：SKU xxx，紧密匹配竞价从 $0.53 调整到 $0.45。原因是近期获客成本偏高，观察3天，重点关注订单量及广告费是否改善。\n只填写实际做过的操作，不由系统代写。" /></div>
@@ -60,7 +86,11 @@
     </el-dialog>
 
     <el-dialog v-model="detailVisible" :title="detailPreview ? '日报预览 · 尚未保存本次内容' : '运营日报'" width="min(1000px, 95vw)" top="4vh" class="daily-detail" @close="detailVersion++">
-      <div class="detail-scroll" v-loading="detailLoading"><article v-if="detailReport" class="report-paper"><header><span class="eyebrow">DAILY OPERATIONS</span><h2>{{ detailReport.snapshot.owner_name }} · 运营日报</h2><p>工作日期 {{ detailReport.work_date }}<el-tag :type="detailReport.status === 'submitted' && !detailPreview ? 'success' : 'info'" size="small">{{ detailPreview ? '未保存预览' : detailReport.status === 'submitted' ? '已提交' : '草稿' }}</el-tag></p></header><div v-for="(block, index) in detailBlocks" :key="index" :class="['report-block', `block-${block.kind}`]">{{ block.text }}</div></article></div>
+      <div class="detail-scroll" v-loading="detailLoading"><article v-if="detailReport" class="report-paper"><header><span class="eyebrow">DAILY OPERATIONS</span><h2>{{ detailReport.snapshot.owner_name }} · 运营日报</h2><p>工作日期 {{ detailReport.work_date }}<el-tag :type="detailReport.status === 'submitted' && !detailPreview ? 'success' : 'info'" size="small">{{ detailPreview ? '未保存预览' : detailReport.status === 'submitted' ? '已提交' : '草稿' }}</el-tag></p></header><div v-for="(block, index) in detailBlocks" :key="index" :class="['report-block', `block-${block.kind}`]">
+          <template v-if="block.items"><span v-for="(item, itemIndex) in block.items" :key="itemIndex" class="report-metric-item" title="较上一日数据；上升绿色、下降红色"><span v-for="(part, partIndex) in dailyReportParts(item.text)" :key="partIndex" :class="part.direction ? `report-change-${part.direction}` : ''">{{ part.text }}</span></span></template>
+          <template v-else-if="block.highlightChanges"><span v-for="(part, partIndex) in dailyReportParts(block.text)" :key="partIndex" :class="part.direction ? `report-change-${part.direction}` : ''">{{ part.text }}</span></template>
+          <template v-else>{{ block.text }}</template>
+        </div></article></div>
       <template #footer><div class="detail-footer"><span class="muted">{{ detailPreview ? '预览不会保存或提交，也不会重新读取经营数据。' : '保存快照 · 非实时数据' }}<br>{{ detailPreview ? '返回填写后保存/提交，即可下载日报图片。' : '导出一张完整长图，方便直接发送到微信群。' }}</span><div v-if="detailPreview"><el-button type="primary" @click="detailVisible = false">返回继续填写</el-button></div><div v-else><el-button v-if="config.can_write && detailReport?.owner_user_id === config.user_id" :disabled="detailLoading || exporting || !!deletingId" :icon="EditPen" @click="editDetail">编辑</el-button><el-button v-if="canDelete(detailReport)" type="danger" plain :icon="Delete" :disabled="detailLoading || exporting || !!deletingId" @click="removeReport(detailReport, detailScope)">删除</el-button><el-button :icon="CopyDocument" :disabled="!detailReport || detailLoading || exporting || !!deletingId" @click="copyReport">复制文字</el-button><el-button type="primary" :icon="Download" :loading="exporting" :disabled="!detailReport || detailLoading || !!deletingId" @click="downloadImage">下载日报图片</el-button></div></div></template>
     </el-dialog>
 
@@ -72,23 +102,31 @@
 import { computed, onMounted, onBeforeUnmount, onActivated, onDeactivated, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, CopyDocument, Delete, Download, EditPen, MagicStick, QuestionFilled, Refresh, Search, View } from '@element-plus/icons-vue'
+import { ArrowRight, Check, CopyDocument, Delete, Download, EditPen, MagicStick, QuestionFilled, Refresh, Search, View } from '@element-plus/icons-vue'
 import { getDailyReportConfig, getDailyReports, getCurrentDailyReport, getDailyReport, previewDailyReport, saveDailyReport, deleteDailyReport } from '@/services/api'
-import { dailyChange, dailyReportBlocks, dailyReportText, dailyReportImage, dailyReportTime } from '@/utils/dailyReportShare'
+import { dailyOverviewMetrics, dailyReportBlocks, dailyReportParts, dailyReportText, dailyReportImage, dailyReportTime } from '@/utils/dailyReportShare'
+import { useOperationGuide } from '@/utils/operationGuide'
 
 const config = ref({ shops: [], users: [], can_all: false, can_write: false, can_delete: false })
 // 首次进入默认展示填写说明，仍允许运营人员手动收起。
 const usageSections = ref(['guide'])
+// 每次打开编辑器默认收起勾选区；仅控制展示，不参与保存或清空已选SKU。
+const skuSections = ref([])
+// v1曾自动记已读；新版本仅认用户明确勾选的v2标记。
+const { pending: skuGuidePending, dontRemind: skuGuideDontRemind, begin: beginSkuSelectionGuide, dismiss: dismissSkuSelectionGuide } = useOperationGuide('daily-report:sku-selection-guide:v2', () => config.value.user_id)
 const initializing = ref(true), error = ref(''), shopId = ref(null), dates = ref([]), workDate = ref('')
 const ownerFilter = ref(null), statusFilter = ref(''), reports = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const deletingId = ref(null)
 const editorVisible = ref(false), opening = ref(false), saving = ref(false), savingStatus = ref(''), snapshot = ref(null), editForm = ref({}), editorScope = ref(null), refreshed = ref(false)
+// 等弹窗位移动画结束后再显示气泡，避免首次定位偏移、需要滚动才对齐。
+const editorPositionReady = ref(false)
 const category = ref(''), skuSearch = ref(''), skuPage = ref(1), baseline = ref('')
 const detailVisible = ref(false), detailReport = ref(null), detailLoading = ref(false), exporting = ref(false), detailScope = ref(null)
 const detailPreview = ref(false)
 const copyVisible = ref(false), copyText = ref('')
 let listVersion = 0, editorVersion = 0, detailVersion = 0, disposed = false
-const overviewMetrics = [{key: 'sales_qty', label: '当日销量'}, {key: 'sales_amount', label: '销售额'}, {key: 'ad_cost', label: '广告费'}, {key: 'sku_report_profit', label: 'SKU报表利润'}]
+const overviewMetrics = computed(() => snapshot.value ? dailyOverviewMetrics(snapshot.value) : [])
+const skuGuideVisible = computed(() => editorVisible.value && editorPositionReady.value && !detailVisible.value && !opening.value && !!snapshot.value && skuGuidePending.value && !skuSections.value.includes('selection'))
 const money = v => v === null || v === undefined ? '—' : Number(v).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
 const formatMetric = (value, key) => value === null || value === undefined ? '—' : key === 'sales_qty' ? Number(value).toLocaleString('zh-CN') : money(value)
 const message = err => err.response?.data?.message || err.message || '操作失败'
@@ -100,6 +138,11 @@ const nameFor = sku => snapshot.value?.rows.find(row => row.seller_sku === sku)?
 const fingerprint = () => JSON.stringify({ form: editForm.value, snapshot: snapshot.value, refreshed: refreshed.value })
 const dirty = () => editorVisible.value && !!snapshot.value && fingerprint() !== baseline.value
 const futureDate = day => config.value.today && `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}` > config.value.today
+
+/** 打开勾选区时关闭本次指引；仅明确勾选“不再提醒”才永久记忆。 */
+function handleSkuSelectionChange(sections) { if (sections.includes('selection')) dismissSkuSelectionGuide() }
+/** 气泡中的快捷入口与直接点击折叠标题保持一致。 */
+function openSkuSelection() { skuSections.value = ['selection']; dismissSkuSelectionGuide() }
 
 /** 当前筛选只提供店铺/站点；已打开编辑器固定自己的上下文，防止切店错存。 */
 function scopeParams() {
@@ -123,8 +166,11 @@ function changeShop() { page.value = 1; reports.value = []; total.value = 0; loa
 /** 打开某工作日：先找本人存档，已有则保留快照，未创建才只读整理新数据。 */
 async function openEditor(day) {
   if (!day || opening.value || saving.value) return
+  editorPositionReady.value = false
   const version = ++editorVersion; editorScope.value = scopeParams(); editorVisible.value = true; opening.value = true; snapshot.value = null
   category.value = ''; skuSearch.value = ''; skuPage.value = 1; refreshed.value = false
+  skuSections.value = []
+  beginSkuSelectionGuide()
   editForm.value = {report_id: null, work_date: day, version: 0, status: 'draft', selected_skus: [], situation_text: '', actions_text: '', issues_text: '', no_issues: false}
   try {
     const response = await getCurrentDailyReport({...editorScope.value, work_date: day})
@@ -276,14 +322,44 @@ onMounted(async () => {
 .daily-workbench{max-width:1680px;margin:0 auto;padding:28px 30px 50px;color:#334155;background:#f5f7fb;min-height:calc(100vh - 70px)}
 .page-heading,.section-heading,.inline-controls,.editor-intro,.editor-footer,.detail-footer,.sku-picker-bar,.sku-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .page-heading{margin-bottom:24px}.write-controls{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.write-controls :deep(.el-date-editor){width:150px}.eyebrow{font-size:11px;letter-spacing:2px;color:#7d94b5;font-weight:600}h1{font-size:27px;margin:6px 0 8px;color:#1e3658}h2{font-size:16px;color:#233f62;margin:0}p{line-height:1.7}.page-heading p{margin:0;color:#8594a8;font-size:13px}
-.panel{background:white;border:1px solid #e5ebf4;border-radius:14px;margin-bottom:18px;overflow:hidden}.filter-bar{padding:20px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}.field{display:flex;flex-direction:column;gap:8px}.field label{font-size:12px;color:#7d8fa9}.field .el-select{width:170px}.field :deep(.el-date-editor){width:310px}.section-heading{padding:18px 20px;border-bottom:1px solid #edf1f6}.section-heading>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.muted{color:#8a9ab1;font-size:12px}.page-error{margin-bottom:18px}.summary-cell{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.7;font-size:12px}.issues-highlight{color:#b7791f}.history-table :deep(.el-table__row){cursor:pointer}.history-table :deep(th.el-table__cell),.candidate-table :deep(th.el-table__cell){background:#f6f8fc;color:#7c8fa8;font-weight:500}.history-table :deep(td.el-table__cell){padding:17px 0}.pagination{display:flex;justify-content:flex-end;padding:18px}.inline-controls .el-date-editor{width:150px}.editor-scroll{max-height:72vh;overflow:auto;padding:0 6px 10px}.editor-intro{margin-bottom:16px}.editor-intro .muted{margin-left:12px}.editor-section{padding:20px 0;border-bottom:1px solid #e9eef5}.editor-section .section-heading{padding:0;border:0;margin-bottom:14px}.editor-section .section-heading p{margin:6px 0 0}.step{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;color:#467fe3;background:#edf3ff;border-radius:8px;margin-right:9px}.source-strip{display:flex;flex-wrap:wrap;gap:22px;padding:13px 16px;background:#f4f7fd;border-radius:9px;font-size:12px;color:#8a9ab1}.source-strip b{color:#506b91;font-weight:500}.overview-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:18px 0}.overview-grid>div{display:flex;flex-direction:column;gap:8px;padding:14px 18px;background:#fafbfd;border:1px solid #edf1f6;border-radius:10px}.overview-grid span{font-size:12px;color:#8a9ab1}.overview-grid strong{font-size:23px;font-weight:600;color:#365c8e}.overview-grid small{font-size:11px;color:#94a3b8}.negative{color:#ef6464!important}.warning-text{font-size:12px;color:#bc8a35;margin-top:0}.sku-picker-bar{margin:8px 0 12px}.sku-picker-bar .el-input{width:240px}.selected-skus{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 16px;font-size:12px;color:#6c81a1}.selected-skus .el-tag{height:auto;min-height:25px;white-space:normal}.sku-code{display:block;font-size:11px;color:#8c9fb7;margin-top:4px}.reason-tags{display:flex;gap:5px;flex-wrap:wrap}.reason-tags .el-tag{height:auto;white-space:normal;line-height:1.7}.sku-pagination{margin:13px 0 18px}.candidate-table small.muted{display:block}.editor-section>h2{margin-bottom:10px}.editor-footer{text-align:left}.editor-footer>div,.detail-footer>div{display:flex;gap:8px;flex-wrap:wrap}.editor-footer .el-button+.el-button,.detail-footer .el-button+.el-button{margin:0}.editor-footer .muted,.detail-footer .muted{line-height:1.8}.detail-scroll{max-height:72vh;overflow:auto;background:#f5f7fb;padding:20px}.report-paper{padding:32px 38px;background:#fff;border:1px solid #e7edf6;border-radius:12px}.report-paper header{border-bottom:1px solid #e9eef5;padding-bottom:15px;margin-bottom:18px}.report-paper header h2{font-size:25px;margin:8px 0}.report-paper header p{color:#8a9ab1;font-size:12px;margin-bottom:0}.report-paper header .el-tag{margin-left:15px}.report-block{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;margin:12px 0;font-size:13px}.block-heading{color:#254466;font-size:17px;font-weight:600;border-top:1px solid #edf1f6;padding-top:20px;margin-top:24px}.block-meta,.block-note{font-size:11px;color:#8a9ab1}.block-metric{padding:16px;background:#f0f5ff;border-radius:8px;color:#3f6cac;font-size:16px;font-weight:500}.block-sku{color:#168d83;font-weight:600;margin-top:20px}.block-warning{color:#b48025;background:#fffbeb;padding:12px;border-radius:7px}
-@media(max-width:800px){.daily-workbench{padding:18px 12px}.page-heading{align-items:flex-start}.section-heading,.editor-intro,.editor-footer,.detail-footer,.sku-picker-bar,.sku-pagination{flex-wrap:wrap}.overview-grid{grid-template-columns:repeat(2,1fr)}.inline-controls{flex-wrap:wrap;gap:8px}.filter-bar{gap:12px}.report-paper{padding:20px 17px}.detail-scroll{padding:8px}.sku-picker-bar .el-input{width:190px}.source-strip{gap:10px}.editor-intro .muted{display:block;margin:8px 0}.editor-footer,.detail-footer{gap:12px}.editor-footer>div,.detail-footer>div{width:100%;justify-content:flex-end}}
+.panel{background:white;border:1px solid #e5ebf4;border-radius:14px;margin-bottom:18px;overflow:hidden}.filter-bar{padding:20px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}.field{display:flex;flex-direction:column;gap:8px}.field label{font-size:12px;color:#7d8fa9}.field .el-select{width:170px}.field :deep(.el-date-editor){width:310px}.section-heading{padding:18px 20px;border-bottom:1px solid #edf1f6}.section-heading>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.muted{color:#8a9ab1;font-size:12px}.page-error{margin-bottom:18px}.summary-cell{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.7;font-size:12px}.issues-highlight{color:#b7791f}.history-table :deep(.el-table__row){cursor:pointer}.history-table :deep(th.el-table__cell),.candidate-table :deep(th.el-table__cell){background:#f6f8fc;color:#7c8fa8;font-weight:500}.history-table :deep(td.el-table__cell){padding:17px 0}.pagination{display:flex;justify-content:flex-end;padding:18px}.inline-controls .el-date-editor{width:150px}.editor-scroll{max-height:72vh;overflow:auto;padding:0 6px 10px}.editor-intro{margin-bottom:16px}.editor-intro .muted{margin-left:12px}.editor-section{padding:20px 0;border-bottom:1px solid #e9eef5}.editor-section .section-heading{padding:0;border:0;margin-bottom:14px}.editor-section .section-heading p{margin:6px 0 0}.step{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;color:#467fe3;background:#edf3ff;border-radius:8px;margin-right:9px}.source-strip{display:flex;flex-wrap:wrap;gap:6px 22px;padding:8px 12px;background:#f4f7fd;border-radius:7px;font-size:12px;line-height:20px;color:#8a9ab1}.source-strip b{color:#506b91;font-weight:500}.overview-grid{display:flex;flex-wrap:wrap;align-items:center;gap:6px 24px;padding:4px 0 10px;line-height:24px}.overview-grid>div{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}.overview-grid .overview-label{font-size:13px;color:#657a96}.overview-grid strong{font-size:16px;font-weight:600;color:#365c8e;font-variant-numeric:tabular-nums}.overview-grid .positive{color:#16a34a}.overview-grid .negative{color:#dc2626!important}.negative{color:#ef6464!important}.warning-text{font-size:12px;color:#bc8a35;margin-top:0}.sku-picker-bar{margin:8px 0 12px}.sku-picker-bar .el-input{width:240px}.selected-skus{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 16px;font-size:12px;color:#6c81a1}.selected-skus .el-tag{height:auto;min-height:25px;white-space:normal}.sku-code{display:block;font-size:11px;color:#8c9fb7;margin-top:4px}.reason-tags{display:flex;gap:5px;flex-wrap:wrap}.reason-tags .el-tag{height:auto;white-space:normal;line-height:1.7}.sku-pagination{margin:13px 0 18px}.candidate-table small.muted{display:block}.editor-section>h2{margin-bottom:10px}.editor-footer{text-align:left}.editor-footer>div,.detail-footer>div{display:flex;gap:8px;flex-wrap:wrap}.editor-footer .el-button+.el-button,.detail-footer .el-button+.el-button{margin:0}.editor-footer .muted,.detail-footer .muted{line-height:1.8}.detail-scroll{max-height:72vh;overflow:auto;background:#f5f7fb;padding:20px}.report-paper{padding:32px 38px;background:#fff;border:1px solid #e7edf6;border-radius:12px}.report-paper header{border-bottom:1px solid #e9eef5;padding-bottom:15px;margin-bottom:18px}.report-paper header h2{font-size:25px;margin:8px 0}.report-paper header p{color:#8a9ab1;font-size:12px;margin-bottom:0}.report-paper header .el-tag{margin-left:15px}.report-block{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;margin:12px 0;font-size:13px}.block-heading{color:#254466;font-size:17px;font-weight:600;border-top:1px solid #edf1f6;padding-top:20px;margin-top:24px}.block-meta,.block-note{font-size:11px;color:#8a9ab1}.block-metric{padding:16px;background:#f0f5ff;border-radius:8px;color:#3f6cac;font-size:16px;font-weight:500}.block-sku{color:#168d83;font-weight:600;margin-top:20px}.block-warning{color:#b48025;background:#fffbeb;padding:12px;border-radius:7px}
+@media(max-width:800px){.daily-workbench{padding:18px 12px}.page-heading{align-items:flex-start}.section-heading,.editor-intro,.editor-footer,.detail-footer,.sku-picker-bar,.sku-pagination{flex-wrap:wrap}.overview-grid{gap:4px 16px}.inline-controls{flex-wrap:wrap;gap:8px}.filter-bar{gap:12px}.report-paper{padding:20px 17px}.detail-scroll{padding:8px}.sku-picker-bar .el-input{width:190px}.source-strip{gap:10px}.editor-intro .muted{display:block;margin:8px 0}.editor-footer,.detail-footer{gap:12px}.editor-footer>div,.detail-footer>div{width:100%;justify-content:flex-end}}
 </style>
 <style scoped>
-/* 操作说明默认展开且可收起；重点勾选用途在编辑器直接可见。 */
+/* 首页操作说明默认展开；编辑器重点勾选用途移至标题悬浮说明，减少占用高度。 */
 /* 关键操作沿用原字号和行内排版，仅轻微加粗、加深颜色。 */
 .guide-emphasis{display:inline;color:#475569;font-size:inherit;font-weight:600}
-.usage-guide{margin-bottom:18px;padding:0 20px;background:white;border:1px solid #e5ebf4;border-radius:12px}.usage-guide :deep(.el-collapse-item__header){font-size:13px;color:#506b91}.usage-guide p{margin:8px 0;color:#657a96;font-size:13px}.selection-guide{margin-bottom:16px}.selection-guide :deep(.el-alert__description){line-height:1.8}
+/* 紧凑折叠入口始终展示已选数量；整体经营指标和人工填写区不随之隐藏。 */
+.sku-selection-collapse{margin:10px 0 14px;border-top:0}
+.sku-selection-collapse :deep(.el-collapse-item__header){height:38px;font-size:13px;color:#506b91}
+.sku-selection-collapse :deep(.el-collapse-item__title){display:flex;align-items:center;min-width:0}
+.sku-selection-title{font-weight:600}.sku-selection-count{margin-left:12px;color:#8291a7;font-size:12px}
+.sku-selection-action{display:inline-flex;align-items:center;gap:4px;margin-left:14px;padding:2px 6px;color:#467fe3;font-size:12px;line-height:20px;border-radius:4px}
+.sku-selection-action .el-icon{transition:transform .2s}.sku-selection-action .is-open{transform:rotate(90deg)}
+.sku-selection-action.is-guided{background:#eaf2ff;color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}
+.sku-selection-collapse :deep(.el-collapse-item__arrow){display:none}
+.sku-selection-collapse :deep(.el-collapse-item__content){padding-bottom:0}
+/* 首次引导悬浮在入口旁，不遮罩、不自动改变选择，也不占正文布局。 */
+:global(.daily-sku-onboarding.el-popper){background:#fffbeb;border-color:#f3d48a;box-shadow:0 5px 18px #7c570026}
+:global(.daily-sku-onboarding .el-popper__arrow::before){background:#fffbeb;border-color:#f3d48a}
+.sku-onboarding-content{font-size:13px;line-height:1.7;color:#785b25}.sku-onboarding-content strong{font-size:14px;color:#604716}
+.sku-onboarding-content p{margin:8px 0 12px}.sku-onboarding-actions{display:flex;justify-content:flex-end;gap:8px}
+.sku-onboarding-optout{height:24px;margin-bottom:8px}
+/* 标题与问号共用说明入口；不再占据正文空间，键盘聚焦仍有清晰边框。 */
+.sku-guide-trigger{display:inline-flex;align-items:center;gap:7px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:help;vertical-align:middle}
+.sku-guide-trigger .el-icon{font-size:13px;color:#8a9ab1}
+.sku-guide-trigger:focus-visible{outline:2px solid #93b4ec;outline-offset:4px;border-radius:3px}
+.sku-guide-content{font-size:13px;line-height:1.7;color:#657a96}
+.sku-guide-content strong{color:#334155}.sku-guide-content p{margin:8px 0 0}
+/* SKU小结突出盈利/亏损结论，日周对比保留正文，广告效率弱化为补充依据。 */
+.block-summary-profit,.block-summary-loss,.block-summary-neutral{padding:9px 12px;border-radius:7px;font-weight:600;margin:8px 0;line-height:1.7}
+.block-summary-profit{color:#047857;background:#f0f9f5}.block-summary-loss{color:#b45309;background:#fffbf1}.block-summary-neutral{color:#475569;background:#f6f8fb}
+.block-comparison{font-size:12px;color:#657a96;line-height:1.8;padding-bottom:14px;border-bottom:1px solid #edf1f6}
+/* 括号变化紧邻指标，保持一组不拆开；上升绿、下降红不代表经营好坏。 */
+.report-metric-item{display:inline-block;margin-right:18px}.report-metric-item:last-child{margin-right:0}
+.report-block .report-change-up,.overview-grid .report-change-up{color:#16a34a}.report-block .report-change-down,.overview-grid .report-change-down{color:#dc2626}
+.overview-grid .overview-change{font-size:12px;font-weight:500;margin-left:-4px;white-space:nowrap;color:#8291a7}
+.usage-guide{margin-bottom:18px;padding:0 20px;background:white;border:1px solid #e5ebf4;border-radius:12px}.usage-guide :deep(.el-collapse-item__header){font-size:13px;color:#506b91}.usage-guide p{margin:8px 0;color:#657a96;font-size:13px}
 /* 手机弹框为固定操作预留空间，避免多行页脚挤出可视区。 */
 @media(max-width:800px){.editor-scroll{max-height:calc(100dvh - 330px)}.detail-scroll{max-height:calc(100dvh - 270px)}.editor-section>.section-heading{align-items:flex-start}.editor-section>.section-heading>div:first-child{flex:1;min-width:0}.selected-skus .el-tag{max-width:100%}.selected-skus :deep(.el-tag__content){white-space:normal;overflow-wrap:anywhere}}
 </style>
