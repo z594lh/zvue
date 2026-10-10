@@ -42,7 +42,7 @@
           <span>{{ index + 1 }}. {{ metricLabel(key) }}</span>
         </div>
       </div>
-      <p class="analysis-help">利润、退款沿用 SKU 日报；退款不再次扣除。ACOS/TACOS 按周期汇总金额计算，广告归因订单数不是全部订单数。</p>
+      <p class="analysis-help">利润、退款沿用 SKU 日报；退款不再次扣除。ACOS/TACOS 按周期汇总金额计算，广告订单数不是全部订单数。</p>
     </div>
     <template #footer>
       <span class="analysis-footer-note">配置属于该负责人，保存后其他有权限的人员也可查看。</span>
@@ -94,30 +94,32 @@
     <el-alert v-if="dataResult?.invalid_skus.length" :title="`有 ${dataResult.invalid_skus.length} 个关注 SKU 已转交或失效，未读取其数据：${dataResult.invalid_skus.join('、')}。请修改配置。`" type="warning" :closable="false" show-icon />
     <el-alert v-if="dataResult?.incomplete_count" :title="`有 ${dataResult.incomplete_count} 个 SKU 本期或对比期缺日报；${changeDirection ? '这些 SKU 不计入当前涨跌筛选。' : '显示已记录小计，暂停涨跌计算，不将缺失当零。'}`" type="warning" :closable="false" show-icon />
     <el-table :key="tableKey" v-loading="dataLoading" :data="dataResult?.list || []" class="workbench-table analysis-result-table" stripe max-height="560" :default-sort="{ prop: sortBy, order: sortOrder === 'desc' ? 'descending' : 'ascending' }" @sort-change="changeSort">
-      <el-table-column prop="seller_sku" label="SKU / 产品中文名称" min-width="235" fixed="left" sortable="custom">
-        <template #default="{ row }"><div class="analysis-product-name">{{ row.product_name || '未维护中文名称' }}</div><div class="workbench-sku">{{ row.seller_sku }}</div></template>
+      <el-table-column prop="seller_sku" label="SKU / 产品中文名称" min-width="190" fixed="left" sortable="custom">
+        <template #header><span class="analysis-column-label" title="SKU / 产品中文名称">SKU / 产品中文名称</span></template>
+        <template #default="{ row }"><el-tooltip :content="row.product_name || '未维护中文名称'" placement="top"><div class="analysis-product-name analysis-ellipsis">{{ row.product_name || '未维护中文名称' }}</div></el-tooltip><el-tooltip :content="row.seller_sku" placement="top"><div class="workbench-sku analysis-ellipsis">{{ row.seller_sku }}</div></el-tooltip></template>
       </el-table-column>
-      <el-table-column v-for="metric in displayMetrics" :key="metric.key" :prop="metric.key" :label="metric.label" min-width="155" align="right" sortable="custom">
-        <template #default="{ row }"><div class="analysis-metric-value" v-bind="analysisMetricAttrs(row, metric)">{{ formatValue(row.current.values[metric.key], metric.kind) }}</div>
+      <el-table-column v-for="metric in displayMetrics" :key="metric.key" :prop="metric.key" :label="metric.label" :min-width="metric.kind === 'quantity' ? 90 : metric.kind === 'ratio' ? 120 : 110" align="right" sortable="custom">
+        <template #header><el-tooltip :content="metric.label" placement="top"><span class="analysis-column-label">{{ metric.label }}</span></el-tooltip></template>
+        <template #default="{ row }"><el-tooltip :content="`${metric.label}：${formatValue(row.current.values[metric.key], metric.kind)}。${analysisMetricAttrs(row, metric).title}`" placement="top"><div class="analysis-metric-value analysis-ellipsis" :class="analysisMetricAttrs(row, metric).class">{{ formatValue(row.current.values[metric.key], metric.kind) }}</div></el-tooltip>
           <el-tooltip :content="changeTooltip(row, metric)" placement="top"><div class="analysis-change" :class="`direction-${row.changes[metric.key].direction}`">
             <el-icon v-if="row.changes[metric.key].direction === 'up'"><Top /></el-icon><el-icon v-else-if="row.changes[metric.key].direction === 'down'"><Bottom /></el-icon>
-            {{ changeText(row.changes[metric.key], metric) }}
+            <span class="analysis-change-text analysis-ellipsis">{{ changeText(row.changes[metric.key], metric) }}</span>
           </div></el-tooltip>
-          <div class="analysis-previous">前期 {{ formatValue(row.previous.values[metric.key], metric.kind) }}</div>
+          <el-tooltip :content="`前期${metric.label}：${formatValue(row.previous.values[metric.key], metric.kind)}`" placement="top"><div class="analysis-previous analysis-ellipsis">前期 {{ formatValue(row.previous.values[metric.key], metric.kind) }}</div></el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="日报覆盖" width="160" align="center">
+      <el-table-column label="日报覆盖" width="105" align="center">
         <template #default="{ row }"><el-tooltip :content="coverageTooltip(row)" placement="top" popper-class="performance-range-tooltip"><div class="analysis-coverage" :class="{ partial: !row.current.complete || !row.previous.complete }">
           <span>本期 {{ row.current.recorded_days }}/{{ row.current.expected_days }} 天</span><span>前期 {{ row.previous.recorded_days }}/{{ row.previous.expected_days }} 天</span>
         </div></el-tooltip></template>
       </el-table-column>
-      <el-table-column label="分析工具" width="400" align="center" fixed="right">
+      <el-table-column label="分析工具" width="160" align="center" fixed="right">
         <template #header><span class="analysis-tools-heading">分析工具
           <el-popover placement="bottom-end" :width="340" :trigger="['hover', 'click']" :show-after="150" :hide-after="200">
             <template #reference><el-button :icon="QuestionFilled" text circle size="small" class="analysis-tools-help" aria-label="分析工具使用说明" /></template>
             <div class="analysis-tools-guide">
               <h4>选择适合你的分析方式</h4>
-              <p><strong>下载数据文件</strong><br>整理该 SKU 的经营与自动广告数据，生成 Markdown 文件。下载本身免费，可将文件交给你常用的免费 AI 工具分析。</p>
+              <p><strong>下载数据文件</strong><br>整理该 SKU 的经营与自动广告数据，生成 Markdown 文件。下载后，可将文件交给你常用的免费 AI 工具分析。</p>
               <p><strong>AI 分析</strong><br>直接调用 DeepSeek API，自动生成经营诊断和具体调整建议，在系统内查看或下载结果。{{ aiCostHint }}</p>
               <p><strong>查看分析结果</strong><br>点击打开最近一次可查看的分析；悬浮右侧菜单可进入历史列表。成功结果保存在数据库，刷新页面后仍可查看。</p>
               <p class="analysis-tools-note">两种方式使用相同资料：最近 3 天逐日及 7 / 15 / 30 天汇总，以表格截止日为准，不随上方展示周期改变。查看、下载已有结果不再调用 API。</p>
@@ -126,6 +128,7 @@
           </el-popover>
         </span></template>
         <template #default="{ row }">
+          <div class="analysis-tool-actions">
           <el-tooltip :content="canExport ? '下载经营与广告数据文件，可交给常用的免费 AI 工具 直接丢给他分析( 例如网页豆包，通义千问，kimi等，稍微麻烦但免费 )。' : '需要 SKU 广告分析资料导出权限，授权后刷新页面。'" placement="top">
             <span><el-button size="small" plain :icon="Download" :loading="exportingSku === row.seller_sku"
               :disabled="!canExport || dataLoading || !!exportingSku" @click="downloadMarkdown(row)">下载数据文件</el-button></span>
@@ -139,6 +142,7 @@
             查看分析结果
             <template #dropdown><el-dropdown-menu><el-dropdown-item command="history" :icon="Clock">查看历史</el-dropdown-item></el-dropdown-menu></template>
           </el-dropdown>
+          </div>
         </template>
       </el-table-column>
       <template #empty><el-empty :description="dataLoading ? '正在读取 SKU 日报…' : dataError ? '查询未完成，请查看上方提示' : '没有匹配的有效关注 SKU'" :image-size="70" /></template>
@@ -158,7 +162,7 @@
       <el-table-column prop="report_date" label="报表截止日" width="115" />
       <el-table-column label="操作人" width="110"><template #default="{ row }">{{ row.created_by_name || `用户 ${row.created_by}` }}</template></el-table-column>
       <el-table-column label="可信度" width="90"><template #default="{ row }"><el-tag :type="confidenceType[row.confidence]" size="small" effect="light">{{ confidenceLabel[row.confidence] }}</el-tag></template></el-table-column>
-      <el-table-column label="分析结论" min-width="300"><template #default="{ row }"><div class="analysis-history-summary">{{ row.summary }}</div></template></el-table-column>
+      <el-table-column label="分析结论" min-width="300"><template #default="{ row }"><div class="analysis-history-summary">{{ simplifyAdTerms(row.summary) }}</div></template></el-table-column>
       <el-table-column label="详情" width="90" fixed="right" align="center"><template #default="{ row }"><el-button size="small" plain :icon="View" :disabled="!!aiReadSku" @click.stop="openHistoryRecord(row)">查看</el-button></template></el-table-column>
       <template #empty><el-empty :description="historyLoading ? '正在读取分析记录…' : historyError ? '读取未完成，请查看提示' : '暂无历史分析，点击“AI 分析”生成第一份建议'" :image-size="65" /></template>
     </el-table>
@@ -259,6 +263,19 @@ const aiBriefNotes = computed(() => {
 const periods = [1, 3, 7, 14, 30]
 let contextVersion = 0, configVersion = 0, candidateVersion = 0, dataVersion = 0, exportVersion = 0, aiVersion = 0, aiReadVersion = 0, historyVersion = 0, candidateTimer = null, tagObserver = null
 const errorMessage = err => err.response?.data?.message || err.message || '操作失败'
+/** 简化广告说明的展示术语；兼容旧接口/历史文案，不改变字段、数字或统计规则。 */
+const simplifyAdTerms = value => String(value ?? '').replace(/广告归因/g, '广告').replace(/归因销售额/g, '广告销售额').replace(/归因订单数/g, '广告订单数').replace(/归因回补/g, '数据补充').replace(/归因修订/g, '数据更新').replace(/归因延迟/g, '数据延迟').replace(/归因成熟/g, '数据稳定').replace(/归因窗口/g, '统计窗口').replace(/归因/g, '统计')
+/** 仅复制转换AI说明字段，保留原始历史、身份/名称、建议数值与其他结构不变。 */
+const simplifyAIResult = result => {
+  const textFields = new Set(['summary', 'title', 'judgment', 'evidence', 'reason', 'review_window', 'stop_condition', 'brief_notes', 'data_gaps', 'action', 'monitor', 'risk', 'success_criteria', 'target_or_signal'])
+  const copy = (value, key) => {
+    if (typeof value === 'string') return textFields.has(key) ? simplifyAdTerms(value) : value
+    if (Array.isArray(value)) return value.map(item => copy(item, key))
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([field, item]) => [field, copy(item, field)]))
+    return value
+  }
+  return { ...result, analysis: copy(result.analysis), history_warning: simplifyAdTerms(result.history_warning) }
+}
 const metricLabel = key => allMetrics.value.find(item => item.key === key)?.label || key
 const displayMetrics = computed(() => metricKeys.value.map(key => allMetrics.value.find(item => item.key === key)).filter(Boolean))
 const analysisColorGuide = `${performanceColorGuide}\n本期缺日报时，仅展示灰色已记录小计，暂不判断状态；其他绝对金额不设置统一颜色门槛。`
@@ -291,7 +308,7 @@ const changeText = (change, metric) => {
 const coverageTooltip = row => `本期缺日报：${row.current.missing_dates.join('、') || '无'}。前期缺日报：${row.previous.missing_dates.join('、') || '无'}。缺日报只展示已记录小计，不计算涨跌。`
 const changeTooltip = (row, metric) => {
   const change = row.changes[metric.key]
-  return `本期 ${formatValue(row.current.values[metric.key], metric.kind)}；前期 ${formatValue(row.previous.values[metric.key], metric.kind)}。${change.kind === 'incomplete' ? coverageTooltip(row) : `差额 ${formatValue(change.delta, metric.kind)}${change.rate === null ? '' : `；相对变化 ${(Number(change.rate) * 100).toFixed(2)}%`}`}`
+  return `${changeText(change, metric)}。本期 ${formatValue(row.current.values[metric.key], metric.kind)}；前期 ${formatValue(row.previous.values[metric.key], metric.kind)}。${change.kind === 'incomplete' ? coverageTooltip(row) : `差额 ${formatValue(change.delta, metric.kind)}${change.rate === null ? '' : `；相对变化 ${(Number(change.rate) * 100).toFixed(2)}%`}`}`
 }
 
 /** 停止候选搜索和标签测量，失效序号阻止已关闭弹框接收旧响应。 */
@@ -321,7 +338,7 @@ const prepare = (row, query) => {
 /** 装载服务端配置，原已选值含失效项也保留，交给用户明确移除。 */
 const applyConfig = config => {
   selectedSkus.value = [...config.selected_skus]; metricKeys.value = [...config.metric_keys]
-  allMetrics.value = config.metrics.map(metric => metric.key === 'sku_report_profit' ? {...metric, label: '利润'} : metric); savedVersion.value = config.version; maxSelected.value = config.max_selected_skus
+  allMetrics.value = config.metrics.map(metric => ({...metric, label: metric.key === 'sku_report_profit' ? '利润' : simplifyAdTerms(metric.label)})); savedVersion.value = config.version; maxSelected.value = config.max_selected_skus
   candidateCount.value = config.candidate_count
   lookup.value = Object.fromEntries(config.selected_items.map(item => [item.seller_sku, item]))
 }
@@ -527,7 +544,7 @@ const readAIResult = async (row, recordId = null) => {
   try {
     const response = recordId === null ? await getLatestPerformanceAIResult(params) : await getPerformanceAIHistoryResult(recordId, params)
     if (current !== contextVersion || requestId !== aiReadVersion || !dataVisible.value) return
-    aiResult.value = response.data.data
+    aiResult.value = simplifyAIResult(response.data.data)
     aiMeta.value = { seller_sku: aiResult.value.seller_sku, product_name: aiResult.value.product_name || row.product_name, report_date: aiResult.value.report_date }
   } catch (err) {
     if (current !== contextVersion || requestId !== aiReadVersion) return
@@ -634,7 +651,7 @@ const startAIAnalysis = async (row, force = false) => {
     sent = true
     const response = await analyzePerformanceSkuWithAI(params)
     if (current !== contextVersion || requestId !== aiVersion || !dataVisible.value) return
-    aiResult.value = response.data.data
+    aiResult.value = simplifyAIResult(response.data.data)
     if (historyVisible.value && historyMeta.value.seller_sku === row.seller_sku) { historyPage.value = 1; loadHistory() }
     if (!aiVisible.value) ElMessage.success(aiResult.value.history_saved === false ? 'AI 分析已完成，但未能保存历史，请保持当前窗口并下载结果' : 'AI 分析已完成并保存，可点击“查看分析结果”查看')
   } catch (err) {
@@ -708,10 +725,14 @@ defineExpose({ openConfig, openData, close })
 .analysis-direction-guide .is-up { color:#15803d; }
 .analysis-direction-guide .is-down { color:#dc2626; }
 .analysis-product-name { color:#344b68; font-weight:600; font-size:13px; }
+/* 仅压缩经营分析表；完整内容保留在悬浮说明中，不改变原始值或排序。 */
+.analysis-result-table :deep(.cell) { padding-left:8px; padding-right:8px; }
+.analysis-ellipsis { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.analysis-column-label { display:inline-block; max-width:calc(100% - 26px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; }
 .analysis-metric-value { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
 .analysis-metric-value:not(.performance-metric) { color:#2b4263; }
-.analysis-change { display:inline-flex; align-items:center; gap:4px; color:#718096; font-size:12px; font-weight:500; line-height:20px; padding:1px 7px; border-radius:5px; margin:6px 0 4px; }
-.analysis-change .el-icon { font-size:14px; }
+.analysis-change { display:inline-flex; align-items:center; gap:4px; max-width:100%; box-sizing:border-box; color:#718096; font-size:12px; font-weight:500; line-height:20px; padding:1px 6px; border-radius:5px; margin:6px 0 4px; }
+.analysis-change .el-icon { font-size:14px; flex-shrink:0; }
 .analysis-change.direction-up { color:#15803d; background:#edf8f0; font-weight:600; }
 .analysis-change.direction-down { color:#dc2626; background:#fef0f0; font-weight:600; }
 .analysis-previous { color:#9aa6b7; font-size:11px; font-variant-numeric:tabular-nums; }
@@ -720,8 +741,14 @@ defineExpose({ openConfig, openData, close })
 .analysis-coverage.partial { color:#af843e; }
 .analysis-result-footer { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:16px; margin-top:18px; }
 .analysis-result-footer>span { font-size:12px; color:#8b98aa; }
-.analysis-ai-action { margin-left:8px; }
-.analysis-view-action { margin-left:8px; vertical-align:middle; }
+/* 工具入口纵向等宽排列，利用指标行高，避免固定右列遮挡大量数据。 */
+.analysis-tool-actions { display:flex; flex-direction:column; align-items:stretch; gap:6px; width:128px; margin:0 auto; }
+.analysis-tool-actions>span { display:flex; }
+.analysis-tool-actions>span>.el-button { width:100%; margin:0; }
+.analysis-view-action { width:100%; margin:0; vertical-align:middle; }
+.analysis-view-action :deep(.el-button-group) { display:flex; width:100%; }
+.analysis-view-action :deep(.el-button-group>.el-button:first-child) { flex:1; min-width:0; padding:5px 8px; }
+.analysis-view-action :deep(.el-dropdown__caret-button) { flex:0 0 28px; padding:5px 6px; }
 .analysis-history-heading { display:flex; align-items:center; flex-wrap:wrap; gap:18px; margin-bottom:16px; }
 .analysis-history-heading>span:last-child { color:#8b98aa; font-size:12px; }
 .analysis-history-summary { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.8; color:#576a84; }

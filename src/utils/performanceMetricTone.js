@@ -7,13 +7,13 @@ export const performanceColorGuide = [
   '广告费：沿用TACOS的颜色，不按绝对花费金额判断高低。',
   '广告占比（广告销售额÷销售额）：≤50%绿，>50%且≤75%黄，>75%红；提示广告依赖，不等于广告订单占比。',
   '销量：有日报的每SKU日均销量=0红，>0且<1件黄，≥1件绿；人员按实际SKU·日数计算，不比较负责总量。',
-  '缺数据灰色，不当零；有广告花费但无相应销售额，无法计算的比率标红提醒。单日样本小、广告归因可能回补，结合趋势判断。'
+  '缺数据灰色，不当零；有广告花费但无相应销售额，无法计算的比率标红提醒。单日样本小，广告数据可能延迟补充，结合趋势判断。'
 ].join('\n')
 
 // 接口金额可为字符串；空串、布尔值及非有限数不是有效业务数字。
 const finite = value => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value)) ? Number(value) : null
 const ratioRules = {
-  acos: { label: 'ACOS', low: 0.25, high: 0.4, denominator: 'ad_sales', source: '广告归因销售额' },
+  acos: { label: 'ACOS', low: 0.25, high: 0.4, denominator: 'ad_sales', source: '广告销售额' },
   tacos: { label: 'TACOS', low: 0.15, high: 0.25, denominator: 'sales_amount', source: '销售额' },
   ad_share: { label: '广告销售占比', low: 0.5, high: 0.75 }
 }
@@ -39,7 +39,7 @@ export const performanceMetricAttrs = (metric, row, skuDays = null) => {
   if (rule) {
     if (value === null) {
       // 仅在相应分母明确为零时提醒，不把缺来源或空值解释成广告无效。
-      if (rule.denominator && finite(row.ad_cost) > 0 && finite(row[rule.denominator]) === 0) return attrs('danger', `有广告花费，但${rule.source}为0；${rule.label}不可计算，需关注销售与归因回补。`)
+      if (rule.denominator && finite(row.ad_cost) > 0 && finite(row[rule.denominator]) === 0) return attrs('danger', `有广告花费，但${rule.source}为0；${rule.label}不可计算，需关注销售及后续数据补充。`)
       return attrs('neutral', `${rule.label}无有效比率，不按0%判断。`)
     }
     if (value < 0) return attrs('neutral', `${rule.label}为负值，可能有数据调整，请核对来源。`)
