@@ -7,24 +7,25 @@
             <el-icon size="24" class="title-icon"><Timer /></el-icon>
             计划任务
           </h1>
-          <p class="page-desc">系统定时任务调度中心 · 上次执行 / 下次执行一目了然</p>
+          <p class="page-desc">查看定时计划，安全触发任务并追踪执行记录 · 手动执行不改变原定时计划</p>
         </div>
       </div>
 
-      <div class="stats-row" v-if="pagination.total > 0">
+      <el-alert v-if="capabilities.message" :title="capabilities.message" :type="capabilities.supported ? 'warning' : 'info'" :closable="false" show-icon class="environment-note" />
+      <div class="stats-row" v-if="stats.total > 0">
         <div class="stat-item">
-          <div class="stat-num">{{ pagination.total }}</div>
+          <div class="stat-num">{{ stats.total }}</div>
           <div class="stat-name">任务总数</div>
         </div>
         <div class="stat-divider" />
         <div class="stat-item">
-          <div class="stat-num" style="color: #f59e0b">{{ upcomingCount }}</div>
+          <div class="stat-num" style="color: #f59e0b">{{ stats.upcoming }}</div>
           <div class="stat-name">未来 1 小时内执行</div>
         </div>
         <div class="stat-divider" />
         <div class="stat-item">
-          <div class="stat-num" style="color: #10b981">{{ runningCount }}</div>
-          <div class="stat-name">运行中</div>
+          <div class="stat-num" style="color: #10b981">{{ stats.running }}</div>
+          <div class="stat-name">正在执行</div>
         </div>
       </div>
 
@@ -58,22 +59,20 @@
           :cell-style="{ padding: '16px', fontSize: '13px' }"
           row-class-name="task-row"
         >
-          <el-table-column label="任务名称" min-width="130">
+          <el-table-column label="任务名称" min-width="155">
             <template #default="{ row }">
-              <span class="name-tag">{{ row.task_name }}</span>
+              <el-tooltip :content="row.scope" placement="top"><span class="name-tag">{{ row.task_name }}</span></el-tooltip>
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="90" align="center">
-            <template #default>
-              <span class="status-badge">
-                <span class="status-dot" />
-                运行中
-              </span>
+          <el-table-column label="当前状态" width="132" align="center">
+            <template #default="{ row }">
+              <el-tag :type="statusType(row.status)" size="small">{{ row.status_label }}</el-tag>
+              <div v-if="row.active_run?.duration_seconds != null" class="time-sub">已运行 {{ duration(row.active_run.duration_seconds) }}</div>
             </template>
           </el-table-column>
 
-          <el-table-column label="执行周期" min-width="260">
+          <el-table-column label="执行周期" min-width="190">
             <template #default="{ row }">
               <div class="cron-box">
                 <code class="cron-expr">{{ row.schedule }}</code>
@@ -89,31 +88,41 @@
           <el-table-column label="下次执行" width="170">
             <template #default="{ row }">
               <div class="time-cell">
-                <div class="time-main">{{ row.next_run || '-' }}</div>
+                <div class="time-main">{{ formatTime(row.next_run) }}</div>
                 <div class="time-sub">{{ fromNow(row.next_run) }}</div>
               </div>
             </template>
           </el-table-column>
 
-          <el-table-column label="上次执行" width="170">
+          <el-table-column label="最近触发 / 结果" width="180">
             <template #default="{ row }">
-              <div v-if="row.last_run" class="time-cell">
-                <div class="time-main">{{ row.last_run }}</div>
-                <div class="time-sub">{{ timeAgo(row.last_run) }}</div>
+              <div v-if="row.last_result" class="time-cell">
+                <div class="time-main">{{ formatTime(row.last_result.created_at) }}</div>
+                <el-tooltip :content="row.last_result.summary"><el-tag :type="statusType(row.last_result.status)" size="small">{{ row.last_result.status_label }}</el-tag></el-tooltip>
               </div>
               <span v-else class="time-empty">—</span>
             </template>
           </el-table-column>
 
-          <el-table-column label="描述" min-width="180">
+          <el-table-column label="描述" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="desc-text">{{ row.description }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="175" fixed="right">
+            <template #default="{ row }">
+              <div class="task-actions">
+                <el-tooltip :content="row.disabled_reason || '按默认范围执行一次，不更改原定时计划'">
+                  <span><el-button type="primary" plain size="small" :loading="executing === row.task_id" :disabled="!row.can_execute || !!executing" @click="handleExecute(row)">立即执行</el-button></span>
+                </el-tooltip>
+                <el-button size="small" :disabled="!row.task_id" @click="openHistory(row)">记录</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
 
         <div v-else-if="!loading" class="empty-state">
-          <el-empty description="暂无计划任务">
+          <el-empty :description="capabilities.supported === false ? '本地Windows不提供Linux计划任务' : '暂无计划任务'">
             <template #image>
               <el-icon size="64" class="empty-icon"><Timer /></el-icon>
             </template>
@@ -137,7 +146,7 @@
         <div v-for="task in tasks" :key="task.task_name" class="m-card">
           <div class="m-header">
             <span class="m-name">{{ task.task_name }}</span>
-            <span class="m-status"><span class="status-dot" />运行中</span>
+            <el-tag :type="statusType(task.status)" size="small">{{ task.status_label }}</el-tag>
           </div>
           <div class="m-section">
             <div class="m-label">执行周期</div>
@@ -149,17 +158,21 @@
           <div class="m-grid">
             <div class="m-grid-item">
               <div class="m-grid-label">下次执行</div>
-              <div class="m-grid-value">{{ task.next_run || '-' }}</div>
+              <div class="m-grid-value">{{ formatTime(task.next_run) }}</div>
               <div class="m-grid-sub">{{ fromNow(task.next_run) }}</div>
             </div>
             <div class="m-grid-item">
-              <div class="m-grid-label">上次执行</div>
-              <div v-if="task.last_run" class="m-grid-value">{{ task.last_run }}</div>
-              <div v-if="task.last_run" class="m-grid-sub">{{ timeAgo(task.last_run) }}</div>
+              <div class="m-grid-label">最近触发 / 结果</div>
+              <div v-if="task.last_result" class="m-grid-value">{{ formatTime(task.last_result.created_at) }}</div>
+              <div v-if="task.last_result" class="m-grid-sub">{{ task.last_result.status_label }}</div>
               <div v-else class="m-grid-value" style="color: #94a3b8">—</div>
             </div>
           </div>
           <div v-if="task.description" class="m-desc">{{ task.description }}</div>
+          <div class="m-task-actions">
+            <el-tooltip :content="task.disabled_reason || task.scope"><span><el-button size="small" type="primary" plain :disabled="!task.can_execute || !!executing" :loading="executing === task.task_id" @click="handleExecute(task)">立即执行</el-button></span></el-tooltip>
+            <el-button size="small" :disabled="!task.task_id" @click="openHistory(task)">执行记录</el-button>
+          </div>
         </div>
       </div>
 
@@ -175,6 +188,27 @@
           @change="handlePageChange"
         />
       </div>
+      <p v-if="tasks.length" class="page-desc execution-help">时间按当前设备时区显示。执行结束不等于所有业务同步成功；点击记录核对日志。撞锁不重复启动，不自动重试。</p>
+      <el-dialog v-model="historyVisible" :title="`${historyTask?.task_name || ''} · 执行记录`" width="min(960px, 94vw)" append-to-body>
+        <el-table v-loading="historyLoading" :data="records" @row-click="openDetail" class="history-table">
+          <el-table-column prop="id" label="记录" width="75" />
+          <el-table-column label="触发时间" width="172"><template #default="{ row }">{{ formatTime(row.created_at) }}</template></el-table-column>
+          <el-table-column label="来源 / 操作人" min-width="135"><template #default="{ row }">{{ row.source === 'manual' ? (row.actor_name || '手动执行') : '定时执行' }}</template></el-table-column>
+          <el-table-column label="结果" width="125"><template #default="{ row }"><el-tag size="small" :type="statusType(row.status)">{{ row.status_label }}</el-tag></template></el-table-column>
+          <el-table-column label="耗时" width="90"><template #default="{ row }">{{ duration(row.duration_seconds) }}</template></el-table-column>
+          <el-table-column prop="summary" label="摘要（点击查看日志）" min-width="200" show-overflow-tooltip />
+        </el-table>
+        <div class="pagination-bar"><el-pagination v-model:current-page="historyPage" :page-size="10" :total="historyTotal" layout="total, prev, pager, next" @current-change="loadHistory" /></div>
+        <template #footer><el-button @click="loadHistory">刷新记录</el-button><el-button @click="historyVisible = false">关闭</el-button></template>
+      </el-dialog>
+      <el-dialog v-model="detailVisible" :title="`执行记录 #${detailRecord?.id || ''}`" width="min(900px, 94vw)" append-to-body>
+        <div v-loading="detailLoading">
+          <p>{{ detailRecord?.summary }}</p>
+          <p class="page-desc">开始 {{ formatTime(detailRecord?.started_at) }} · 结束 {{ formatTime(detailRecord?.finished_at) }} · 耗时 {{ duration(detailRecord?.duration_seconds) }}</p>
+          <pre class="run-log">{{ detailLog }}</pre>
+        </div>
+        <template #footer><el-button :disabled="!detailRecord || detailLoading" @click="openDetail(detailRecord)">刷新日志</el-button><el-button @click="detailVisible = false">关闭</el-button></template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -183,14 +217,34 @@
 export default { name: 'CronTasksView' }
 </script>
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, onBeforeUnmount } from 'vue'
 import { Timer, Refresh, Search } from '@element-plus/icons-vue'
-import { getCronTasks } from '@/services/api.js'
-import { ElMessage } from 'element-plus'
+import { getCronTasks, executeCronTask, getCronTaskRuns, getCronTaskRun } from '@/services/api.js'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const tasks = ref([])
 const loading = ref(false)
 const keyword = ref('')
+const capabilities = ref({ supported: null, ready: false, message: '' })
+const stats = ref({ total: 0, running: 0, upcoming: 0 })
+const executing = ref('')
+const historyVisible = ref(false)
+const historyTask = ref(null)
+const records = ref([])
+const historyLoading = ref(false)
+const historyPage = ref(1)
+const historyTotal = ref(0)
+const detailVisible = ref(false)
+const detailRecord = ref(null)
+const detailLog = ref('')
+const detailLoading = ref(false)
+const requestIds = new Map()
+let active = false
+let timer = null
+let sequence = 0
+let historySequence = 0
+let detailSequence = 0
+let confirming = false
 
 const pagination = ref({
   page: 1,
@@ -199,23 +253,10 @@ const pagination = ref({
   total_pages: 0
 })
 
-const upcomingCount = computed(() => {
-  const oneHour = Date.now() + 60 * 60 * 1000
-  return tasks.value.filter(t => t.next_run && new Date(t.next_run).getTime() <= oneHour).length
-})
-const runningCount = computed(() => tasks.value.length)
-
-const timeAgo = (ts) => {
-  const diff = Date.now() - new Date(ts).getTime()
-  const sec = Math.floor(diff / 1000)
-  if (sec < 60) return sec + ' 秒前'
-  const min = Math.floor(sec / 60)
-  if (min < 60) return min + ' 分钟前'
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return hr + ' 小时前'
-  const day = Math.floor(hr / 24)
-  return day + ' 天前'
-}
+const statusType = status => ({ running: 'primary', pending: 'primary', external: 'primary', blocked: 'warning', idle: 'success', finished: 'warning', skipped: 'info', expired: 'info', failed: 'danger', interrupted: 'danger', unknown: 'danger', unmanaged: 'info' }[status] || 'info')
+const formatTime = value => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
+const duration = seconds => seconds == null ? '—' : seconds < 60 ? `${seconds}秒` : `${Math.floor(seconds / 60)}分${seconds % 60}秒`
+const errorMessage = error => error?.response?.data?.message || '暂时无法连接服务器，请刷新核对状态，不会自动重试执行任务'
 
 const fromNow = (ts) => {
   if (!ts) return ''
@@ -282,7 +323,7 @@ const humanize = (schedule) => {
   }
   if (map[schedule]) return map[schedule]
 
-  if (schedule.startsWith('0 ') && schedule.endsWith(' * * *')) {
+  if (/^0 \d{1,2} \* \* \*$/.test(schedule)) {
     const h = schedule.split(' ')[1]
     return '每天 ' + h + ':00 执行'
   }
@@ -297,27 +338,36 @@ const humanize = (schedule) => {
   return null
 }
 
-const fetchTasks = async () => {
-  loading.value = true
+const fetchTasks = async (quiet = false) => {
+  quiet = quiet === true
+  if (!active || (quiet && loading.value)) return
+  const ticket = ++sequence
+  if (!quiet) loading.value = true
   try {
     const res = await getCronTasks({
       keyword: keyword.value || undefined,
       page: pagination.value.page,
       per_page: pagination.value.per_page
     })
-    if (res.data && (res.data.status === 'success' || res.data.success)) {
+    if (!active || ticket !== sequence) return
+    if (res.data?.success) {
       tasks.value = res.data.tasks || res.data.data || []
+      capabilities.value = res.data.capabilities || { supported: true, message: '' }
+      stats.value = res.data.stats || { total: 0, running: 0, upcoming: 0 }
       if (res.data.pagination) {
         pagination.value = { ...pagination.value, ...res.data.pagination }
       }
     } else {
-      ElMessage.warning((res.data && res.data.message) || '获取任务列表失败')
+      throw new Error(res.data?.message || '获取任务列表失败')
     }
   } catch (err) {
-    console.error(err)
-    ElMessage.error('网络异常，无法获取计划任务')
+    if (active && ticket === sequence) {
+      tasks.value = tasks.value.map(row => ({ ...row, can_execute: false, disabled_reason: '请刷新核对服务器状态' }))
+      capabilities.value.message = errorMessage(err)
+      if (!quiet) ElMessage.error(errorMessage(err))
+    }
   } finally {
-    loading.value = false
+    if (ticket === sequence) loading.value = false
   }
 }
 
@@ -330,12 +380,115 @@ const handlePageChange = () => {
   fetchTasks()
 }
 
-onMounted(() => {
+const loadHistory = async () => {
+  if (!active || !historyVisible.value || !historyTask.value) return
+  const ticket = ++historySequence
+  historyLoading.value = true
+  try {
+    const { data } = await getCronTaskRuns(historyTask.value.task_id, { page: historyPage.value, per_page: 10 })
+    if (!active || !historyVisible.value || ticket !== historySequence) return
+    records.value = data.records || []
+    historyTotal.value = data.pagination?.total || 0
+  } catch (error) {
+    if (active && historyVisible.value && ticket === historySequence) ElMessage.error(errorMessage(error))
+  } finally {
+    if (ticket === historySequence) historyLoading.value = false
+  }
+}
+const openHistory = row => {
+  historyTask.value = row
+  records.value = []
+  historyPage.value = 1
+  historyTotal.value = 0
+  historyVisible.value = true
+  loadHistory()
+}
+const openDetail = async row => {
+  if (!active) return
+  const ticket = ++detailSequence
+  detailRecord.value = row
+  detailLog.value = ''
+  detailVisible.value = true
+  detailLoading.value = true
+  try {
+    const { data } = await getCronTaskRun(row.id)
+    if (!active || !detailVisible.value || ticket !== detailSequence) return
+    detailRecord.value = data.record
+    detailLog.value = data.log
+  } catch (error) {
+    if (active && detailVisible.value && ticket === detailSequence) ElMessage.error(errorMessage(error))
+  } finally {
+    if (ticket === detailSequence) detailLoading.value = false
+  }
+}
+const newRequestId = () => {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  // HTTP内网可能没有randomUUID，仍使用安全随机数生成标准UUID，不使用Math.random。
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 15) | 64
+  bytes[8] = (bytes[8] & 63) | 128
+  const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+const handleExecute = async row => {
+  if (!active || !row.can_execute || executing.value) return
+  executing.value = row.task_id
+  confirming = true
+  try {
+    await ElMessageBox.confirm(`立即执行「${row.task_name}」？范围：${row.scope}。不改变原定时计划；相关任务正在运行时不会重复启动。`, '立即执行计划任务', { confirmButtonText: '确认执行', cancelButtonText: '取消', type: 'info' })
+  } catch {
+    executing.value = ''
+    return
+  } finally {
+    confirming = false
+  }
+  if (!active) { executing.value = ''; return }
+  try {
+    // 响应丢失时保留编号，下次确认仍查询原请求，不生成第二份任务。
+    if (!requestIds.has(row.task_id)) requestIds.set(row.task_id, newRequestId())
+    const { data } = await executeCronTask(row.task_id, { request_id: requestIds.get(row.task_id), confirm: true })
+    requestIds.delete(row.task_id)
+    if (!active) return
+    ElMessage.success(data.message || '请求已接收')
+    await fetchTasks(true)
+  } catch (error) {
+    if (error?.response?.status >= 400 && error.response.status < 500) requestIds.delete(row.task_id)
+    if (active) { ElMessage.error(errorMessage(error)); await fetchTasks(true) }
+  } finally {
+    executing.value = ''
+  }
+}
+const start = () => {
+  if (active) return
+  active = true
   fetchTasks()
-})
+  timer = setInterval(() => {
+    if (!document.hidden && capabilities.value.supported) fetchTasks(true)
+  }, 5000)
+}
+const stop = () => {
+  active = false
+  sequence++; historySequence++; detailSequence++
+  loading.value = historyLoading.value = detailLoading.value = false
+  historyVisible.value = detailVisible.value = false
+  if (confirming) ElMessageBox.close()
+  clearInterval(timer)
+  timer = null
+}
+onMounted(start)
+onActivated(start)
+onDeactivated(stop)
+onBeforeUnmount(stop)
 </script>
 
 <style scoped>
+.environment-note { margin-bottom: 16px; }
+.task-actions { display: flex; align-items: center; gap: 8px; }
+.task-actions .el-button { margin-left: 0; }
+.m-task-actions { padding: 12px 16px; display: flex; gap: 10px; }
+.execution-help { margin-top: 16px; line-height: 1.7; }
+.history-table { cursor: pointer; }
+.run-log { max-height: 52vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fa; color: #334155; padding: 14px; border-radius: 8px; font-size: 12px; line-height: 1.7; }
 .cron-page {
   min-height: 100vh;
   background: #f8fafc;

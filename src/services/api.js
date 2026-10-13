@@ -1663,6 +1663,10 @@ export const batchUpdateLogisticsWaybillStatus = (data) => {
 export const getCronTasks = (params = {}) => {
   return api.get('/cron/tasks', { params });
 };
+// 固定任务执行：请求编号用于排重，不自动重试，不接受脚本或命令。
+export const executeCronTask = (taskId, data) => api.post(`/cron/tasks/${taskId}/execute`, data, { timeout: 15000 });
+export const getCronTaskRuns = (taskId, params) => api.get(`/cron/tasks/${taskId}/runs`, { params, timeout: 15000 });
+export const getCronTaskRun = (id) => api.get(`/cron/runs/${id}`, { timeout: 15000 });
 
 /**
  * 获取当前用户的菜单列表（后端已按权限过滤）
