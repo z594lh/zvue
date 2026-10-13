@@ -1538,6 +1538,11 @@ export const getAdvertisingProducts = (params = {}) => {
 
 // ==================== FBA 月度仓储费报表接口 ====================
 
+/** 获取当前店铺最近12个连续计费月趋势，按币种独立汇总。 */
+export const getFbaStorageFeeMonthlyTrend = (params = {}) => {
+  return api.get('/reports/fba-storage-fees/monthly-trend', { params });
+};
+
 /**
  * 获取 FBA 月度仓储费列表
  * @param {Object} params {shop_id, month_of_charge, search, country_code, fulfillment_center, product_size_tier, page, page_size}

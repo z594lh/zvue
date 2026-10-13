@@ -7,7 +7,7 @@
           <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><Box /></el-icon>
           FBA 月度仓储费报表
         </h1>
-        <p class="page-subtitle">按 SKU 维度查看最近半年各月净仓储费</p>
+        <p class="page-subtitle">查看年度费用趋势；SKU 表格默认展示最近 6 个有数据的计费月</p>
       </div>
       <div class="header-actions">
         <el-select v-model="selectedShop" placeholder="请选择店铺" clearable style="width:180px" @change="handleShopChange">
@@ -19,26 +19,31 @@
       </div>
     </div>
 
-    <!-- 筛选栏（一行） -->
+    <FbaStorageFeeTrend :shop-id="selectedShop" :refresh-key="trendRefreshKey" />
+
+    <!-- 筛选栏（一行），月份标签折叠避免历史月份撑高 -->
     <div class="filter-bar">
-      <el-select v-model="filter.months" multiple placeholder="计费月" clearable style="width:300px" @change="fetchData">
+      <el-select v-model="filter.months" multiple filterable collapse-tags collapse-tags-tooltip :max-collapse-tags="2" placeholder="默认最近 6 个计费月" clearable style="width:300px" @change="onMainFilterChange">
         <el-option v-for="m in options.months" :key="m" :label="m" :value="m" />
       </el-select>
-      <el-input v-model="filter.search" placeholder="SKU / ASIN / 名称" clearable style="width:160px" @keyup.enter="fetchData">
+      <el-input v-model="filter.search" placeholder="SKU / ASIN / 名称" clearable style="width:160px" @keyup.enter="onMainFilterChange" @clear="onMainFilterChange">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
-      <el-select v-model="filter.country_code" placeholder="国家/站点" clearable style="width:110px" @change="fetchData">
+      <el-select v-model="filter.country_code" placeholder="国家/站点" clearable style="width:110px" @change="onMainFilterChange">
         <el-option v-for="c in options.country_codes" :key="c" :label="c" :value="c" />
       </el-select>
-      <el-select v-model="filter.fulfillment_center" filterable placeholder="仓库" clearable style="width:100px" @change="fetchData">
+      <el-select v-model="filter.fulfillment_center" filterable placeholder="仓库" clearable style="width:100px" @change="onMainFilterChange">
         <el-option v-for="fc in options.fulfillment_centers" :key="fc" :label="fc" :value="fc" />
       </el-select>
-      <el-select v-model="filter.product_size_tier" placeholder="尺寸段" clearable style="width:110px" @change="fetchData">
+      <el-select v-model="filter.product_size_tier" placeholder="尺寸段" clearable style="width:110px" @change="onMainFilterChange">
         <el-option v-for="t in options.product_size_tiers" :key="t" :label="t" :value="t" />
       </el-select>
-      <el-button type="primary" @click="fetchData"><el-icon><Search /></el-icon></el-button>
+      <el-button type="primary" @click="onMainFilterChange"><el-icon><Search /></el-icon></el-button>
       <el-button plain @click="resetFilter"><el-icon><RefreshLeft /></el-icon></el-button>
       <el-button plain :loading="exporting" @click="handleExport"><el-icon><Download /></el-icon></el-button>
+      <el-tooltip content="默认取最近6个有数据的计费月；可搜索选择更早月份，清空或重置恢复默认。图表独立展示全店12个月。" placement="top">
+        <el-icon class="month-help"><QuestionFilled /></el-icon>
+      </el-tooltip>
     </div>
 
     <!-- 汇总卡片 -->
@@ -68,7 +73,8 @@
 
     <!-- 数据表格 -->
     <div class="table-panel" v-loading="loading">
-      <table class="data-table">
+      <div class="table-scroll">
+      <table class="data-table" :style="{ minWidth: `${470 + months.length * 118}px` }">
         <thead>
           <tr>
             <th width="130">卖家 SKU</th>
@@ -110,6 +116,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       <el-empty v-if="!loading && !tableData.length" description="暂无数据" />
       <div class="pagination-wrap">
         <el-pagination
@@ -127,7 +134,7 @@
     <el-drawer v-model="detailVisible" :title="`${currentSku} 仓储费详情`" size="900px" destroy-on-close>
       <div v-loading="detailLoading" class="detail-panel">
         <div class="detail-filter-bar">
-          <el-select v-model="detailFilter.months" multiple placeholder="计费月" clearable style="width:200px" @change="onDetailFilterChange">
+          <el-select v-model="detailFilter.months" multiple filterable collapse-tags collapse-tags-tooltip :max-collapse-tags="1" placeholder="计费月" clearable style="width:240px" @change="onDetailMonthsChange">
             <el-option v-for="m in detailOptions.months" :key="m" :label="m" :value="m" />
           </el-select>
           <el-select v-model="detailFilter.fulfillment_center" filterable placeholder="仓库" clearable style="width:140px" @change="onDetailFilterChange">
@@ -135,12 +142,16 @@
             <el-option v-for="fc in detailOptions.fulfillment_centers" :key="fc" :label="fc" :value="fc" />
           </el-select>
           <el-button plain size="small" @click="resetDetailFilter"><el-icon><RefreshLeft /></el-icon> 重置</el-button>
+          <el-tooltip content="打开时沿用主表计费月份；可搜索选择更早月份。清空或重置恢复本次打开时的月份，仓库筛选仅影响明细。" placement="top">
+            <el-icon class="month-help"><QuestionFilled /></el-icon>
+          </el-tooltip>
         </div>
         <div class="detail-summary">
           <span>仓储费：{{ formatMoney(displayDetailSummary.total_storage_fee) }}</span>
           <span>激励抵扣：{{ formatMoney(displayDetailSummary.total_incentive_fee) }}</span>
           <span>净仓储费：<strong>{{ formatMoney(displayDetailSummary.total_net_fee) }}</strong></span>
         </div>
+        <div class="table-scroll">
         <table class="data-table detail-table">
           <thead>
             <tr>
@@ -173,6 +184,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
         <el-empty v-if="!detailLoading && !pagedDetailList.length" description="暂无明细数据" />
         <div class="pagination-wrap">
           <el-pagination
@@ -191,9 +203,10 @@
 
 <script setup>
 /* eslint-disable no-undef */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated, onDeactivated, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Box, Money, Discount, Wallet, Search, Refresh, RefreshLeft, Download } from '@element-plus/icons-vue'
+import { Box, Money, Discount, Wallet, Search, Refresh, RefreshLeft, Download, QuestionFilled } from '@element-plus/icons-vue'
+import FbaStorageFeeTrend from '@/components/FbaStorageFeeTrend.vue'
 import { useShopCache } from '@/composables/useShopCache'
 import {
   getFbaStorageFeeFilters,
@@ -214,6 +227,12 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
 const months = ref([])
+const trendRefreshKey = ref(0)
+let pageActive = true
+let shopSequence = 0
+let dataSequence = 0
+let detailSequence = 0
+let detailBaseMonths = []
 
 const defaultFilter = () => ({
   months: [],
@@ -263,11 +282,6 @@ const detailVisible = ref(false)
 const detailLoading = ref(false)
 const currentSku = ref('')
 const detailList = ref([])
-const detailSummary = reactive({
-  total_storage_fee: 0,
-  total_incentive_fee: 0,
-  total_net_fee: 0
-})
 const detailOptions = reactive({
   months: [],
   fulfillment_centers: []
@@ -339,34 +353,46 @@ const sortArrow = (field) => {
 }
 
 const fetchFilters = async () => {
-  if (!selectedShop.value) return
+  const shop = selectedShop.value
+  const ticket = shopSequence
+  if (!shop || !pageActive) return false
   try {
-    const res = await getFbaStorageFeeFilters({ shop_id: selectedShop.value })
+    const res = await getFbaStorageFeeFilters({ shop_id: shop })
+    if (!pageActive || ticket !== shopSequence || shop !== selectedShop.value) return false
     if (res.data.status === 'success') {
       const data = res.data.data || {}
       options.months = data.months || []
       options.country_codes = data.country_codes || []
       options.fulfillment_centers = data.fulfillment_centers || []
       options.product_size_tiers = data.product_size_tiers || []
+      return true
     }
-  } catch { ElMessage.error('获取筛选选项失败') }
+  } catch { if (pageActive && ticket === shopSequence) ElMessage.error('获取筛选选项失败') }
+  return false
 }
 
 const fetchData = async () => {
+  if (!pageActive) return
+  const ticket = ++dataSequence
   if (!selectedShop.value) {
     tableData.value = []
     total.value = 0
     months.value = []
+    Object.assign(summary, { total_storage_fee: 0, total_incentive_fee: 0, total_net_fee: 0 })
+    loading.value = false
     return
   }
   loading.value = true
   try {
     const res = await getFbaStorageFeesBySku(buildParams())
+    if (!pageActive || ticket !== dataSequence) return
     if (res.data.status === 'success') {
       const data = res.data.data || {}
       tableData.value = data.list || []
       total.value = data.total || 0
       months.value = data.months || []
+      // 清空月份沿用后端原默认范围，并让选择框与实际表头保持一致。
+      if (!filter.months.length) filter.months = [...months.value]
       const s = data.summary || {}
       summary.total_storage_fee = Number(s.total_storage_fee || 0)
       summary.total_incentive_fee = Number(s.total_incentive_fee || 0)
@@ -374,38 +400,56 @@ const fetchData = async () => {
     } else {
       ElMessage.warning(res.data.message || '请求失败')
     }
-  } catch { ElMessage.error('请求失败') }
-  finally { loading.value = false }
+  } catch { if (pageActive && ticket === dataSequence) ElMessage.error('请求失败') }
+  finally { if (ticket === dataSequence) loading.value = false }
 }
 
 const handleShopChange = async () => {
+  const ticket = ++shopSequence
+  dataSequence++; detailSequence++
+  detailVisible.value = false
+  tableData.value = []; total.value = 0; months.value = []
+  Object.assign(summary, { total_storage_fee: 0, total_incentive_fee: 0, total_net_fee: 0 })
+  Object.assign(options, { months: [], country_codes: [], fulfillment_centers: [], product_size_tiers: [] })
   Object.assign(filter, defaultFilter())
   page.value = 1
+  if (!selectedShop.value) { loading.value = false; return }
   await fetchFilters()
+  if (!pageActive || ticket !== shopSequence) return
+  filter.months = options.months.slice(0, 6)
   await fetchData()
 }
 
 const resetFilter = () => {
   Object.assign(filter, defaultFilter())
+  filter.months = options.months.slice(0, 6)
   page.value = 1
   fetchData()
 }
 
+const onMainFilterChange = () => { page.value = 1; fetchData() }
+
 const handleSync = async () => {
   if (!selectedShop.value) return
+  const shop = selectedShop.value
+  const ticket = shopSequence
   syncing.value = true
   try {
-    const res = await syncFbaStorageFees({ shop_id: selectedShop.value })
+    const res = await syncFbaStorageFees({ shop_id: shop })
+    if (!pageActive || ticket !== shopSequence || shop !== selectedShop.value) return
     if (res.data.status === 'success') {
       const result=res.data.data || {}
       const months=result.months?.join('、')
       ElMessage.success(months ? `同步完成：${months}，处理 ${result.saved} 条；这是计费月份，不是报告创建月份` : (res.data.message || '同步完成（无可用月报数据）'))
       await fetchFilters()
-      await fetchData()
+      if (pageActive && ticket === shopSequence) {
+        trendRefreshKey.value++
+        await fetchData()
+      }
     } else {
       ElMessage.warning(res.data.message || '同步失败')
     }
-  } catch (error) { ElMessage.error(error.response?.data?.message || '同步失败，请检查后端仓储费日志') }
+  } catch (error) { if (pageActive && ticket === shopSequence) ElMessage.error(error.response?.data?.message || '同步失败，请检查后端仓储费日志') }
   finally { syncing.value = false }
 }
 
@@ -437,50 +481,58 @@ const openDetail = async (row) => {
   detailLoading.value = true
   detailList.value = []
   detailPage.value = 1
+  detailBaseMonths = [...months.value]
   Object.assign(detailFilter, defaultDetailFilter())
+  detailFilter.months = [...detailBaseMonths]
+  detailOptions.months = [...new Set([...options.months, ...detailBaseMonths])].sort().reverse()
+  detailOptions.fulfillment_centers = []
+  await loadDetail()
+}
+
+const loadDetail = async () => {
+  if (!pageActive || !detailVisible.value || !selectedShop.value) return
+  const ticket = ++detailSequence
+  detailLoading.value = true
+  detailList.value = []
   try {
     const res = await getFbaStorageFeeSkuDetail({
       shop_id: selectedShop.value,
-      seller_sku: row.seller_sku,
-      months: filter.months.join(',')
+      seller_sku: currentSku.value,
+      months: detailFilter.months.join(',')
     })
+    if (!pageActive || !detailVisible.value || ticket !== detailSequence) return
     if (res.data.status === 'success') {
       const data = res.data.data || {}
       detailList.value = data.list || []
-      const s = data.summary || {}
-      detailSummary.total_storage_fee = Number(s.total_storage_fee || 0)
-      detailSummary.total_incentive_fee = Number(s.total_incentive_fee || 0)
-      detailSummary.total_net_fee = Number(s.total_net_fee || 0)
-
-      const monthsSet = new Set()
       const fcSet = new Set()
       detailList.value.forEach(item => {
-        if (item.month_of_charge) monthsSet.add(item.month_of_charge)
         if (item.fulfillment_center) fcSet.add(item.fulfillment_center)
       })
-      detailOptions.months = Array.from(monthsSet).sort().reverse()
       detailOptions.fulfillment_centers = Array.from(fcSet).sort()
-      Object.assign(detailFilter, {
-        months: [...detailOptions.months],
-        fulfillment_center: ''
-      })
     } else {
       ElMessage.warning(res.data.message || '获取详情失败')
     }
-  } catch { ElMessage.error('获取详情失败') }
-  finally { detailLoading.value = false }
+  } catch { if (pageActive && detailVisible.value && ticket === detailSequence) ElMessage.error('获取详情失败') }
+  finally { if (ticket === detailSequence) detailLoading.value = false }
 }
 
 const onDetailFilterChange = () => {
   detailPage.value = 1
 }
 
+const onDetailMonthsChange = () => {
+  if (!detailFilter.months.length) detailFilter.months = [...detailBaseMonths]
+  detailPage.value = 1
+  loadDetail()
+}
+
 const resetDetailFilter = () => {
   Object.assign(detailFilter, {
-    months: [...detailOptions.months],
+    months: [...detailBaseMonths],
     fulfillment_center: ''
   })
   detailPage.value = 1
+  loadDetail()
 }
 
 const formatMoney = (val) => {
@@ -501,18 +553,30 @@ const formatNumber = (val, digits = 2) => {
   return num.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
-onMounted(async () => {
+const initialize = async () => {
   await fetchShopList()
+  if (!pageActive) return
   const defId = defaultShopId()
   if (defId && shopList.value.find(s => s.id === defId)) {
     selectedShop.value = defId
-    await fetchFilters()
-    await fetchData()
-    if (filter.months.length === 0 && months.value.length > 0) {
-      filter.months = [...months.value]
-    }
+    await handleShopChange()
   }
+}
+onMounted(initialize)
+onActivated(() => {
+  if (pageActive) return
+  pageActive = true
+  if (selectedShop.value) fetchData()
+  else initialize()
 })
+const stopPage = () => {
+  pageActive = false
+  shopSequence++; dataSequence++; detailSequence++
+  loading.value = detailLoading.value = false
+  detailVisible.value = false
+}
+onDeactivated(stopPage)
+onBeforeUnmount(stopPage)
 </script>
 
 <style scoped>
@@ -543,6 +607,8 @@ onMounted(async () => {
   flex-wrap: nowrap;
 }
 .filter-bar :deep(.el-select) { flex-shrink: 0; }
+.month-help { color: #909399; cursor: help; flex-shrink: 0; }
+.table-scroll { overflow-x: auto; }
 
 .summary-cards {
   display: grid;
@@ -627,6 +693,7 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 .detail-summary {
   display: flex;
