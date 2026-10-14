@@ -48,6 +48,7 @@
         <el-button :loading="loading" @click="fetchTasks">
           <el-icon><Refresh /></el-icon>刷新
         </el-button>
+        <span class="page-desc">执行中优先 · 下次执行由近到远</span>
       </div>
 
       <div class="main-card" v-loading="loading" element-loading-text="加载中...">

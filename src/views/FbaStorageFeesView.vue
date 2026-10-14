@@ -19,13 +19,13 @@
       </div>
     </div>
 
-    <FbaStorageFeeTrend :shop-id="selectedShop" :refresh-key="trendRefreshKey" />
+    <FbaStorageFeeTrend :shop-id="selectedShop" :refresh-key="trendRefreshKey + analysisRefreshKey" />
 
     <el-radio-group v-model="viewMode" class="storage-view-switch">
       <el-radio-button value="workbench">待处理 SKU 清单</el-radio-button>
       <el-radio-button value="history">历史月度对比</el-radio-button>
     </el-radio-group>
-    <StorageCostWorkbench v-if="viewMode === 'workbench'" :shop-id="selectedShop" :refresh-key="trendRefreshKey" />
+    <StorageCostWorkbench v-if="viewMode === 'workbench'" :shop-id="selectedShop" :refresh-key="trendRefreshKey" @monthly-updated="handleAnalysisUpdated" />
     <div v-show="viewMode === 'history'">
 
     <!-- 筛选栏（一行），月份标签折叠避免历史月份撑高 -->
@@ -238,6 +238,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const months = ref([])
 const trendRefreshKey = ref(0)
+const analysisRefreshKey = ref(0)
 let pageActive = true
 let shopSequence = 0
 let dataSequence = 0
@@ -438,6 +439,14 @@ const resetFilter = () => {
 }
 
 const onMainFilterChange = () => { page.value = 1; fetchData() }
+
+// 分析窗口补齐月报后只刷新历史与图表，不重置正在查看的分析窗口。
+const handleAnalysisUpdated = async () => {
+  const ticket = shopSequence
+  analysisRefreshKey.value++
+  await fetchFilters()
+  if (pageActive && ticket === shopSequence) await fetchData()
+}
 
 const handleSync = async () => {
   if (!selectedShop.value) return

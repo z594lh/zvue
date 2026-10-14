@@ -18,22 +18,26 @@
       <el-button class="source-button" type="primary" plain :disabled="!shopId || !data.can_sync || data.schema_ready === false" @click="syncVisible = true">补齐仓储报告</el-button>
     </div>
     <div class="cost-scope">
-      <span>历史费用月 <strong>{{ data.month || '—' }}</strong> · 对比 {{ data.prior_month || '—' }}</span>
+      <span>历史费用月（估算） <strong>{{ data.month || '—' }}</strong> · 对比 {{ data.prior_month || '—' }}</span>
       <span>当前库存快照 <strong>{{ data.sources?.find(item => item.kind === 'health')?.snapshot_date || '未获取' }}</strong></span>
-      <span v-for="item in data.totals || []" :key="`${item.country_code}-${item.currency}`">{{ item.country_code || '未标国家' }} · {{ item.currency || '未标币种' }} 全店月度净费 <strong>{{ amount(item.net_fee) }}</strong><span v-if="item.net_fee == null && item.unknown_amount_groups">（已知小计 {{ amount(item.known_net_fee) }}，{{ item.unknown_amount_groups }}组金额待核对）</span></span>
+      <span v-for="item in data.totals || []" :key="`${item.country_code}-${item.currency}`">{{ item.country_code || '未标国家' }} · {{ item.currency || '未标币种' }} 全店月度净费 <strong>{{ amount(item.net_fee) }}</strong><span v-if="item.net_fee == null && item.unknown_amount_groups">（已知小计 {{ amount(item.known_net_fee) }}，{{ item.unknown_amount_groups }}组资料待补齐）</span></span>
       <span>关注 SKU / 国家 / 币种组合 {{ data.risk_count || 0 }} 个</span>
     </div>
     <div class="source-status">
-      <span>资料状态：</span><span v-for="kind in ['monthly', 'health', 'aged', 'overage']" :key="kind" :title="sourceText(kind)">{{ kindNames[kind] }}：{{ sourceText(kind) }}</span>
+      <span>资料状态：</span><el-tooltip v-for="kind in ['monthly', 'health', 'aged', 'overage']" :key="kind" :content="sourceText(kind)" :popper-style="riskTipStyle"><span>{{ kindNames[kind] }}：{{ sourceLabel(data.sources?.find(item => item.kind === kind)) }}</span></el-tooltip>
+    </div>
+    <div v-for="item in data.summary || []" :key="`${item.country_code}-${item.currency}`" class="analysis-summary">
+      <div><strong>{{ data.month }} · {{ item.country_code }} / {{ item.currency }}</strong> · 仓储费 {{ amount(item.storage_fee) }} − 激励抵扣 {{ amount(item.incentive_fee) }} = 净仓储费 <strong>{{ amount(item.net_fee) }}</strong> · <span :class="changeClass(item.change)">较上月 {{ changeText(item.change) }}{{ item.change.percent == null ? '' : `（${signed(item.change.percent)}%）` }}</span></div>
+      <ul><li v-for="tip in item.actions" :key="tip">{{ tip }}</li></ul>
     </div>
     <details class="report-coverage"><summary>查看报告覆盖情况（4类来源）及店铺超量费</summary>
       <el-table :data="data.report_coverage || []" size="small">
         <el-table-column prop="label" label="报告" min-width="170" /><el-table-column prop="scope" label="时间 / 粒度" min-width="180" />
-        <el-table-column label="获取状态" min-width="130"><template #default="{row}">{{ statusLabel(row.attempt_status) }}<div class="secondary">{{ row.attempt_message }}</div></template></el-table-column>
+        <el-table-column label="获取状态" min-width="130"><template #default="{row}">{{ sourceLabel(row) }}<div v-if="row.display_status_label" class="secondary">最近请求：{{ statusLabel(row.attempt_status) }}</div><div class="secondary">{{ row.context_note }}</div><div class="secondary">{{ row.attempt_message }}</div></template></el-table-column>
         <el-table-column prop="row_count" label="成功原行数" width="110" /><el-table-column prop="field_count" label="已保留字段数" width="110" />
-        <el-table-column label="需核对" min-width="160"><template #default="{row}"><div v-if="row.ambiguous_groups">{{ row.ambiguous_groups }}组重复身份，原行完整保留</div><div v-if="row.component_mismatch_rows">{{ row.component_mismatch_rows }}行拆分与月费总额不一致</div><span v-if="!row.ambiguous_groups && !row.component_mismatch_rows">—</span></template></el-table-column>
+        <el-table-column label="系统处理说明" min-width="230"><template #default="{row}">{{ row.processing_note || '—' }}<a v-if="row.policy_url" :href="row.policy_url" target="_blank" rel="noopener noreferrer">Amazon官方说明</a></template></el-table-column>
       </el-table>
-      <p class="scope-note">完整月报用于工作台，历史月表/年度图仍沿用原同步数据。基础费和仓储利用率附加费是月报拆分，不再次加回净费；长期/超龄费与仓储超量费是其他报告。取消/缺报告均不代表0收费。</p>
+      <p class="scope-note">完整月报保存时同步更新历史表和年度图。同仓多行先汇总再替换，重复同步不会重复计费。基础费参考与利用率附加费不再次加回净费；取消/缺超龄报告不代表0收费。</p>
       <el-table v-if="data.overage_rows?.length" :data="data.overage_rows.slice((overagePage-1)*20,overagePage*20)" size="small">
         <el-table-column prop="charge_date" label="日期" width="105" /><el-table-column prop="country_code" label="国家" width="70" /><el-table-column prop="storage_type" label="存储类型" />
         <el-table-column label="使用 / 限额 / 超量体积"><template #default="{row}">{{ number(row.usage_volume) }} / {{ number(row.limit_volume) }} / {{ number(row.overage_volume) }} {{ row.volume_units }}</template></el-table-column>
@@ -42,8 +46,8 @@
       <el-pagination v-if="data.overage_rows?.length" v-model:current-page="overagePage" :page-size="20" :total="data.overage_rows.length" layout="total, prev, pager, next" />
       <p class="scope-note">仓储超量费按店铺/存储类型统计，没有SKU或仓库明细，不按比例分摊给SKU，也不混入已收超龄费。</p>
     </details>
-    <p class="scope-note">由服务器计划任务每日更新库存健康及最近两个完整月份的费用报告；本页只展示已保存数据，点“刷新”不会调用Amazon。手动“补齐仓储报告”可更新其他月份。工作台优先完整月报，历史月表/年度图沿用原同步。“—”为未知，不是0；历史费用与当前库存分开看。</p>
-    <el-table :data="data.list || []" v-loading="loading" class="cost-table" @sort-change="sortChanged" :default-sort="{prop:'priority', order:'descending'}">
+    <p class="scope-note">计划任务自动更新库存健康及最近两个完整月份的费用报告；“刷新”只读取已保存数据，不调用Amazon。“补齐仓储报告”可手动获取其他月份。“—”为未知，不是0；历史费用与当前库存分开看。</p>
+    <el-table :data="data.list || []" v-loading="loading" class="cost-table" @sort-change="sortChanged" :default-sort="{prop:'net_fee', order:'descending'}">
       <el-table-column label="SKU / 中文名" min-width="220"><template #default="{ row }"><strong class="sku-name" :title="row.product_name">{{ row.product_name || '未匹配名称' }}</strong><div class="sku-code">{{ row.identifier_type === 'fnsku' ? 'FNSKU：' : '' }}{{ row.seller_sku }}</div><div v-if="row.identifier_type === 'fnsku'" class="secondary">尚未唯一匹配SKU</div><div v-if="row.top_warehouse" class="secondary">主要费用仓库 {{ row.top_warehouse.code }} · {{ amount(row.top_warehouse.net_fee) }}</div></template></el-table-column>
       <el-table-column label="国家 / 币种" width="95"><template #default="{ row }">{{ row.country_code || '未知' }} · {{ row.currency || '未知' }}</template></el-table-column>
       <el-table-column label="月度净仓储费" prop="net_fee" sortable="custom" width="155" align="right"><template #default="{ row }"><strong :class="row.priority ? 'cost-warning' : ''">{{ amount(row.net_fee) }}</strong><div v-if="row.net_fee == null && row.known_net_fee != null" class="secondary">已知小计 {{ amount(row.known_net_fee) }}</div><div class="secondary">上月 {{ amount(row.prior_net_fee) }}</div><div v-if="row.fee_source" class="secondary" :title="`本期：${row.fee_source}；上期：${row.prior_fee_source || '未知'}`">{{ row.fee_source }}</div><el-tooltip v-if="row.utilization_fee != null" content="月报拆分列，不重复加回月费；与超龄附加费不同"><div :class="Number(row.utilization_fee)>0 ? 'cost-warning' : 'secondary'">利用率附加费 {{ amount(row.utilization_fee) }}</div></el-tooltip></template></el-table-column>
@@ -76,9 +80,8 @@
         <template v-if="detail">
           <div class="detail-overview"><strong>{{ detailQuery.seller_sku }}</strong> · {{ detailQuery.country_code }} · {{ detailQuery.currency }} · 计费 {{ detail.month }}<p>{{ detail.overview }}</p><ul v-if="detail.suggestions?.length"><li v-for="tip in detail.suggestions" :key="tip">{{ tip }}</li></ul></div>
           <p class="scope-note">{{ detail.note }}</p>
-          <p v-if="detail.sku.fee_source" class="scope-note">月费来源：{{ detail.sku.fee_source }} · 上期：{{ detail.sku.prior_fee_source }}。基础费 {{ amount(detail.sku.base_fee) }} / 利用率附加费 {{ amount(detail.sku.utilization_fee) }} {{ detailQuery.currency }}；拆分不重复叠加，利用率附加费不等于超龄费。</p>
-          <el-alert v-if="detail.sku.ambiguous_fee_rows" type="warning" :closable="false" :title="`${detail.sku.ambiguous_fee_rows}组月费记录存在重复业务身份，原行已完整保留；不能确认的非零费用和库存不累加、不补0，请核对下方完整报告。`" />
-          <el-alert v-if="detail.sku.component_difference != null && Number(detail.sku.component_difference) !== 0" type="warning" :closable="false" :title="`报告月费与基础费＋利用率附加费之和相差 ${amount(detail.sku.component_difference)} ${detailQuery.currency}，原因尚未核实。按月费原总额对账，差额不当作新增收费。`" />
+          <p v-if="detail.sku.fee_source" class="scope-note">月费来源：{{ detail.sku.fee_source }} · 上期：{{ detail.sku.prior_fee_source }}。基础费参考 {{ amount(detail.sku.base_fee) }} / 利用率附加费 {{ amount(detail.sku.utilization_fee) }} {{ detailQuery.currency }}；参考拆分不重复叠加，利用率附加费不等于超龄费。</p>
+          <p v-if="detail.sku.component_difference != null && Number(detail.sku.component_difference) !== 0" class="scope-note">系统已采用报告原月费金额汇总。基础费参考列与总额不同，不代表新增收费，不作为异常标签，也不会重复加费。</p>
           <div class="detail-title"><h3>仓库月度费用排名（{{ detail.warehouses.length }} 个，每页10个）</h3><el-button size="small" @click="loadDetail">刷新详情</el-button></div>
           <el-table :data="detail.warehouses.slice((warehousePage-1)*10,warehousePage*10)" size="small">
             <el-table-column prop="warehouse" label="仓库" width="85" />
@@ -87,10 +90,10 @@
             <el-table-column label="SKU费用占比" width="110" align="right"><template #default="{row}">{{ row.share_percent == null ? '—' : `${Number(row.share_percent).toFixed(1)}%` }}</template></el-table-column>
             <el-table-column label="单件月费" width="110" align="right"><template #default="{row}">{{ amount(row.unit_monthly_fee) }}</template></el-table-column>
             <el-table-column label="较上月" min-width="130" align="right"><template #default="{row}"><span :class="changeClass(row.change)">{{ changeText(row.change) }}</span></template></el-table-column>
-            <el-table-column label="基础费 / 利用率附加费" min-width="175" align="right"><template #default="{row}">{{ amount(row.base_fee) }} / {{ amount(row.utilization_fee) }}</template></el-table-column>
+            <el-table-column label="基础费参考 / 利用率附加费" min-width="175" align="right"><template #default="{row}">{{ amount(row.base_fee) }} / {{ amount(row.utilization_fee) }}</template></el-table-column>
           </el-table>
           <el-pagination v-model:current-page="warehousePage" :page-size="10" :total="detail.warehouses.length" layout="total, prev, pager, next" />
-          <p class="scope-note">单件月费 = 同月净仓储费 ÷ 同月月均库存，不是实际单件收费标准。拆分缺失或与原月费快照金额不一致时不展示；基础费与附加费不再叠加计入净额。</p>
+          <p class="scope-note">单件月费 = 同月净仓储费 ÷ 同月月均库存，不是实际单件收费标准。基础费为报告参考列，可能不覆盖完整总额；缺参考显示“—”，净费以原月费减抵扣为准，不再次加回拆分。</p>
 
           <h3>当前库存与库龄</h3>
           <template v-if="detail.sku.health">
@@ -109,13 +112,13 @@
           <el-table v-if="detail.aged_rows.length" :data="detail.aged_rows" size="small"><el-table-column prop="charge_date" label="收费快照日期" /><el-table-column prop="tier" label="库龄档位" /><el-table-column label="收费数量"><template #default="{row}">{{ number(row.quantity) }}</template></el-table-column><el-table-column label="已收金额"><template #default="{row}">{{ amount(row.amount) }} {{ detailQuery.currency }}</template></el-table-column></el-table>
           <p v-else class="empty-note">本月未获取该SKU的超龄收费记录，不按0收费处理；查看资料状态确认报告是否可用。</p>
           <details v-if="detail.monthly_report_rows?.length" class="raw-records"><summary>完整月费报告原行及费率（{{ detail.monthly_report_rows.length }} 条）</summary>
-            <p class="scope-note">以下为报告原行，重复身份会标出；不要直接累加疑似重复金额。点“全部字段”可查看该行完整业务字段。</p>
+            <p class="scope-note">系统已按各原行的金额与抵扣归集，同仓多行不等于重复同步。原字段保留供追溯，无需逐行核对。</p>
             <el-table :data="detail.monthly_report_rows.slice((reportPage-1)*10,reportPage*10)" size="small">
               <el-table-column prop="warehouse" label="仓库" width="75" /><el-table-column label="原月均库存" width="105"><template #default="{row}">{{ number(row.average_quantity) }}</template></el-table-column>
-              <el-table-column label="基础费 / 利用率附加费" min-width="180"><template #default="{row}">{{ amount(row.base_fee) }} / {{ amount(row.utilization_fee) }}<div v-if="row.component_difference != null && Number(row.component_difference)!==0" class="cost-warning">与月费差额 {{ amount(row.component_difference) }}</div></template></el-table-column>
+              <el-table-column label="基础费参考 / 利用率附加费" min-width="180"><template #default="{row}">{{ amount(row.base_fee) }} / {{ amount(row.utilization_fee) }}</template></el-table-column>
               <el-table-column label="利用率 / 费率" min-width="155"><template #default="{row}">{{ number(row.utilization_ratio) }} {{ row.utilization_ratio_units }} / {{ amount(row.utilization_rate) }}</template></el-table-column>
               <el-table-column label="金额 / 抵扣" min-width="140"><template #default="{row}">{{ amount(row.storage_fee) }} / {{ amount(row.incentive_fee) }}</template></el-table-column>
-              <el-table-column label="原字段" width="110"><template #default="{row}"><el-popover trigger="click" placement="left" width="430"><template #reference><el-button link type="primary">全部字段</el-button></template><div class="original-fields"><div v-for="(value,key) in row.report_fields" :key="key"><strong>{{ key }}</strong>：{{ value || '—' }}</div></div></el-popover><div v-if="row.identity_rows>1" class="cost-warning">重复身份</div></template></el-table-column>
+              <el-table-column label="原字段" width="110"><template #default="{row}"><el-popover trigger="click" placement="left" width="430"><template #reference><el-button link type="primary">全部字段</el-button></template><div class="original-fields"><div v-for="(value,key) in row.report_fields" :key="key"><strong>{{ key }}</strong>：{{ value || '—' }}</div></div></el-popover><div v-if="row.identity_rows>1" class="secondary">同仓明细已合并</div></template></el-table-column>
             </el-table>
             <el-pagination v-model:current-page="reportPage" :page-size="10" :total="detail.monthly_report_rows.length" layout="total, prev, pager, next" />
           </details>
@@ -148,7 +151,8 @@ import { QuestionFilled } from '@element-plus/icons-vue'
 import { getStorageCostAnalysis, getStorageCostDetail, updateStorageAnalysisSource } from '@/services/api'
 
 const props = defineProps({ shopId: [Number,String], refreshKey: Number })
-const initial = () => ({ month:'', search:'', risk:'', country_code:'', currency:'', sort:'priority', order:'desc', page:1, page_size:20 })
+const emit = defineEmits(['monthly-updated'])
+const initial = () => ({ month:'', search:'', risk:'', country_code:'', currency:'', sort:'net_fee', order:'desc', page:1, page_size:20 })
 const query = reactive(initial())
 const data = ref({ list:[], sources:[] })
 const loading = ref(false)
@@ -158,15 +162,14 @@ const warehousePage = ref(1)
 const reportPage = ref(1), overagePage = ref(1)
 const syncVisible = ref(false), syncing = ref(false), syncMessage = ref(''), sourceKind = ref('all'), sourceMonth = ref(''), syncJobs = ref([])
 const kindNames = { monthly:'完整月费 / 利用率附加费', health:'库存健康 / 库龄', aged:'长期 / 超龄收费', overage:'仓储超量费（店铺级）' }
-const risks = [['aged','已有超龄收费'],['utilization','利用率附加费'],['fee_review','月费金额待核对'],['split_review','月费拆分待核对'],['slow','库存消化慢'],['aging','180天以上库存'],['excess','预计冗余库存'],['estimated','预计超龄费用'],['rising','费用明显上涨'],['high','费用占比高']]
+const risks = [['aged','已有超龄收费'],['utilization','利用率附加费'],['fee_review','月费资料不全'],['slow','库存消化慢'],['aging','180天以上库存'],['excess','预计冗余库存'],['estimated','预计超龄费用'],['rising','费用明显上涨'],['high','费用占比高']]
 // 与后端classify/dataset的实际触发口径保持一致；筛选项和表格标签共用说明。
 const riskTipStyle = { maxWidth:'min(360px, calc(100vw - 32px))', boxSizing:'border-box', whiteSpace:'pre-line', lineHeight:'1.8', overflowWrap:'anywhere' }
 const riskGuide = '鼠标停留在关注标签或筛选选项上，可查看含义、判断条件和处理建议。\n费用标签对应所选历史计费月；库存标签使用最新可用快照，不代表该历史月的库存。\n库存快照超过7天暂停对应库存预警；库龄日期未知或超过7天，暂停库龄/预计超龄预警。没有标签不代表没有风险。'
 const riskTips = {
   aged: '含义：所选计费月的长期/超龄收费报告中，该SKU列示的收费金额大于0。\n注意：这是历史收费记录，不是未来费用预估，也不与月费混加为账单总额。\n建议：点“详情”核对收费日期、库龄档位和数量，再评估促销、控制补货或移除。',
   utilization: '含义：所选月的完整月费报告中，仓储利用率附加费大于0。\n注意：它是月费的拆分项，不再次加回净仓储费，也不等于超龄附加费或仓储超量费。\n建议：点“详情”查看仓库费率、利用率及计费数量/体积，结合当前库存评估处理。',
-  fee_review: '含义：该SKU当月净仓储费无法完整确认，例如存在疑似重复身份的非零金额或必需金额缺失。\n注意：“已知小计”不等于全部费用，未知金额不是0。\n建议：点“详情”展开完整月费原行，核对重复记录和金额后再判断费用高低。',
-  split_review: '含义：报告月费总额与“基础费＋仓储利用率附加费”之和不一致，当前原因未确认。\n注意：差额不代表新增收费，也不能自行补加到费用中。\n建议：点“详情”查看拆分差额和完整原字段，以报告月费原总额核对账单。',
+  fee_review: '含义：该SKU当月必需金额字段缺失，暂时无法确认完整净仓储费。\n注意：“已知小计”不是全部费用，未知不按0处理。同仓多行已由系统汇总，不属于此标签。\n处理：计划任务后续更新报告，也可使用“补齐仓储报告”手动更新；无需逐行核对。',
   slow: '判断：最新有效健康快照中，有可售库存但近30天销量为0，或预计消化天数超过120天。\n算法：可售库存 ÷（近30天销量 ÷ 30）；这里的销量为报告发货件数。\n注意：是按现有销量不变估算的运营参考，不是清仓期限或收费门槛。\n建议：结合季节、在途补货与销售计划，评估促销及补货节奏。',
   aging: '判断：有效库龄快照中存在180天以上库存；存在365天以上库存时重点标红，两类都可被此筛选选中。\n注意：180/365天只是运营筛查线，不代表当地实际收费门槛；“至少”表示仅能确认部分库存数量。\n建议：点“详情”核对库龄快照日期、原分档数量及预计超龄费用。',
   excess: '含义：最新有效健康报告中，Amazon给出的“预计冗余库存”数量大于0，即预计超出需求的库存。\n注意：这是库存建议，不代表商品不能销售、已经亏损或已经收费。\n建议：结合季节性和推广计划核对预计冗余数量，再评估控补货、促销或移除。',
@@ -191,11 +194,12 @@ const healthMissing = row => row.health_status === 'ambiguous' ? '多个库存�
 const supplyText = health => health.available != null && health.sales_30d != null && Number(health.available) > 0 && Number(health.sales_30d) === 0 ? '有库存 · 近30天未出单' : health.days_of_supply == null ? '消化天数无法计算' : `预计消化 ${number(health.days_of_supply)} 天`
 const stockClass = health => !health.fresh ? 'secondary' : Number(health.available) > 0 && health.sales_30d != null && Number(health.sales_30d) === 0 ? 'cost-danger' : Number(health.days_of_supply) > 120 ? 'cost-warning' : ''
 const oldStockText = health => health.aged_quantity == null || (!health.aged_quantity_complete && Number(health.aged_quantity) === 0) ? '180天以上库存未知' : `180天以上 ${health.aged_quantity_complete ? '' : '至少 '}${number(health.aged_quantity)} 件`
-const statusLabel = status => ({queued:'等待请求',creating:'请求创建中',pending:'报告生成中',ready:'已获取',no_data:'未获报告（金额未知）',failed:'本次失败',missing:'未获取',uncertain:'请求未确认'}[status] || '待核对')
+const statusLabel = status => ({queued:'等待请求',creating:'请求创建中',pending:'报告生成中',ready:'已获取',no_data:'暂无返回明细',failed:'生成未完成·待复查',missing:'尚未获取',uncertain:'请求未确认',not_applicable:'不适用·已停止收费'}[status] || '尚未获取')
+const sourceLabel = row => row?.display_status_label || statusLabel(row?.attempt_status)
 const sourceText = kind => {
   const row = data.value.sources?.find(item=>item.kind===kind)
   if (!row) return '未获取'
-  return `${statusLabel(row.attempt_status)}${row.data_at ? ` · 上次成功 ${row.data_at.slice(0,10)}（${row.row_count}条）${kind === 'health' && row.snapshot_date ? ` · 库存快照 ${row.snapshot_date}` : ''}` : ''}${row.attempt_message ? ` · ${row.attempt_message}` : ''}`
+  return `${sourceLabel(row)}${row.display_status_label ? ` · 最近请求：${statusLabel(row.attempt_status)}` : ''}${row.data_at ? ` · 上次成功 ${row.data_at.slice(0,10)}（${row.row_count}条）${kind === 'health' && row.snapshot_date ? ` · 库存快照 ${row.snapshot_date}` : ''}` : ''}${row.context_note ? ` · ${row.context_note}` : ''}${row.attempt_message ? ` · ${row.attempt_message}` : ''}`
 }
 const fetchRows = async () => {
   if (!active) return
@@ -213,7 +217,7 @@ const fetchRows = async () => {
   finally { if(ticket===sequence)loading.value=false }
 }
 const search=()=>{query.page=1;fetchRows()}
-const sortChanged=({prop,order})=>{query.sort=prop||'priority';query.order=order==='ascending'?'asc':'desc';search()}
+const sortChanged=({prop,order})=>{query.sort=prop||'net_fee';query.order=order==='ascending'?'asc':'desc';search()}
 const openDetail=row=>{detailQuery.value={shop_id:props.shopId,month:data.value.month,seller_sku:row.seller_sku,country_code:row.country_code,currency:row.currency};detailVisible.value=true;rawOpen.value=false;rawPage.value=warehousePage.value=reportPage.value=1;loadDetail()}
 const loadDetail=async()=>{
   const ticket=++detailSequence;detail.value=null;detailLoading.value=true
@@ -246,9 +250,9 @@ const updateSource=async action=>{
     }
     if(!live())return
     const waiting=syncJobs.value.map((job,index)=>['creating','pending','uncertain'].includes(job.status)?index:-1).filter(index=>index>=0)
-    syncMessage.value=waiting.length ? '各报告独立获取中；不会因某一来源取消而跳过其他报告' : syncJobs.value.every(job=>job.status==='ready') ? '资料已保存，清单已更新' : '本轮检查结束；已保存可得报告，未取得的来源请查看说明'
+    syncMessage.value=waiting.length ? '各报告独立获取中；不会因某一来源取消而跳过其他报告' : syncJobs.value.every(job=>['ready','not_applicable'].includes(job.status)) ? '适用资料已保存，清单已更新' : '本轮检查结束；已保存可得报告，未取得的来源请查看资料状态说明'
     if(waiting.length)pollTimer=setTimeout(()=>round('check',waiting),6000)
-    else{syncing.value=false;await fetchRows()}
+    else{syncing.value=false;await fetchRows();if(live() && syncJobs.value.some(job=>job.kind==='monthly' && job.status==='ready'))emit('monthly-updated')}
   }
   round(action,jobs.map((_,index)=>index))
 }
@@ -263,6 +267,7 @@ onMounted(start);onActivated(start);onDeactivated(stop);onBeforeUnmount(stop)
 .cost-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}.source-button{margin-left:auto}.help{color:#909399;cursor:help}
 .cost-scope{display:flex;gap:18px;flex-wrap:wrap;padding:10px 12px;background:#f4f7fc;border-radius:6px;font-size:12px;color:#64748b}.cost-scope strong{color:#334155}
 .source-status{display:flex;gap:10px 18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#8492a6}.source-status>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.analysis-summary{margin-top:12px;padding:12px 16px;background:#f5f8fc;border-radius:6px;font-size:13px;color:#475569;line-height:1.8}.analysis-summary ul{margin:6px 0 0;padding-left:20px}.analysis-summary li+li{margin-top:3px}
 .scope-note{color:#909399;font-size:12px;line-height:1.7;margin:10px 0}.sku-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#334155}.sku-code{font-family:monospace;font-size:11px;color:#8492a6;margin-top:4px}
 .secondary{color:#909399;font-size:12px}.cost-warning{color:#b77900}.cost-danger{color:#dc2626}.cost-success{color:#059669}.risk-tags{display:flex;gap:5px;flex-wrap:wrap}.cost-pagination{display:flex;justify-content:flex-end;margin-top:14px}
 .risk-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;height:100%}.risk-option .help{font-size:12px}.risk-tag{cursor:help}
