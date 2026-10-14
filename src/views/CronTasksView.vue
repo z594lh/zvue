@@ -191,6 +191,7 @@
       </div>
       <p v-if="tasks.length" class="page-desc execution-help">时间按当前设备时区显示。执行结束不等于所有业务同步成功；点击记录核对日志。撞锁不重复启动，不自动重试。</p>
       <el-dialog v-model="historyVisible" :title="`${historyTask?.task_name || ''} · 执行记录`" width="min(960px, 94vw)" append-to-body>
+        <p class="page-desc" style="margin-bottom:12px">已结束的执行记录及日志保留最近7天，系统自动清理；等待执行、执行中或状态待核实的记录不会清理。</p>
         <el-table v-loading="historyLoading" :data="records" @row-click="openDetail" class="history-table">
           <el-table-column prop="id" label="记录" width="75" />
           <el-table-column label="触发时间" width="172"><template #default="{ row }">{{ formatTime(row.created_at) }}</template></el-table-column>
