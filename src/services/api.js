@@ -1543,6 +1543,12 @@ export const getFbaStorageFeeMonthlyTrend = (params = {}) => {
   return api.get('/reports/fba-storage-fees/monthly-trend', { params });
 };
 
+// 仓储成本清单及仓库排名：只读本地资料，不调用Amazon。
+export const getStorageCostAnalysis = (params) => api.get('/reports/fba-storage-fees/analysis', { params });
+export const getStorageCostDetail = (params) => api.get('/reports/fba-storage-fees/analysis/detail', { params });
+// 显式请求或检查报告，不自动重发创建请求。
+export const updateStorageAnalysisSource = (data) => api.post('/reports/fba-storage-fees/analysis/sync', data, { timeout: 90000 });
+
 /**
  * 获取 FBA 月度仓储费列表
  * @param {Object} params {shop_id, month_of_charge, search, country_code, fulfillment_center, product_size_tier, page, page_size}

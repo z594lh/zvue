@@ -7,7 +7,7 @@
           <el-icon size="28" style="margin-right:8px;vertical-align:middle;color:#667eea;"><Box /></el-icon>
           FBA 月度仓储费报表
         </h1>
-        <p class="page-subtitle">查看年度费用趋势；SKU 表格默认展示最近 6 个有数据的计费月</p>
+        <p class="page-subtitle">优先查看高费用及积压风险 SKU；历史月度对比保留最近 6 个计费月</p>
       </div>
       <div class="header-actions">
         <el-select v-model="selectedShop" placeholder="请选择店铺" clearable style="width:180px" @change="handleShopChange">
@@ -20,6 +20,13 @@
     </div>
 
     <FbaStorageFeeTrend :shop-id="selectedShop" :refresh-key="trendRefreshKey" />
+
+    <el-radio-group v-model="viewMode" class="storage-view-switch">
+      <el-radio-button value="workbench">待处理 SKU 清单</el-radio-button>
+      <el-radio-button value="history">历史月度对比</el-radio-button>
+    </el-radio-group>
+    <StorageCostWorkbench v-if="viewMode === 'workbench'" :shop-id="selectedShop" :refresh-key="trendRefreshKey" />
+    <div v-show="viewMode === 'history'">
 
     <!-- 筛选栏（一行），月份标签折叠避免历史月份撑高 -->
     <div class="filter-bar">
@@ -198,6 +205,7 @@
         </div>
       </div>
     </el-drawer>
+    </div>
   </div>
 </template>
 
@@ -207,6 +215,7 @@ import { ref, reactive, computed, onMounted, onActivated, onDeactivated, onBefor
 import { ElMessage } from 'element-plus'
 import { Box, Money, Discount, Wallet, Search, Refresh, RefreshLeft, Download, QuestionFilled } from '@element-plus/icons-vue'
 import FbaStorageFeeTrend from '@/components/FbaStorageFeeTrend.vue'
+import StorageCostWorkbench from '@/components/StorageCostWorkbench.vue'
 import { useShopCache } from '@/composables/useShopCache'
 import {
   getFbaStorageFeeFilters,
@@ -219,6 +228,7 @@ import {
 const { shopList, fetchShopList, defaultShopId } = useShopCache()
 
 const selectedShop = ref(null)
+const viewMode = ref('workbench')
 const loading = ref(false)
 const syncing = ref(false)
 const exporting = ref(false)
@@ -608,6 +618,7 @@ onBeforeUnmount(stopPage)
 }
 .filter-bar :deep(.el-select) { flex-shrink: 0; }
 .month-help { color: #909399; cursor: help; flex-shrink: 0; }
+.storage-view-switch { margin-bottom: 12px; }
 .table-scroll { overflow-x: auto; }
 
 .summary-cards {
