@@ -40,6 +40,30 @@ export const ownerPerformanceDays = (rows, owner, currency, profitKey, first, la
   return days
 }
 
+// 每日列表复用服务端已汇总字段，不重新求利润、平均比率或相加跨SKU订单数。
+export const ownerPerformanceDailyRows = (rows, owner, currency, first, last) => {
+  const start = new Date(`${first}T00:00:00Z`), end = new Date(`${last}T00:00:00Z`)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(first || '') || !/^\d{4}-\d{2}-\d{2}$/.test(last || '') ||
+      !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+      start.toISOString().slice(0, 10) !== first || end.toISOString().slice(0, 10) !== last ||
+      end < start || (end - start) / 86400000 > 92) throw new Error('每日数据日期范围必须为有效的1～93天')
+  const byDay = new Map()
+  for (const row of rows || []) {
+    if ((row.owner_user_id ?? null) !== (owner ?? null) || row.currency !== currency) continue
+    const recorded = new Date(`${row.business_date}T00:00:00Z`)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.business_date || '') || !Number.isFinite(recorded.getTime()) || recorded.toISOString().slice(0,10) !== row.business_date) throw new Error('每日汇总缺少有效业务日期，请重新查询')
+    if (row.business_date < first || row.business_date > last) continue
+    if (byDay.has(row.business_date)) throw new Error('同一人员、币种和日期返回重复汇总，请重新查询')
+    byDay.set(row.business_date, row)
+  }
+  const days = []
+  for (const day = new Date(start); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+    const businessDate = day.toISOString().slice(0, 10), source = byDay.get(businessDate)
+    days.push(source ? { ...source, source_state: 'available' } : { business_date: businessDate, currency, source_state: 'no_data' })
+  }
+  return days
+}
+
 export const performanceChartOption = (rows, metrics, currency) => {
   const ordered = [...rows].sort((a, b) => a.business_date.localeCompare(b.business_date))
   const axes = [...new Set(metrics.map(metric => metric.axis))]

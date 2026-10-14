@@ -28,7 +28,7 @@
       <el-table-column prop="profit" label="利润" width="105" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('profit',row)">{{ money(row.profit) }}</span></template></el-table-column>
       <el-table-column prop="acos" label="ACOS" width="100" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('acos',row)">{{ percent(row.acos) }}</span></template></el-table-column>
       <el-table-column prop="tacos" label="TACOS" width="100" align="right" sortable="custom"><template #default="{row}"><span v-bind="performanceMetricAttrs('tacos',row)">{{ percent(row.tacos) }}</span></template></el-table-column>
-      <el-table-column label="详情" width="190" class-name="performance-action-cell"><template #default="{row}"><div class="performance-actions"><el-button size="small" plain :icon="TrendCharts" :disabled="loading || !row.seller_sku" @click="openTrend(row)">趋势</el-button><el-button size="small" plain :icon="Calendar" :disabled="loading || !row.seller_sku" @click="openDaily(row)">每日数据</el-button></div></template></el-table-column>
+      <el-table-column label="详情" width="115" class-name="performance-action-cell"><template #default="{row}"><div class="performance-actions"><el-button size="small" plain :icon="Calendar" :disabled="loading || !row.seller_sku" @click="openDaily(row)">每日数据</el-button></div></template></el-table-column>
     </el-table>
     <div v-if="coverage" class="performance-summary">
       <div class="workbench-muted">全量合计 · {{ total }} 个 SKU / 币种组合（不是当前页）· {{ coverage.date_from }} ～ {{ coverage.date_to }} · 退款已包含在利润中，不再另扣</div>
@@ -40,7 +40,7 @@
     <div class="workbench-pagination"><span class="workbench-muted">共 {{ total }} 个 SKU / 币种组合 · 点击列名旁箭头全量排序 · 缺值排在最后</span>
       <el-pagination v-model:current-page="page" v-model:page-size="pageSize" :page-sizes="[20,50,100]" :total="total" layout="total,sizes,prev,pager,next" @current-change="load" @size-change="reload" />
     </div>
-    <el-dialog v-model="dailyVisible" :title="`${dailySku?.product_name || dailySku?.seller_sku || ''} · 每日经营数据`" width="min(1240px, 96vw)" class="ownership-dialog" append-to-body @close="invalidateDaily">
+    <el-dialog v-model="dailyVisible" :title="`${dailySku?.product_name || dailySku?.seller_sku || ''} · 每日经营数据`" width="min(1240px, 96vw)" class="ownership-dialog performance-sku-daily-dialog" append-to-body @close="invalidateDaily">
       <div class="workbench-muted" style="margin-bottom:14px">{{ ownerName }} · {{ dailySku?.seller_sku }} · {{ dailyDates[0] }} 至 {{ dailyDates[1] }} · {{ dailySku?.currency }}。只计该人员归属下的数据。</div>
       <div class="performance-daily-filter"><el-switch v-model="showAllDaily" active-text="显示完整查询区间" @change="resizeDaily" /><span class="workbench-muted">默认只列负责日期；缺日报显示空值，已有日报的真实零值正常显示0。</span></div>
       <el-tooltip :content="performanceColorGuide" placement="top" popper-class="performance-color-tooltip"><span class="performance-color-guide" tabindex="0">颜色参考 <i class="is-green" />正常 <i class="is-yellow" />关注 <i class="is-red" />重点关注 <el-icon><QuestionFilled /></el-icon></span></el-tooltip>
@@ -57,22 +57,25 @@
         <el-table-column label="TACOS" width="105" align="right"><template #default="{row}"><span v-bind="performanceMetricAttrs('tacos',row)">{{ percent(row.tacos) }}</span></template></el-table-column>
       </el-table>
       <div class="workbench-pagination"><span class="workbench-muted">最新日期在前 · 共 {{ dailyTotal }} 行</span><el-pagination v-model:current-page="dailyPage" v-model:page-size="dailyPageSize" :page-sizes="[10,20,50,100]" :total="dailyTotal" layout="total,sizes,prev,pager,next,jumper" @current-change="loadDaily" @size-change="resizeDaily" /></div>
+      <section v-if="dailyVisible" class="performance-sku-daily-trend">
+        <h3>SKU 经营趋势</h3>
+        <p class="workbench-muted">展示完整查询区间，不受上方分页影响；点击图例可隐藏指标，悬停查看当天数值。</p>
+        <p class="workbench-muted">{{ rangeDescription(dailySku || {}) }}</p>
+        <el-alert v-if="trendError" :title="trendError" type="error" :closable="false" show-icon />
+        <div v-loading="trendLoading" class="performance-sku-daily-chart" style="min-height:400px">
+          <PerformanceTrendChart v-if="!trendLoading && !trendError && trendRows.length" :rows="trendRows" :metrics="skuMetrics" :currency="dailySku?.currency || ''" :height="400" />
+          <el-empty v-else-if="!trendLoading && !trendError" description="所选日期暂无趋势数据" />
+        </div>
+        <p class="workbench-muted">销量按件、广告费和利润按币种、ACOS按百分比分轴；未负责或缺日报的日期保留断点，不当作零。</p>
+      </section>
       <template #footer><el-button @click="dailyVisible=false">返回 SKU 列表</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="trendVisible" :title="`${trendSku?.product_name || trendSku?.seller_sku || ''} · SKU 经营趋势`" width="min(1240px, 96vw)" class="ownership-dialog" append-to-body @close="invalidateTrend">
-      <p class="workbench-muted">{{ ownerName }} · {{ trendSku?.seller_sku }} · {{ trendDates[0] }} 至 {{ trendDates[1] }} · {{ trendSku?.currency }}。展示完整筛选期间；点击图例可隐藏指标，悬停查看当天数值。</p>
-      <p class="workbench-muted">{{ rangeDescription(trendSku || {}) }}</p>
-      <el-alert v-if="trendError" :title="trendError" type="error" :closable="false" show-icon />
-      <div v-loading="trendLoading"><PerformanceTrendChart v-if="trendVisible" :rows="trendRows" :metrics="skuMetrics" :currency="trendSku?.currency || ''" :height="400" /></div>
-      <p class="workbench-muted">销量按件、广告费和利润按币种、ACOS 按百分比分别使用刻度；缺数据保留断点，不当作零。</p>
-      <template #footer><el-button @click="trendVisible=false">返回 SKU 列表</el-button></template>
     </el-dialog>
   </el-dialog>
 </template>
 
 <script setup>
-import { computed, ref, onUnmounted } from 'vue'
-import { Search, Calendar, TrendCharts, QuestionFilled } from '@element-plus/icons-vue'
+import { computed, ref, onDeactivated, onUnmounted } from 'vue'
+import { Search, Calendar, QuestionFilled } from '@element-plus/icons-vue'
 import PerformanceTrendChart from '@/components/PerformanceTrendChart.vue'
 import { getPerformanceSkus, getPerformanceSkuDaily } from '@/services/api.js'
 import { performanceColorGuide, performanceMetricAttrs } from '@/utils/performanceMetricTone.js'
@@ -87,7 +90,7 @@ const dailyVisible=ref(false), dailyLoading=ref(false), dailyError=ref(''), dail
 const dailyPage=ref(1), dailyPageSize=ref(10), dailyTotal=ref(0), dailyQuery=ref({})
 const showAllDaily=ref(false)
 const sourceLabels={available:'已有日报',missing_report:'负责，但缺日报',not_responsible:'不在负责范围'}
-const trendVisible=ref(false), trendLoading=ref(false), trendError=ref(''), trendRows=ref([]), trendSku=ref(null), trendDates=ref([])
+const trendLoading=ref(false), trendError=ref(''), trendRows=ref([])
 const skuMetrics=[{key:'sales_qty',label:'销量',axis:'quantity',color:'#527eea'}, {key:'ad_cost',label:'广告费',axis:'amount',color:'#e9a23b'}, {key:'acos',label:'ACOS',axis:'percent',color:'#9a77dc'}, {key:'profit',label:'利润',axis:'amount',color:'#34b7a5'}]
 let version=0, dailyVersion=0, trendVersion=0
 const money=value=>value===null || value===undefined ? '—' : Number(value).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})
@@ -97,9 +100,8 @@ const compactRange=(first,last)=>first && last ? `${first.slice(5)} ～ ${last.s
 const rangesText=ranges=>(ranges || []).map(range=>`${range.date_from} ～ ${range.date_to}（${range.days}天）`).join('；') || '无'
 // 负责日期与实际计入日期分别说明，多次交接和缺日报均保留分段，不能用查询日期代替。
 const rangeDescription=row=>`负责：${rangesText(row.responsibility_ranges)}。实际计入：${rangesText(row.data_ranges)}。缺日报：${rangesText(row.missing_report_ranges)}。负责${row.responsibility_days || 0}天，计入${row.data_day_count || 0}天，缺日报${row.missing_report_days || 0}天。`
-const invalidateDaily=()=>{dailyVersion++;dailyLoading.value=false}
-const invalidateTrend=()=>{trendVersion++;trendLoading.value=false}
-const closeChildren=()=>{dailyVisible.value=false;trendVisible.value=false;invalidateDaily();invalidateTrend()}
+const invalidateDaily=()=>{dailyVersion++;trendVersion++;dailyLoading.value=false;trendLoading.value=false;trendRows.value=[];trendError.value=''}
+const closeChildren=()=>{dailyVisible.value=false;invalidateDaily()}
 const invalidate=()=>{version++;loading.value=false;closeChildren()}
 const params=()=>{
   if(dates.value?.length!==2)throw new Error('请选择统计日期')
@@ -134,19 +136,30 @@ const loadDaily=async()=>{
 const resizeDaily=()=>{dailyPage.value=1;loadDaily()}
 const openDaily=row=>{
   invalidateDaily();dailySku.value=row;dailyDates.value=[...dates.value];dailyQuery.value={...params(),seller_sku:row.seller_sku,currency:row.currency}
-  showAllDaily.value=false;dailyPage.value=1;dailyTotal.value=0;dailyVisible.value=true;loadDaily()
+  showAllDaily.value=false;dailyPage.value=1;dailyTotal.value=0;dailyVisible.value=true;loadDaily();loadTrend()
 }
-const openTrend=async row=>{
+const loadTrend=async()=>{
   const current=++trendVersion
-  trendSku.value=row;trendDates.value=[...dates.value];trendRows.value=[];trendError.value='';trendVisible.value=true;trendLoading.value=true
+  trendRows.value=[];trendError.value='';trendLoading.value=true
   try{
     // 接口最多93天；趋势显式取完整查询区间而非当前页，未负责和缺日报日保留断点。
-    const response=await getPerformanceSkuDaily({...params(),seller_sku:row.seller_sku,currency:row.currency,daily_scope:'all',page:1,page_size:200,sort_by:'business_date',sort_order:'asc'})
-    if(current!==trendVersion || !trendVisible.value)return
+    const response=await getPerformanceSkuDaily({...dailyQuery.value,daily_scope:'all',page:1,page_size:200,sort_by:'business_date',sort_order:'asc'})
+    if(current!==trendVersion || !dailyVisible.value)return
     if(response.data.data.total>response.data.data.list.length)throw new Error('趋势数据未完整返回，请缩小日期范围')
     trendRows.value=response.data.data.list
   }catch(err){if(current===trendVersion)trendError.value=message(err)}finally{if(current===trendVersion)trendLoading.value=false}
 }
+onDeactivated(()=>{visible.value=false;invalidate()})
 onUnmounted(invalidate)
 defineExpose({open,close:()=>{visible.value=false;invalidate()}})
 </script>
+
+<style>
+.performance-sku-daily-dialog{display:flex;flex-direction:column;max-height:90vh;margin-top:5vh !important}
+.performance-sku-daily-dialog .el-dialog__body{min-height:0;overflow-y:auto}
+.performance-sku-daily-dialog .el-dialog__header,.performance-sku-daily-dialog .el-dialog__footer{flex-shrink:0}
+.performance-sku-daily-trend{margin-top:20px;padding-top:18px;border-top:1px solid #eef2f7}
+.performance-sku-daily-trend h3{margin:0 0 8px;color:#2b4b72;font-size:16px}
+.performance-sku-daily-chart{overflow-x:auto}
+@media(max-width:768px){.performance-sku-daily-chart .performance-trend-chart{min-width:600px}}
+</style>
