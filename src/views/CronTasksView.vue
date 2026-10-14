@@ -435,7 +435,7 @@ const handleExecute = async row => {
   executing.value = row.task_id
   confirming = true
   try {
-    await ElMessageBox.confirm(`立即执行「${row.task_name}」？范围：${row.scope}。不改变原定时计划；相关任务正在运行时不会重复启动。`, '立即执行计划任务', { confirmButtonText: '确认执行', cancelButtonText: '取消', type: 'info' })
+    await ElMessageBox.confirm(`立即执行「${row.task_name}」？范围：${row.scope}。不改变原定时计划；同一任务正在运行时不会重复启动，不影响其他任务。`, '立即执行计划任务', { confirmButtonText: '确认执行', cancelButtonText: '取消', type: 'info' })
   } catch {
     executing.value = ''
     return
