@@ -77,7 +77,7 @@ export const performanceChartOption = (rows, metrics, currency) => {
       valueFormatter: value => value === null || value === undefined ? '无数据' : Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
     },
     grid: { left: 65, right: axes.length > 2 ? 130 : 70, top: 70, bottom: ordered.length > 14 ? 85 : 40, containLabel: true },
-    xAxis: { type: 'category', boundaryGap: false, data: ordered.map(row => row.business_date), axisLabel: { formatter: value => value.slice(5), color: '#8693a5' } },
+    xAxis: { type: 'category', boundaryGap: metrics.some(metric => metric.type === 'bar'), data: ordered.map(row => row.business_date), axisLabel: { formatter: value => value.slice(5), color: '#8693a5' } },
     yAxis: axes.map((axis, index) => ({
       type: 'value', name: unit(axis), position: index === 0 ? 'left' : 'right', offset: index > 1 ? 65 : 0,
       minInterval: axis === 'quantity' ? 1 : undefined,
@@ -86,7 +86,7 @@ export const performanceChartOption = (rows, metrics, currency) => {
     })),
     dataZoom: ordered.length > 14 ? [{ type: 'slider', bottom: 8, height: 22, start: 0, end: 100 }] : [],
     series: metrics.map(metric => ({
-      name: `${metric.label} (${unit(metric.axis)})`, type: 'line', yAxisIndex: axes.indexOf(metric.axis),
+      name: `${metric.label} (${unit(metric.axis)})`, type: metric.type === 'bar' ? 'bar' : 'line', yAxisIndex: axes.indexOf(metric.axis),
       data: ordered.map(row => chartValue(row[metric.key], metric.axis)), connectNulls: false,
       showSymbol: ordered.length <= 31, symbolSize: 5, lineStyle: { width: 2 },
       emphasis: { focus: 'series' }

@@ -5,12 +5,12 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { init, use } from 'echarts/core'
-import { LineChart } from 'echarts/charts'
+import { BarChart, LineChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent, DataZoomComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { performanceChartOption } from '@/services/performanceCharts.js'
 
-use([LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, CanvasRenderer])
+use([BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent, DataZoomComponent, CanvasRenderer])
 const props=defineProps({rows:{type:Array,default:()=>[]},metrics:{type:Array,required:true},currency:{type:String,default:''},height:{type:Number,default:320}})
 const element=ref(null)
 let chart, observer

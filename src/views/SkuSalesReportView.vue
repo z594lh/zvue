@@ -14,9 +14,6 @@
           <el-option label="全部店铺" :value="null" />
           <el-option v-for="shop in shopList" :key="shop.id" :label="shop.shop_name" :value="shop.id" />
         </el-select>
-        <el-button type="success" plain :loading="generating" @click="handleGenerateAll">
-          <el-icon><Refresh /></el-icon> 全量生成
-        </el-button>
       </div>
     </div>
 
@@ -135,13 +132,19 @@
                 <div class="product-code">{{ scope.row.asin || '-' }} / {{ scope.row.sku || '-' }}</div>
                 <div class="product-meta">
                   <span class="product-date">{{ scope.row.report_date || '-' }}</span>
-                  <el-tooltip content="查看趋势图" placement="top">
-                    <el-button type="primary" link size="small" class="trend-btn" @click="handleOpenTrend(scope.row)">
-                      <el-icon><TrendCharts /></el-icon>
-                    </el-button>
-                  </el-tooltip>
                 </div>
               </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="经营判断" width="215" align="center">
+            <template #header><el-tooltip content="14天主判断，7天看变化，30天作参考。每件回收贡献=(利润+产品成本+头程费用)÷销量；区分清库存与长期补货，点击标签查看依据。" placement="top"><span>经营判断 <el-icon><QuestionFilled /></el-icon></span></el-tooltip></template>
+            <template #default="{row}">
+              <el-tooltip :content="decisionHint(row)" placement="top" popper-class="sku-decision-tooltip"><button type="button" class="inventory-decision-cell" :aria-label="`查看 ${row.sku} 经营判断`" @click="openDecision(row)">
+                <el-tag :type="decisionType(row)" :style="recoveryToneStyle(row.inventory_decision)" :class="`inventory-decision-${row.inventory_decision?.code || 'insufficient'}`" size="small">{{ row.inventory_decision?.label || '待更新判断' }}</el-tag>
+                <span v-if="!row.inventory_decision || row.inventory_decision.code==='insufficient'" class="inventory-decision-muted">{{ row.inventory_decision?.summary || '请更新后端后重新查询' }}</span>
+                <small class="inventory-decision-muted">{{ row.inventory_decision?.basis_days || 14 }}天参考 · 截至 {{ row.inventory_decision?.date_to || '—' }} · 查看依据</small>
+              </button></el-tooltip>
             </template>
           </el-table-column>
 
@@ -266,9 +269,9 @@
           </el-table-column>
 
           <!-- 操作：固定右侧 -->
-          <el-table-column label="操作" align="center" width="90" fixed="right">
+          <el-table-column label="操作" align="center" width="110" fixed="right">
             <template #default="scope">
-              <el-button type="primary" link size="small" :loading="scope.row.generating" @click="handleGenerateSingle(scope.row)">生成</el-button>
+              <el-button type="primary" link size="small" :disabled="loading || !scope.row.sku" @click="handleOpenDaily(scope.row)"><el-icon><Calendar /></el-icon> 每日数据</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -287,52 +290,31 @@
       </div>
     </div>
 
-    <!-- SKU 趋势图弹窗 -->
-    <el-dialog
-      v-model="trendVisible"
-      :title="trendProductName ? `SKU 趋势图 - ${trendSku || ''} - ${trendProductName}` : `SKU 趋势图 - ${trendSku || ''}`"
-      width="900px"
-      destroy-on-close
-      :close-on-click-modal="false"
-      @opened="handleTrendDialogOpened"
-      @closed="handleTrendDialogClosed"
-    >
-      <div class="trend-header">
-        <el-radio-group v-model="trendDays" size="small" @change="handleTrendDaysChange">
-          <el-radio-button :label="7">近7天</el-radio-button>
-          <el-radio-button :label="14">近14天</el-radio-button>
-          <el-radio-button :label="30">近30天</el-radio-button>
-          <el-radio-button :label="60">近60天</el-radio-button>
-        </el-radio-group>
-      </div>
-      <div v-loading="trendLoading" class="trend-chart-wrapper">
-        <div ref="trendChartRef" class="trend-chart"></div>
-      </div>
-    </el-dialog>
+    <SkuSalesDaily ref="dailyDetails" />
+    <SkuInventoryDecision ref="decisionDetails" />
   </div>
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onDeactivated, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
+import SkuSalesDaily from '@/components/SkuSalesDaily.vue'
+import SkuInventoryDecision from '@/components/SkuInventoryDecision.vue'
+import { recoveryToneStyle } from '@/services/skuInventoryDecision.js'
 import {
   ShoppingCart, Box, OfficeBuilding, Coin, Wallet, Money,
-  Search, Refresh, Download, CircleClose, TrendCharts
+  Search, Download, CircleClose, Calendar, QuestionFilled
 } from '@element-plus/icons-vue'
 import {
   getShopOptions,
-  getSkuSalesList,
-  generateSkuSales,
-  generateSkuSalesForSku,
-  getSkuSalesTrend
+  getSkuSalesList
 } from '@/services/api.js'
 
 export default {
   name: 'SkuSalesReportView',
   components: {
     ShoppingCart, Box, OfficeBuilding, Coin, Wallet, Money,
-    Search, Refresh, Download, CircleClose, TrendCharts
+    Search, Download, CircleClose, Calendar, QuestionFilled, SkuSalesDaily, SkuInventoryDecision
   },
   setup() {
     const selectedShop = ref(null)
@@ -346,18 +328,15 @@ export default {
     const total = ref(0)
     const list = ref([])
     const loading = ref(false)
-    const generating = ref(false)
-
-    // 趋势图相关
-    const trendVisible = ref(false)
-    const trendLoading = ref(false)
-    const trendSku = ref('')
-    const trendProductName = ref('')
-    const trendShopId = ref(null)
-    const trendDays = ref(30)
-    const trendData = ref([])
-    const trendChartRef = ref(null)
-    let trendChartInstance = null
+    const dailyDetails = ref(null)
+    const decisionDetails = ref(null)
+    let requestVersion = 0
+    const decisionBasis = row => row.inventory_decision?.periods?.find(period => period.days === row.inventory_decision.basis_days)
+    const decisionType = row => ({ profitable:'success', recoverable:'danger', thin:'warning', draining:'danger' }[row.inventory_decision?.code] || 'info')
+    const decisionHint = row => [row.inventory_decision?.summary || '请更新后端后重新查询', row.inventory_decision?.fallback_note,
+      decisionBasis(row) ? `参考${row.inventory_decision.basis_days}天，日报覆盖${decisionBasis(row).recorded_days}/${row.inventory_decision.basis_days}天，销量${decisionBasis(row).sales_qty ?? '—'}件。` : '',
+      '回收贡献为历史估算；未计未来仓储和弃置费，不直接代表值得补货或应立即弃置。'].filter(Boolean).join('\n')
+    const openDecision = row => { if (!loading.value) decisionDetails.value?.open(row,shopList.value) }
 
     const allWindows = ['1d', '3d', '7d', '14d', '30d']
     const selectedWindows = ref(['1d', '7d', '30d'])
@@ -502,6 +481,9 @@ export default {
     }
 
     const fetchSkuSalesData = async () => {
+      const version = ++requestVersion
+      dailyDetails.value?.close()
+      decisionDetails.value?.close()
       loading.value = true
       try {
         const params = {
@@ -514,16 +496,16 @@ export default {
           page_size: pageSize.value
         }
         const res = await getSkuSalesList(params)
-        if (res.data.status === 'success') {
-          list.value = (res.data.data.list || []).map(row => ({ ...row, generating: false }))
+        if (version===requestVersion && res.data.status === 'success') {
+          list.value = res.data.data.list || []
           total.value = res.data.data.total || 0
           computeSummary()
         }
       } catch (e) {
         console.error(e)
-        ElMessage.error('获取 SKU 销售数据失败')
+        if (version===requestVersion) ElMessage.error('获取 SKU 销售数据失败')
       } finally {
-        loading.value = false
+        if (version===requestVersion) loading.value = false
       }
     }
 
@@ -545,42 +527,6 @@ export default {
       fetchSkuSalesData()
     }
 
-    const handleGenerateAll = async () => {
-      generating.value = true
-      try {
-        const res = await generateSkuSales({ shop_id: selectedShop.value })
-        if (res.data.status === 'success') {
-          ElMessage.success(res.data.message || 'SKU 销售报表生成完成')
-          fetchSkuSalesData()
-        }
-      } catch (e) {
-        console.error(e)
-        ElMessage.error('生成失败')
-      } finally {
-        generating.value = false
-      }
-    }
-
-    const handleGenerateSingle = async (row) => {
-      if (!selectedShop.value) {
-        ElMessage.warning('请先选择店铺')
-        return
-      }
-      row.generating = true
-      try {
-        const res = await generateSkuSalesForSku(row.sku, { shop_id: selectedShop.value })
-        if (res.data.status === 'success') {
-          ElMessage.success(`${row.sku} 生成完成`)
-          fetchSkuSalesData()
-        }
-      } catch (e) {
-        console.error(e)
-        ElMessage.error(`${row.sku} 生成失败`)
-      } finally {
-        row.generating = false
-      }
-    }
-
     const handleExport = () => {
       ElMessage.info('导出功能开发中...')
     }
@@ -596,192 +542,8 @@ export default {
       fetchSkuSalesData()
     }
 
-    // 趋势图：根据天数计算起止日期
-    const getTrendDateRange = (days) => {
-      const end = new Date()
-      end.setHours(0, 0, 0, 0)
-      const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000)
-      const pad = (n) => String(n).padStart(2, '0')
-      const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-      return { start_date: fmt(start), end_date: fmt(end) }
-    }
-
-    const handleOpenTrend = (row) => {
-      trendSku.value = row.sku || ''
-      trendProductName.value = row.product_name || ''
-      trendShopId.value = selectedShop.value
-      trendDays.value = 30
-      trendVisible.value = true
-      fetchTrendData()
-    }
-
-    const fetchTrendData = async () => {
-      if (!trendSku.value) return
-      trendLoading.value = true
-      try {
-        const { start_date, end_date } = getTrendDateRange(trendDays.value)
-        const params = {
-          sku: trendSku.value,
-          start_date,
-          end_date
-        }
-        if (trendShopId.value) {
-          params.shop_id = trendShopId.value
-        }
-        const res = await getSkuSalesTrend(params)
-        if (res.data.status === 'success') {
-          trendData.value = res.data.data?.list || []
-        } else {
-          trendData.value = []
-        }
-      } catch (e) {
-        console.error(e)
-        ElMessage.error('获取趋势数据失败')
-        trendData.value = []
-      } finally {
-        trendLoading.value = false
-        nextTick(() => renderTrendChart())
-      }
-    }
-
-    const handleTrendDaysChange = () => {
-      fetchTrendData()
-    }
-
-    const handleTrendDialogOpened = () => {
-      nextTick(() => renderTrendChart())
-    }
-
-    const handleTrendDialogClosed = () => {
-      if (trendChartInstance) {
-        trendChartInstance.dispose()
-        trendChartInstance = null
-      }
-      trendData.value = []
-      trendSku.value = ''
-      trendProductName.value = ''
-      trendShopId.value = null
-    }
-
-    const renderTrendChart = () => {
-      if (!trendChartRef.value) return
-      if (!trendChartInstance) {
-        trendChartInstance = echarts.init(trendChartRef.value)
-      }
-      const dates = trendData.value.map(item => item.date)
-      const sales = trendData.value.map(item => Number(item.sales || 0))
-      const adCost = trendData.value.map(item => Number(item.ad_cost || 0))
-      const profit = trendData.value.map(item => Number(item.profit || 0))
-      const pct = (val) => {
-        const n = Number(val || 0) * 100
-        return Math.round(n * 100) / 100
-      }
-      const acos = trendData.value.map(item => pct(item.acos))
-      const tacos = trendData.value.map(item => pct(item.tacos))
-
-      const option = {
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: { type: 'cross' },
-          formatter: (params) => {
-            const date = params[0]?.axisValue || ''
-            let html = `<div style="font-weight:600;margin-bottom:4px">${date}</div>`
-            params.forEach(p => {
-              const isPct = p.seriesName === 'ACOS' || p.seriesName === 'TACOS'
-              const isSales = p.seriesName === '销量'
-              let val = p.value
-              if (isPct) val = `${val.toFixed(2)}%`
-              else if (isSales) val = Number(val).toLocaleString('en-US')
-              else val = Number(val).toFixed(2)
-              html += `<div style="display:flex;align-items:center;gap:6px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
-                <span style="flex:1">${p.seriesName}</span>
-                <span style="font-weight:600">${val}</span>
-              </div>`
-            })
-            return html
-          }
-        },
-        legend: {
-          data: ['销量', '广告费', '利润', 'ACOS', 'TACOS'],
-          bottom: 0
-        },
-        grid: {
-          left: '3%',
-          right: '4%',
-          bottom: '15%',
-          top: '12%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          data: dates,
-          axisLabel: { rotate: 30, fontSize: 11 }
-        },
-        yAxis: [
-          {
-            type: 'value',
-            name: '数量 / 金额',
-            position: 'left',
-            axisLabel: {
-              formatter: (value) => {
-                if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1) + 'k'
-                return Number(value).toFixed(value % 1 === 0 ? 0 : 2)
-              }
-            }
-          },
-          {
-            type: 'value',
-            name: '百分比',
-            position: 'right',
-            axisLabel: {
-              formatter: (value) => `${Number(value).toFixed(2)}%`
-            }
-          }
-        ],
-        series: [
-          {
-            name: '销量',
-            type: 'bar',
-            data: sales,
-            itemStyle: { color: '#f97316' }
-          },
-          {
-            name: '广告费',
-            type: 'line',
-            data: adCost,
-            itemStyle: { color: '#ef4444' },
-            smooth: true
-          },
-          {
-            name: '利润',
-            type: 'line',
-            data: profit,
-            itemStyle: { color: '#10b981' },
-            smooth: true
-          },
-          {
-            name: 'ACOS',
-            type: 'line',
-            yAxisIndex: 1,
-            data: acos,
-            itemStyle: { color: '#8b5cf6' },
-            smooth: true
-          },
-          {
-            name: 'TACOS',
-            type: 'line',
-            yAxisIndex: 1,
-            data: tacos,
-            itemStyle: { color: '#6366f1' },
-            smooth: true
-          }
-        ]
-      }
-
-      trendChartInstance.setOption(option, true)
-      trendChartInstance.resize()
-    }
+    const handleOpenDaily = row => { if (!loading.value) dailyDetails.value?.open(row, selectedShop.value, shopList.value) }
+    onDeactivated(() => { requestVersion++;loading.value=false;dailyDetails.value?.close();decisionDetails.value?.close() })
 
     watch([page, pageSize], () => {
       fetchSkuSalesData()
@@ -795,15 +557,14 @@ export default {
     return {
       selectedShop, shopList,
       keyword, sku, sortBy, sortDir,
-      page, pageSize, total, list, loading, generating,
+      page, pageSize, total, list, loading,
       allWindows, selectedWindows, displayWindows, windows, windowLabels, toggleWindow,
       summary,
       formatNumber, formatPercent, getProfitRateTagType, getAcosClass, getAdRatio,
       headerCellStyle,
       fetchSkuSalesData, handleSearch, handleSortChange,
-      handleGenerateAll, handleGenerateSingle, handleExport, handleReset,
-      trendVisible, trendLoading, trendSku, trendProductName, trendDays, trendChartRef,
-      handleOpenTrend, handleTrendDaysChange, handleTrendDialogOpened, handleTrendDialogClosed
+      handleExport, handleReset, dailyDetails, handleOpenDaily,
+      decisionDetails, decisionBasis, decisionType, decisionHint, openDecision, recoveryToneStyle
     }
   }
 }
@@ -1009,29 +770,6 @@ export default {
   margin-top: 4px;
 }
 
-.trend-btn {
-  padding: 0;
-  height: auto;
-  font-size: 14px;
-}
-
-/* 趋势图弹窗 */
-.trend-header {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
-.trend-chart-wrapper {
-  width: 100%;
-  height: 420px;
-}
-
-.trend-chart {
-  width: 100%;
-  height: 100%;
-}
-
 /* 迷你卡片：核心样式 */
 .mini-card {
   background: #f8fafc;
@@ -1095,6 +833,12 @@ export default {
 .text-success { color: #10b981; }
 .text-warning { color: #f59e0b; }
 .text-danger { color: #ef4444; }
+.inventory-decision-cell{display:flex;flex-direction:column;align-items:center;gap:7px;width:100%;border:0;background:transparent;padding:8px 0;cursor:pointer;font:inherit}
+.inventory-decision-cell:focus-visible{outline:2px solid #527eea;border-radius:6px}
+.inventory-decision-cell .el-tag{max-width:190px;height:auto;min-height:20px;padding:2px 6px;line-height:1.6;white-space:normal}
+.inventory-decision-cell .el-tag__content{white-space:normal;overflow-wrap:anywhere}
+.inventory-decision-muted{font-size:11px;color:#8693a5;line-height:1.6;max-width:190px}
+.inventory-decision-thin{--el-tag-text-color:#c2410c;--el-tag-bg-color:#fff7ed;--el-tag-border-color:#fed7aa}
 
 /* 窗口选择器 */
 .window-select-group {

@@ -81,7 +81,7 @@
                       :step="0.05"
                       style="width: 100%"
                     />
-                    <span class="input-hint">默认 0.20</span>
+                    <span class="input-hint">默认 0</span>
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
@@ -94,7 +94,7 @@
                       :step="0.01"
                       style="width: 100%"
                     />
-                    <span class="input-hint">默认 0.03</span>
+                    <span class="input-hint">默认 0</span>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -287,7 +287,7 @@
                       :step="0.05"
                       style="width: 100%"
                     />
-                    <span class="input-hint">默认 0.20</span>
+                    <span class="input-hint">默认 0</span>
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
@@ -300,7 +300,7 @@
                       :step="0.01"
                       style="width: 100%"
                     />
-                    <span class="input-hint">默认 0.03</span>
+                    <span class="input-hint">默认 0</span>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -501,8 +501,8 @@ export default {
       seller_sku: '',
       shop_id: null,
       target_profit_rate: 0.25,
-      ad_rate: 0.20,
-      refund_rate: 0.03
+      ad_rate: 0,
+      refund_rate: 0
     })
 
     const forwardRules = {
@@ -526,8 +526,8 @@ export default {
           target_profit_rate: formForward.target_profit_rate,
           shop_id: formForward.shop_id
         }
-        if (formForward.ad_rate !== null && formForward.ad_rate !== undefined) payload.ad_rate = formForward.ad_rate
-        if (formForward.refund_rate !== null && formForward.refund_rate !== undefined) payload.refund_rate = formForward.refund_rate
+        payload.ad_rate = formForward.ad_rate ?? 0
+        payload.refund_rate = formForward.refund_rate ?? 0
 
         const response = await calculatePricing(payload)
         if (response.data.status === 'success') {
@@ -548,8 +548,8 @@ export default {
       formForward.seller_sku = ''
       formForward.shop_id = null
       formForward.target_profit_rate = 0.25
-      formForward.ad_rate = 0.20
-      formForward.refund_rate = 0.03
+      formForward.ad_rate = 0
+      formForward.refund_rate = 0
       resultForward.value = null
       formForwardRef.value?.resetFields?.()
     }
@@ -563,8 +563,8 @@ export default {
       seller_sku: '',
       shop_id: null,
       selling_price: null,
-      ad_rate: 0.20,
-      refund_rate: 0.03
+      ad_rate: 0,
+      refund_rate: 0
     })
 
     const reverseRules = {
@@ -596,8 +596,8 @@ export default {
           selling_price: formReverse.selling_price,
           shop_id: formReverse.shop_id
         }
-        if (formReverse.ad_rate !== null && formReverse.ad_rate !== undefined) payload.ad_rate = formReverse.ad_rate
-        if (formReverse.refund_rate !== null && formReverse.refund_rate !== undefined) payload.refund_rate = formReverse.refund_rate
+        payload.ad_rate = formReverse.ad_rate ?? 0
+        payload.refund_rate = formReverse.refund_rate ?? 0
 
         const response = await calculateProfitRate(payload)
         if (response.data.status === 'success') {
@@ -618,8 +618,8 @@ export default {
       formReverse.seller_sku = ''
       formReverse.shop_id = null
       formReverse.selling_price = null
-      formReverse.ad_rate = 0.20
-      formReverse.refund_rate = 0.03
+      formReverse.ad_rate = 0
+      formReverse.refund_rate = 0
       resultReverse.value = null
       formReverseRef.value?.resetFields?.()
     }

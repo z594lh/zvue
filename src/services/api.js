@@ -1304,23 +1304,6 @@ export const getSkuSalesList = (params = {}) => {
 };
 
 /**
- * 手动全量生成 SKU 销售数据报表
- * @param {Object} data {report_date, shop_id}
- */
-export const generateSkuSales = (data = {}) => {
-  return api.post('/reports/sku-sales/generate', data);
-};
-
-/**
- * 手动单 SKU 生成 SKU 销售数据报表
- * @param {string} sku SKU 编号
- * @param {Object} data {shop_id, report_date}
- */
-export const generateSkuSalesForSku = (sku, data = {}) => {
-  return api.post(`/reports/sku-sales/generate/${encodeURIComponent(sku)}`, data);
-};
-
-/**
  * 获取 SKU 销售趋势数据（按天）
  * @param {Object} params {sku, shop_id, start_date, end_date, days}
  */
