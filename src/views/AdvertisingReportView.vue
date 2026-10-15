@@ -63,10 +63,10 @@
           <el-table-column prop="judge" label="好坏判断" min-width="180" />
         </el-table>
 
-        <h4>🔄 转化指标（7天 vs 30天）</h4>
+        <h4>🔄 转化指标（7d）</h4>
         <p class="guide-tip">
           <el-icon><InfoFilled /></el-icon>
-          买家点击广告后，<strong>7天内</strong>下单算广告归因；<strong>30天内</strong>是给高客单价/长决策周期产品参考的。日常看 <strong>7d</strong> 就够了。
+          本页展示原广告报告的 <strong>7d</strong> 订单和销售额；7d 是广告报告的转化窗口，不是只查询最近7天。上方日期筛选仍决定日报、周报、月报的统计范围。
         </p>
         <el-table :data="guideConversion" size="small" style="margin-bottom:20px" :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}">
           <el-table-column prop="name" label="指标" width="100" />
@@ -74,6 +74,8 @@
           <el-table-column prop="formula" label="计算公式" min-width="160" />
           <el-table-column prop="judge" label="好坏判断" min-width="180" />
         </el-table>
+
+        <p class="guide-tip">ACOS 的分母是广告销售额，不是总销量。有花费但没有广告销售时，显示红色“— · 有花费无广告销售”；花费和广告销售均为0时，显示灰色“— · 无广告花费”。只有广告销售额为正，0广告花费才对应有效0%；数据缺失显示“数据不完整”。近期数据可能延迟回补，不能把暂无广告销售理解为最终结果。</p>
 
         <h4>🌰 实际例子</h4>
         <div class="guide-example">
@@ -91,7 +93,7 @@
           <div class="priority-item">
             <span class="priority-num">1</span>
             <div>
-              <strong>第一看 ACOS</strong> — 是否亏钱一目了然
+              <strong>第一看 ACOS 和广告花费</strong> — 先排查有花费无广告销售，再结合产品利润空间判断
             </div>
           </div>
           <div class="priority-item">
@@ -157,7 +159,7 @@
         <div class="card-icon"><el-icon size="24"><DataAnalysis /></el-icon></div>
         <div class="card-body">
           <div class="card-label">ACOS (7d)</div>
-          <div class="card-value" :class="getAcosClass(summary.avg_acos_7d)">{{ formatPct(summary.avg_acos_7d) }}</div>
+          <AdvertisingAcos class="summary-acos" :spend="summary.total_ad_spend" :sales="summary.total_sales_7d" />
         </div>
       </div>
       <div class="summary-card card-roas">
@@ -278,27 +280,13 @@
         <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="120">
           <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
         </el-table-column>
-        <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="110">
+        <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="150">
           <template #default="scope">
-            <span :class="getAcosClass(scope.row.acos_7d)">{{ formatPct(scope.row.acos_7d) }}</span>
+            <AdvertisingAcos :spend="scope.row.ad_spend" :sales="scope.row.sales_7d" />
           </template>
         </el-table-column>
         <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110">
           <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
-        </el-table-column>
-        <el-table-column prop="orders_30d" label="订单(30d)" align="right" width="100">
-          <template #default="scope">{{ formatNumber(scope.row.orders_30d, 0) }}</template>
-        </el-table-column>
-        <el-table-column prop="sales_30d" label="销售(30d)" align="right" width="120">
-          <template #default="scope">${{ formatNumber(scope.row.sales_30d) }}</template>
-        </el-table-column>
-        <el-table-column prop="acos_30d" label="ACOS(30d)" align="right" width="110">
-          <template #default="scope">
-            <span :class="getAcosClass(scope.row.acos_30d)">{{ formatPct(scope.row.acos_30d) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="roas_30d" label="ROAS(30d)" align="right" width="110">
-          <template #default="scope">{{ formatNumber(scope.row.roas_30d, 2) }}x</template>
         </el-table-column>
       </el-table>
       <el-pagination
@@ -318,6 +306,8 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
+import AdvertisingAcos from '@/components/AdvertisingAcos.vue'
+import { advertisingAcos } from '@/services/advertisingAcos.js'
 import {
   Promotion, Refresh, RefreshLeft, Search, View, Mouse, Money, TrendCharts,
   Coin, DataAnalysis, Histogram, ShoppingCart, Wallet, DataLine, List,
@@ -335,7 +325,7 @@ export default {
   components: {
     Promotion, Refresh, RefreshLeft, Search, View, Mouse, Money, TrendCharts,
     Coin, DataAnalysis, Histogram, ShoppingCart, Wallet, DataLine, List,
-    Document, InfoFilled, ArrowDown, ArrowUp
+    Document, InfoFilled, ArrowDown, ArrowUp, AdvertisingAcos
   },
   setup() {
     const selectedShop = ref(null)
@@ -387,18 +377,6 @@ export default {
       const n = Number(val)
       if (isNaN(n)) return '—'
       return n.toFixed(2) + '%'
-    }
-
-    const getAcosClass = (val) => {
-      if (val === null || val === undefined) return ''
-      let v = Number(val)
-      if (isNaN(v)) return ''
-      // 兼容后端返回百分比数值（如 55.36）或小数（如 0.5536）
-      if (v > 1) v = v / 100
-      if (v > 0.5) return 'text-danger'
-      if (v > 0.3) return 'text-warning'
-      if (v > 0) return 'text-success'
-      return ''
     }
 
     const fetchShops = async () => {
@@ -525,7 +503,7 @@ export default {
     const guideConversion = [
       { name: '订单(7d)', meaning: '广告带来的订单数', formula: '—', judge: '—' },
       { name: '销售(7d)', meaning: '广告带来的销售额', formula: '—', judge: '—' },
-      { name: 'ACOS(7d)', meaning: '广告销售成本比（最核心）', formula: '花费÷销售×100%', judge: '<30%健康，<15%优秀，>50%亏钱' },
+      { name: 'ACOS(7d)', meaning: '广告销售成本比', formula: '广告花费÷广告销售额×100%', judge: '≤30%绿、30%～50%黄、>50%红，仅为阅读参考；无销售不显示0%' },
       { name: 'ROAS(7d)', meaning: '广告支出回报率', formula: '销售÷花费', judge: '>3.3健康，>6优秀（1/ACOS）' }
     ]
 
@@ -745,10 +723,16 @@ export default {
           trigger: 'axis',
           axisPointer: { type: 'cross' },
           formatter: (params) => {
+            if (!params?.length) return ''
+            const point = data[params[0].dataIndex]
+            const acos = advertisingAcos(point?.ad_spend, point?.sales_7d)
+            const acosText = acos.text + (acos.note ? `（${acos.note}）` : '')
+            let showedAcos = false
             let html = `<div style="font-weight:600;margin-bottom:6px;">${params[0].axisValue}</div>`
             params.forEach(p => {
               let val = p.value
-              if (['ACOS', 'CTR'].includes(p.seriesName)) val = Number(val).toFixed(2) + '%'
+              if (p.seriesName === 'ACOS') { val = acosText; showedAcos = true }
+              else if (p.seriesName === 'CTR') val = Number(val).toFixed(2) + '%'
               else if (p.seriesName === 'CPC') val = '$' + Number(val).toFixed(2)
               else val = '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
               html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">
@@ -757,6 +741,8 @@ export default {
                 <span style="font-weight:600;">${val}</span>
               </div>`
             })
+            // 无效点通常不进入ECharts参数，仍需说明为何没有ACOS曲线点。
+            if (!showedAcos) html += `<div>ACOS：${acosText}</div>`
             return html
           }
         },
@@ -823,7 +809,8 @@ export default {
             name: 'ACOS',
             type: 'line',
             yAxisIndex: 1,
-            data: data.map(d => d.acos || 0),
+            data: data.map(d => advertisingAcos(d.ad_spend, d.sales_7d).value),
+            connectNulls: false,
             smooth: true,
             itemStyle: { color: '#ef4444' },
             lineStyle: { width: 3 },
@@ -912,7 +899,7 @@ export default {
       trendChartRef, detailTableRef, showGuide,
       trendFilter, campaignOptions, adGroupOptions, productOptions,
       adGroupDisabled, productDisabled,
-      formatNumber, formatK, formatPct, getAcosClass,
+      formatNumber, formatK, formatPct,
       guideMetrics, guideConversion,
       handleShopChange, fetchAllData, fetchList,
       handleTypeChange, onStartDateChange, onEndDateChange, handleGenerate,
@@ -1072,6 +1059,8 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.summary-acos {font-size:18px}
 
 /* 图表 */
 .chart-card {
