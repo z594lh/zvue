@@ -232,16 +232,20 @@
       </div>
       <el-table
         ref="detailTableRef"
+        class="advertising-detail-table"
         :data="list"
+        stripe
         v-loading="loading"
         style="width:100%"
         row-key="id"
+        :indent="14"
         :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
         :header-cell-style="{background:'#f8f9fa',color:'#555',fontWeight:600}"
         @row-click="handleRowClick"
       >
-        <el-table-column label="维度" min-width="260">
+        <el-table-column label="维度" width="340" class-name="dimension-column">
           <template #default="scope">
+            <el-tooltip :content="dimensionLabel(scope.row)" placement="top-start" :show-after="300" :popper-style="{maxWidth:'480px',overflowWrap:'anywhere',lineHeight:'1.7'}"><span class="dimension-label" tabindex="0">
             <span v-if="scope.row.level === 'date'" class="tree-level-date">{{ scope.row.report_date }}</span>
             <span v-else-if="scope.row.level === 'campaign'" class="tree-level-campaign">
               <el-tag size="small" effect="plain" type="primary" class="level-tag">广告活动</el-tag>
@@ -257,35 +261,36 @@
               <span v-if="scope.row.product_name" class="product-name">- {{ scope.row.product_name }}</span>
               <span v-else-if="scope.row.advertised_sku" class="product-sku">({{ scope.row.advertised_sku }})</span>
             </span>
+            </span></el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="impressions" label="曝光" align="right" width="100">
+        <el-table-column prop="impressions" label="曝光" align="right" min-width="100">
           <template #default="scope">{{ formatNumber(scope.row.impressions, 0) }}</template>
         </el-table-column>
-        <el-table-column prop="clicks" label="点击" align="right" width="90">
+        <el-table-column prop="clicks" label="点击" align="right" min-width="75">
           <template #default="scope">{{ formatNumber(scope.row.clicks, 0) }}</template>
         </el-table-column>
-        <el-table-column prop="ad_spend" label="花费" align="right" width="110">
+        <el-table-column prop="ad_spend" label="花费" align="right" min-width="100">
           <template #default="scope">${{ formatNumber(scope.row.ad_spend) }}</template>
         </el-table-column>
-        <el-table-column prop="ctr" label="CTR" align="right" width="90">
+        <el-table-column prop="ctr" label="CTR" align="right" min-width="85">
           <template #default="scope">{{ formatPct(scope.row.ctr) }}</template>
         </el-table-column>
-        <el-table-column prop="cpc" label="CPC" align="right" width="90">
+        <el-table-column prop="cpc" label="CPC" align="right" min-width="85">
           <template #default="scope">${{ formatNumber(scope.row.cpc) }}</template>
         </el-table-column>
-        <el-table-column prop="orders_7d" label="订单(7d)" align="right" width="100">
+        <el-table-column prop="orders_7d" label="订单(7d)" align="right" min-width="90">
           <template #default="scope">{{ formatNumber(scope.row.orders_7d, 0) }}</template>
         </el-table-column>
-        <el-table-column prop="sales_7d" label="销售(7d)" align="right" width="120">
+        <el-table-column prop="sales_7d" label="销售(7d)" align="right" min-width="110">
           <template #default="scope">${{ formatNumber(scope.row.sales_7d) }}</template>
         </el-table-column>
-        <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" width="150">
+        <el-table-column prop="acos_7d" label="ACOS(7d)" align="right" min-width="145">
           <template #default="scope">
             <AdvertisingAcos :spend="scope.row.ad_spend" :sales="scope.row.sales_7d" />
           </template>
         </el-table-column>
-        <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" width="110">
+        <el-table-column prop="roas_7d" label="ROAS(7d)" align="right" min-width="95">
           <template #default="scope">{{ formatNumber(scope.row.roas_7d, 2) }}x</template>
         </el-table-column>
       </el-table>
@@ -617,6 +622,15 @@ export default {
 
     // --- 明细表格展开/折叠 ---
 
+    // 列内仅省略展示，悬浮保留完整名称/标识，不改变原树节点身份。
+    const dimensionLabel = row => {
+      if (row.level === 'date') return row.report_date || ''
+      if (row.level === 'campaign') return `广告活动：${row.campaign_name || row.campaign_id || '—'}`
+      if (row.level === 'ad_group') return `广告组：${row.ad_group_name || row.ad_group_id || '—'}`
+      return ['广告商品：' + (row.advertised_asin || '—'), row.product_name,
+        row.advertised_sku ? `SKU：${row.advertised_sku}` : ''].filter(Boolean).join(' · ')
+    }
+
     const toDateStr = (val) => {
       if (!val) return ''
       if (typeof val === 'string') return val.trim().split(' ')[0]
@@ -905,7 +919,7 @@ export default {
       handleTypeChange, onStartDateChange, onEndDateChange, handleGenerate,
       onTrendCampaignChange, onTrendAdGroupChange, onTrendProductChange,
       resetTrendFilter,
-      handleRowClick, expandAllRows, collapseAllRows
+      handleRowClick, expandAllRows, collapseAllRows, dimensionLabel
     }
   }
 }
@@ -1167,6 +1181,14 @@ export default {
   font-weight: 600;
   color: #1f2937;
 }
+
+/* 限制身份列，剩余宽度给数值列，树形缩进与长名称分别占位。 */
+.advertising-detail-table :deep(.dimension-column .cell){display:flex;align-items:center;min-width:0}
+.advertising-detail-table :deep(.el-table__indent),
+.advertising-detail-table :deep(.el-table__expand-icon),
+.advertising-detail-table :deep(.el-table__placeholder){flex-shrink:0}
+.dimension-label{flex:1;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.advertising-detail-table :deep(.el-table__body td:not(.dimension-column) .cell){font-variant-numeric:tabular-nums}
 
 .tree-level-campaign {
   color: #374151;
