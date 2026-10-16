@@ -11,7 +11,7 @@
         </template>
         <el-tooltip content="刷新当前位置数据" placement="bottom" :show-after="250">
           <span class="sync-control">
-            <el-button size="small" text circle type="primary" :icon="Refresh" :loading="syncing" :loading-icon="Refresh" :disabled="!selectedShopId || syncing" :aria-busy="syncing" aria-label="刷新当前位置数据" @click="handleSync" />
+            <el-button class="sync-button" plain circle type="primary" :icon="Refresh" :loading="syncing" :loading-icon="Refresh" :disabled="!selectedShopId || syncing" :aria-busy="syncing" aria-label="刷新当前位置数据" @click="handleSync" />
           </span>
         </el-tooltip>
       </nav>
@@ -199,12 +199,17 @@ defineExpose({ shopId: selectedShopId })
   background: #f5f7fa;
 }
 .cpc-tabs {
+  /* 系统导航60px + 页签36px，吸顶时不遮挡上层导航。 */
+  position: sticky;
+  top: 96px;
+  z-index: 98;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0 16px;
   background: #fff;
   border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 3px 8px rgba(31, 45, 61, 0.06);
   padding: 0 16px;
 }
 .cpc-tab-extra {
@@ -217,6 +222,8 @@ defineExpose({ shopId: selectedShopId })
   gap: 12px;
 }
 .sync-control { display: inline-flex; align-items: center; flex-shrink: 0; }
+.sync-button { width: 36px; height: 36px; font-size: 20px; }
+.sync-button :deep(.el-icon) { stroke: currentColor; stroke-width: 0.5; }
 .date-range-pickers {
   display: flex;
   align-items: center;
@@ -230,7 +237,7 @@ defineExpose({ shopId: selectedShopId })
 .date-end-picker {
   width: 150px;
 }
-.cpc-breadcrumbs { flex: 1 1 280px; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 12px 0; font-size: 13px; }
+.cpc-breadcrumbs { flex: 1 1 280px; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 13px; }
 .breadcrumb-link { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #409eff; text-decoration: none; }
 .breadcrumb-link:hover { text-decoration: underline; }
 .breadcrumb-link:focus-visible { outline: 2px solid #409eff; outline-offset: 2px; }
