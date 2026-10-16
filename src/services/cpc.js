@@ -211,3 +211,13 @@ export const getCpcCreateProducts = (params = {}) => {
 export const createCpcCampaign = (data) => {
   return api.post('/create-campaign', data)
 }
+
+// 安全创建：保存提交编号后逐步推进，读取进度不会向Amazon发送写请求。
+export const getCpcCreationMeta = params => api.get('/creation/meta', { params })
+export const getCpcCreationProducts = params => api.get('/creation/products', { params })
+export const getCpcCreationJobs = params => api.get('/creation/jobs', { params })
+export const getCpcCreationJob = (id, shopId) => api.get(`/creation/jobs/${id}`, { params: { shop_id: shopId } })
+export const startCpcCreation = data => api.post('/creation/jobs', data)
+export const runCpcCreation = (id, data) => api.post(`/creation/jobs/${id}/run`, data)
+export const repairCpcCreation = (id, data) => api.post(`/creation/jobs/${id}/repair`, data)
+export const resolveCpcCreation = (id, data) => api.post(`/creation/jobs/${id}/resolve`, data)

@@ -21,6 +21,7 @@
           placeholder="--请选择店铺--"
           filterable
           clearable
+          :disabled="shopDisabled"
           style="width:180px"
           @change="handleShopChange"
         >
@@ -72,7 +73,8 @@ const { shopList, fetchShopList, defaultShopId } = useShopCache()
 const props = defineProps({
   activeTab: { type: String, required: true },
   breadcrumbs: { type: Array, default: () => [] },
-  refreshHandler: { type: Function, default: null }
+  refreshHandler: { type: Function, default: null },
+  shopDisabled: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['shopChange'])
