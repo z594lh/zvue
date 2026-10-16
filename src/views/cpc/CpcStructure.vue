@@ -1,5 +1,5 @@
 <template>
-  <CpcLayout active-tab="campaigns" @shop-change="onShopChange">
+  <CpcLayout active-tab="campaigns" :refresh-handler="fetchData" @shop-change="onShopChange">
     <div class="cpc-sub-page">
       <div class="filter-panel">
         <h3 class="page-title">
@@ -67,16 +67,20 @@ const search = ref('')
 
 const onShopChange = (val) => { shopId.value = val; fetchData() }
 
+let fetchGeneration = 0
 const fetchData = async () => {
-  if (!shopId.value) { treeData.value = []; return }
+  const version = ++fetchGeneration
+  if (!shopId.value) { treeData.value = []; return false }
   loading.value = true
   try {
     const res = await getCpcStructureTree({ shop_id: shopId.value })
+    if (version !== fetchGeneration || res.data.status !== 'success') return false
     if (res.data.status === 'success') {
       treeData.value = res.data.data || []
     }
-  } catch { ElMessage.error('获取结构数据失败') }
-  finally { loading.value = false }
+    return true
+  } catch { if (version === fetchGeneration) ElMessage.error('获取结构数据失败'); return false }
+  finally { if (version === fetchGeneration) loading.value = false }
 }
 
 const filterNode = (node, keyword) => {

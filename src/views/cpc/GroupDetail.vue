@@ -1,5 +1,5 @@
 <template>
-  <CpcLayout active-tab="groups" @shop-change="onShopChange">
+  <CpcLayout active-tab="groups" :breadcrumbs="breadcrumbs" :refresh-handler="refreshInfo" @shop-change="onShopChange">
     <div class="group-detail-page">
       <!-- 顶部标题区 -->
       <div class="detail-header">
@@ -22,7 +22,7 @@
         </div>
       </div>
 
-      <div class="detail-body">
+      <div class="detail-body" :class="{ 'history-body': activeMenu === 'history' }">
         <!-- 左侧导航 -->
         <div class="detail-sidebar">
           <div
@@ -73,6 +73,12 @@ const groupInfo = ref(null)
 const campaignInfo = ref(null)
 const activeMenu = ref('ads')
 const stateLoading = ref(false)
+let groupRequest = 0, campaignRequest = 0
+const refreshInfo = async () => (await Promise.all([loadGroupInfo(), loadCampaignInfo()])).every(Boolean)
+const breadcrumbs = computed(() => [
+  { key: 'campaign', label: `广告活动：${campaignInfo.value?.name || campaignId}`, to: { name: 'CpcCampaignDetail', params: { id: campaignId } } },
+  { key: 'group', label: `广告组：${groupInfo.value?.name || adGroupId}`, to: { name: 'CpcGroupDetail', params: { id: campaignId, adGroupId } } }
+])
 
 const menus = [
   { key: 'ads', label: '广告' },
@@ -101,32 +107,44 @@ const servingStatusType = computed(() => {
 
 const onShopChange = (val) => {
   shopId.value = val
+  groupInfo.value = null
+  campaignInfo.value = null
   loadGroupInfo()
   loadCampaignInfo()
 }
 
 const loadGroupInfo = async () => {
-  if (!shopId.value || !campaignId || !adGroupId) return
+  const version = ++groupRequest
+  const requestedShop = shopId.value
+  if (!shopId.value || !campaignId || !adGroupId) return false
   try {
-    const res = await getCpcGroup(adGroupId, { shop_id: shopId.value })
+    const res = await getCpcGroup(adGroupId, { shop_id: requestedShop })
+    if (requestedShop !== shopId.value || version !== groupRequest) return false
     if (res.data.status === 'success') {
       const info = res.data.data || null
       if (info && info.state) info.state = info.state.toUpperCase()
       groupInfo.value = info
+      return true
     }
-  } catch { ElMessage.error('获取广告组信息失败') }
+  } catch { if (requestedShop === shopId.value) ElMessage.error('获取广告组信息失败') }
+  return false
 }
 
 const loadCampaignInfo = async () => {
-  if (!shopId.value || !campaignId) return
+  const version = ++campaignRequest
+  const requestedShop = shopId.value
+  if (!shopId.value || !campaignId) return false
   try {
-    const res = await getCpcCampaign(campaignId, { shop_id: shopId.value })
+    const res = await getCpcCampaign(campaignId, { shop_id: requestedShop })
+    if (requestedShop !== shopId.value || version !== campaignRequest) return false
     if (res.data.status === 'success') {
       const info = res.data.data || {}
       if (info.targeting_type) info.targeting_type = info.targeting_type.toUpperCase()
       campaignInfo.value = info
+      return true
     }
   } catch { /* 活动信息失败不影响主流程 */ }
+  return false
 }
 
 const toggleGroupState = async (val) => {
@@ -181,4 +199,7 @@ onMounted(() => {
 .sidebar-item:hover { background: #f5f7fa; }
 .sidebar-item.active { background: #f5f7fa; font-weight: 600; }
 .detail-content { flex: 1; padding: 16px 20px; }
+/* 历史表在内容区内横向滚动，不撑宽页面或挤压侧栏。 */
+.history-body .detail-sidebar { flex: 0 0 160px; }
+.history-body .detail-content { min-width: 0; }
 </style>

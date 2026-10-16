@@ -307,6 +307,7 @@
 </template>
 
 <script setup>
+import { useCpcEntityRefresh } from '@/composables/useCpcEntityRefresh'
 /* eslint-disable no-undef */
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -367,8 +368,10 @@ const stateLabel = (val) => {
 
 const selectedRows = computed(() => tableData.value.filter(row => row._selected))
 
+let fetchGeneration = 0
 const fetchData = async () => {
-  if (!props.shopId || !props.campaignId || !props.adGroupId) return
+  const version = ++fetchGeneration
+  if (!props.shopId || !props.campaignId || !props.adGroupId) return false
   loading.value = true
   try {
     if (isAuto.value) {
@@ -383,6 +386,7 @@ const fetchData = async () => {
         search: filter.search,
         state: filter.state
       })
+      if (version !== fetchGeneration || res.data.status !== 'success') return false
       if (res.data.status === 'success') {
         let list = res.data.data.list || []
         list = list.filter(item => autoExpressions.includes(item.resolved_expression))
@@ -402,6 +406,7 @@ const fetchData = async () => {
         search: filter.search,
         state: filter.state
       })
+      if (version !== fetchGeneration || res.data.status !== 'success') return false
       if (res.data.status === 'success') {
         tableData.value = (res.data.data.list || []).map(item => ({
           ...item,
@@ -415,8 +420,9 @@ const fetchData = async () => {
         total.value = res.data.data.total || 0
       }
     }
-  } catch { ElMessage.error('请求失败') }
-  finally { loading.value = false }
+    return true
+  } catch { if (version === fetchGeneration) ElMessage.error('请求失败'); return false }
+  finally { if (version === fetchGeneration) loading.value = false }
 }
 
 watch(() => props.targetingType, () => {
@@ -768,6 +774,7 @@ const fmtInt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleS
 const fmtPct = (val) => val != null && Number(val) !== 0 ? Number(val).toFixed(2) + '%' : '--'
 
 watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true })
+useCpcEntityRefresh(fetchData)
 </script>
 
 <style scoped>

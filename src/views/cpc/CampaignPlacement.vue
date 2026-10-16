@@ -66,6 +66,7 @@
 </template>
 
 <script setup>
+import { useCpcEntityRefresh } from '@/composables/useCpcEntityRefresh'
 /* eslint-disable no-undef */
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -106,8 +107,10 @@ const placementCodeMap = {
 
 const placementLabel = (val) => placementMap[val] || val || '--'
 
+let fetchGeneration = 0
 const fetchData = async () => {
-  if (!props.shopId || !props.campaignId) return
+  const version = ++fetchGeneration
+  if (!props.shopId || !props.campaignId) return false
   loading.value = true
   try {
     const [placeRes, campRes] = await Promise.all([
@@ -119,15 +122,18 @@ const fetchData = async () => {
       }),
       getCpcCampaign(props.campaignId, { shop_id: props.shopId })
     ])
+    if (version !== fetchGeneration || placeRes.data.status !== 'success') return false
     if (placeRes.data.status === 'success') {
       const data = placeRes.data.data
       tableData.value = Array.isArray(data) ? data : (data?.list || [])
     }
+    if (version !== fetchGeneration || campRes.data.status !== 'success') return false
     if (campRes.data.status === 'success') {
       campaignBiddingLabel.value = campRes.data.data.bidding_strategy_label || campRes.data.data.bidding_strategy || '--'
     }
-  } catch { ElMessage.error('请求失败') }
-  finally { loading.value = false }
+    return true
+  } catch { if (version === fetchGeneration) ElMessage.error('请求失败'); return false }
+  finally { if (version === fetchGeneration) loading.value = false }
 }
 
 const editPlacement = (row) => {
@@ -184,6 +190,7 @@ const fmtPct = (val) => val != null && Number(val) !== 0 ? Number(val).toFixed(2
 
 watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true })
 watch([startDate, endDate], () => { if (props.shopId) fetchData() })
+useCpcEntityRefresh(fetchData)
 </script>
 
 <style scoped>

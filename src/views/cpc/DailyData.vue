@@ -1,5 +1,5 @@
 <template>
-  <CpcLayout active-tab="campaigns" @shop-change="onShopChange">
+  <CpcLayout active-tab="campaigns" :refresh-handler="fetchData" @shop-change="onShopChange">
     <div class="cpc-sub-page">
       <div class="page-header">
         <h3>{{ pageTitle }} - 分日数据</h3>
@@ -106,9 +106,11 @@ const summary = computed(() => {
 
 const onShopChange = (val) => { shopId.value = val; fetchData() }
 
+let fetchGeneration = 0
 const fetchData = async () => {
-  if (!shopId.value) return
-  if (!isSummary.value && !entityId.value) return
+  const version = ++fetchGeneration
+  if (!shopId.value) return false
+  if (!isSummary.value && !entityId.value) return false
   loading.value = true
   try {
     const params = {
@@ -121,11 +123,13 @@ const fetchData = async () => {
       params.id = entityId.value
     }
     const res = await getCpcDailyData(params)
+    if (version !== fetchGeneration || res.data.status !== 'success') return false
     if (res.data.status === 'success') {
       tableData.value = res.data.data.list || []
     }
-  } catch { ElMessage.error('请求失败') }
-  finally { loading.value = false }
+    return true
+  } catch { if (version === fetchGeneration) ElMessage.error('请求失败'); return false }
+  finally { if (version === fetchGeneration) loading.value = false }
 }
 
 const formatNum = (val) => val != null ? Number(val).toFixed(2) : '--'

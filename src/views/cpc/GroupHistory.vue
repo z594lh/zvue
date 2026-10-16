@@ -1,18 +1,13 @@
 <template>
-  <div class="group-section">
-    <el-empty description="历史记录功能开发中" />
-  </div>
+  <ChangeHistory scope="group" :shop-id="shopId" :campaign-id="campaignId" :ad-group-id="adGroupId" />
 </template>
 
 <script setup>
 /* eslint-disable no-undef */
+import ChangeHistory from '@/components/cpc/ChangeHistory.vue'
 defineProps({
   shopId: { type: [Number, String], default: null },
   campaignId: { type: [Number, String], required: true },
   adGroupId: { type: [Number, String], required: true }
 })
 </script>
-
-<style scoped>
-.group-section { background: #fff; padding: 40px 0; }
-</style>

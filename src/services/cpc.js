@@ -1,9 +1,28 @@
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const api = axios.create({
   baseURL: '/api/cpc',
   timeout: 120000,
   headers: { 'Content-Type': 'application/json' }
+})
+
+// 否定投放由后端验证登录，逐次读取 Token，避免登录/退出后沿用旧凭证。
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('auth_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (['post', 'put', 'delete'].includes(config.method) && !config.headers['X-Request-ID']) {
+    config.headers['X-Request-ID'] = window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+      const random = window.crypto?.getRandomValues ? window.crypto.getRandomValues(new Uint8Array(1))[0] % 16 : Math.floor(Math.random() * 16)
+      return (char === 'x' ? random : (random & 3) | 8).toString(16)
+    })
+  }
+  return config
+})
+
+api.interceptors.response.use(response => {
+  if (response.data?.history_warning) ElMessage.warning(response.data.history_warning)
+  return response
 })
 
 // ==================== 账号列表 ====================
@@ -13,7 +32,7 @@ export const getCpcAccounts = () => {
 
 // ==================== 实体同步 ====================
 export const syncCpcEntities = (data) => {
-  return api.post('/entities/sync', data)
+  return api.post('/entities/sync', data, { timeout: 300000 })
 }
 
 export const syncAllCpcEntities = () => {
@@ -21,6 +40,10 @@ export const syncAllCpcEntities = () => {
 }
 
 // ==================== 广告活动 ====================
+export const getCpcChangeHistory = (params = {}) => {
+  return api.get('/history', { params })
+}
+
 export const getCpcCampaigns = (params = {}) => {
   return api.get('/campaigns', { params })
 }
@@ -124,6 +147,11 @@ export const updateCpcNegativeTarget = (targetId, data) => {
 
 export const createCpcNegativeTarget = (data) => {
   return api.post('/negative-targets', data)
+}
+
+// 仅拉取当前层级实体，不修改 Amazon 广告。
+export const refreshCpcNegatives = (kind, data) => {
+  return api.post(kind === 'keywords' ? '/negative-keywords/refresh' : '/negative-targets/refresh', data)
 }
 
 // ==================== 搜索词报告 ====================

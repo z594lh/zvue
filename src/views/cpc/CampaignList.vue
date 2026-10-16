@@ -1,10 +1,5 @@
 <template>
-  <CpcLayout active-tab="campaigns" @shop-change="onShopChange">
-    <template #tab-extra>
-      <el-button type="primary" :loading="syncing" :disabled="syncing" @click="handleSync">
-        <el-icon><Refresh /></el-icon> 同步最新实体信息
-      </el-button>
-    </template>
+  <CpcLayout active-tab="campaigns" :refresh-handler="fetchData" @shop-change="onShopChange">
     <div class="cpc-campaign-page">
       <!-- 筛选栏 -->
       <div class="filter-panel">
@@ -191,10 +186,10 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh, Warning } from '@element-plus/icons-vue'
+import { Warning } from '@element-plus/icons-vue'
 import CpcLayout from '@/components/cpc/CpcLayout.vue'
 import AnalysisDialog from '@/components/cpc/AnalysisDialog.vue'
-import { getCpcCampaigns, updateCpcCampaign, syncCpcEntities, syncAllCpcEntities } from '@/services/cpc'
+import { getCpcCampaigns, updateCpcCampaign } from '@/services/cpc'
 import { exportToCSV } from '@/utils/export'
 import { useCpcDateRange } from '@/composables/useCpcDateRange'
 
@@ -202,7 +197,6 @@ const router = useRouter()
 const shopId = ref(null)
 const { startDate, endDate } = useCpcDateRange()
 const loading = ref(false)
-const syncing = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -334,15 +328,18 @@ const onShopChange = (val) => {
   fetchData()
 }
 
+let fetchGeneration = 0
 const fetchData = async () => {
+  const version = ++fetchGeneration
   if (!shopId.value) {
     tableData.value = []
     total.value = 0
-    return
+    return false
   }
   loading.value = true
   try {
     const res = await getCpcCampaigns(buildFilterParams())
+    if (version !== fetchGeneration || res.data.status !== 'success') return false
     if (res.data.status === 'success') {
       tableData.value = (res.data.data.list || []).map(item => ({
         ...item,
@@ -358,8 +355,9 @@ const fetchData = async () => {
       }))
       total.value = res.data.data.total || 0
     }
-  } catch { ElMessage.error('请求失败') }
-  finally { loading.value = false }
+    return true
+  } catch { if (version === fetchGeneration) ElMessage.error('请求失败'); return false }
+  finally { if (version === fetchGeneration) loading.value = false }
 }
 
 const sortBy = (field) => {
@@ -494,25 +492,6 @@ const handleExport = () => {
     return val
   })
   if (!ok) ElMessage.warning('暂无数据可导出')
-}
-
-const handleSync = async () => {
-  if (syncing.value) return
-  syncing.value = true
-  try {
-    const api = shopId.value ? syncCpcEntities : syncAllCpcEntities
-    const payload = shopId.value ? { shop_id: shopId.value } : undefined
-    const res = await api(payload)
-    if (res.data.status === 'success') {
-      const data = res.data.data || {}
-      const total = data.total || 0
-      ElMessage.success(`同步完成，共同步 ${total} 条实体数据`)
-      fetchData()
-    } else {
-      ElMessage.error(res.data.message || '同步失败')
-    }
-  } catch { ElMessage.error('同步请求失败') }
-  finally { syncing.value = false }
 }
 
 const isEmptyVal = (val) => val == null || val === '' || Number(val) === 0 || Number.isNaN(Number(val))

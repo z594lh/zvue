@@ -83,6 +83,7 @@
 </template>
 
 <script setup>
+import { useCpcEntityRefresh } from '@/composables/useCpcEntityRefresh'
 /* eslint-disable no-undef */
 import { ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -109,8 +110,10 @@ const filter = reactive({ search: '', state: '' })
 
 const selectedRows = computed(() => tableData.value.filter(row => row._selected))
 
+let fetchGeneration = 0
 const fetchData = async () => {
-  if (!props.shopId || !props.campaignId) return
+  const version = ++fetchGeneration
+  if (!props.shopId || !props.campaignId) return false
   loading.value = true
   try {
     const res = await getCpcGroups({
@@ -123,6 +126,7 @@ const fetchData = async () => {
       search: filter.search,
       state: filter.state
     })
+    if (version !== fetchGeneration || res.data.status !== 'success') return false
     if (res.data.status === 'success') {
       tableData.value = (res.data.data.list || []).map(item => ({
         ...item,
@@ -135,8 +139,9 @@ const fetchData = async () => {
       }))
       total.value = res.data.data.total || 0
     }
-  } catch { ElMessage.error('请求失败') }
-  finally { loading.value = false }
+    return true
+  } catch { if (version === fetchGeneration) ElMessage.error('请求失败'); return false }
+  finally { if (version === fetchGeneration) loading.value = false }
 }
 
 const goToDetail = (row) => {
@@ -239,6 +244,7 @@ const fmtPct = (val) => val != null && Number(val) !== 0 ? Number(val).toFixed(2
 
 watch(() => props.shopId, (val) => { if (val) fetchData() }, { immediate: true })
 watch([startDate, endDate], () => { page.value = 1; fetchData() })
+useCpcEntityRefresh(fetchData)
 </script>
 
 <style scoped>

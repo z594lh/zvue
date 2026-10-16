@@ -1,5 +1,5 @@
 <template>
-  <CpcLayout active-tab="campaigns" @shop-change="onShopChange">
+  <CpcLayout active-tab="campaigns" :breadcrumbs="breadcrumbs" :refresh-handler="loadCampaignInfo" @shop-change="onShopChange">
     <div class="campaign-detail-page">
       <!-- 顶部标题区 -->
       <div class="detail-header">
@@ -24,7 +24,7 @@
         </div>
       </div>
 
-      <div class="detail-body">
+      <div class="detail-body" :class="{ 'history-body': activeMenu === 'history' }">
         <!-- 左侧导航 -->
         <div class="detail-sidebar">
           <div
@@ -42,7 +42,7 @@
         <div class="detail-content">
           <CampaignGroups v-if="activeMenu === 'groups'" :shop-id="shopId" :campaign-id="campaignId" />
           <CampaignPlacement v-else-if="activeMenu === 'placement'" :shop-id="shopId" :campaign-id="campaignId" />
-          <!-- <CampaignNegative v-else-if="activeMenu === 'negative'" :shop-id="shopId" :campaign-id="campaignId" /> -->
+          <GroupNegative v-else-if="activeMenu === 'negative'" scope="campaign" :shop-id="shopId" :campaign-id="campaignId" :targeting-type="campaignInfo?.targeting_type" />
           <!-- <CampaignBudgetRules v-else-if="activeMenu === 'budgetRules'" :shop-id="shopId" :campaign-id="campaignId" :daily-budget="Number(campaignInfo?.daily_budget) || 0" /> -->
           <CampaignSettings v-else-if="activeMenu === 'settings'" :shop-id="shopId" :campaign-id="campaignId" :campaign-info="campaignInfo" @updated="loadCampaignInfo" />
           <CampaignHistory v-else-if="activeMenu === 'history'" :shop-id="shopId" :campaign-id="campaignId" />
@@ -60,7 +60,7 @@ import { ElMessage } from 'element-plus'
 import CpcLayout from '@/components/cpc/CpcLayout.vue'
 import CampaignGroups from './CampaignGroups.vue'
 import CampaignPlacement from './CampaignPlacement.vue'
-// import CampaignNegative from './CampaignNegative.vue'
+import GroupNegative from './GroupNegative.vue'
 // import CampaignBudgetRules from './CampaignBudgetRules.vue'
 import CampaignSettings from './CampaignSettings.vue'
 import CampaignHistory from './CampaignHistory.vue'
@@ -73,11 +73,17 @@ const shopId = ref(null)
 const campaignInfo = ref(null)
 const activeMenu = ref('groups')
 const stateLoading = ref(false)
+let campaignRequest = 0
+const breadcrumbs = computed(() => [{
+  key: 'campaign',
+  label: `广告活动：${campaignInfo.value?.name || campaignId}`,
+  to: { name: 'CpcCampaignDetail', params: { id: campaignId } }
+}])
 
 const menus = [
   { key: 'groups', label: '广告组' },
   { key: 'placement', label: '竞价调整' },
-  // { key: 'negative', label: '否定投放' }, // v3 API 暂不支持活动级否定投放
+  { key: 'negative', label: '否定投放' },
   // { key: 'budgetRules', label: '预算规则' }, // 后端列为二期
   { key: 'settings', label: '广告活动设置' },
   { key: 'history', label: '历史记录' }
@@ -101,20 +107,26 @@ const servingStatusType = computed(() => {
 
 const onShopChange = (val) => {
   shopId.value = val
+  campaignInfo.value = null
   loadCampaignInfo()
 }
 
 const loadCampaignInfo = async () => {
-  if (!shopId.value || !campaignId) return
+  const version = ++campaignRequest
+  const requestedShop = shopId.value
+  if (!shopId.value || !campaignId) return false
   try {
-    const res = await getCpcCampaign(campaignId, { shop_id: shopId.value })
+    const res = await getCpcCampaign(campaignId, { shop_id: requestedShop })
+    if (requestedShop !== shopId.value || version !== campaignRequest) return false
     if (res.data.status === 'success') {
       const info = res.data.data || {}
       if (info.state) info.state = info.state.toUpperCase()
       if (info.daily_budget != null) info.daily_budget = Number(info.daily_budget)
       campaignInfo.value = info
+      return true
     }
-  } catch { ElMessage.error('获取广告活动信息失败') }
+  } catch { if (requestedShop === shopId.value) ElMessage.error('获取广告活动信息失败') }
+  return false
 }
 
 const toggleCampaignState = async (val) => {
@@ -166,4 +178,7 @@ onMounted(() => { if (shopId.value) loadCampaignInfo() })
 .sidebar-item:hover { background: #f5f7fa; }
 .sidebar-item.active { background: #f5f7fa; font-weight: 600; }
 .detail-content { flex: 1; padding: 16px 20px; }
+/* 历史表在内容区内横向滚动，不撑宽页面或挤压侧栏。 */
+.history-body .detail-sidebar { flex: 0 0 160px; }
+.history-body .detail-content { min-width: 0; }
 </style>
