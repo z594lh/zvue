@@ -2,8 +2,8 @@
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
-        <h1 class="logo">勤发跨境ERP</h1>
-        <p class="subtitle">欢迎回来</p>
+        <h1 class="logo">{{ uiConfig.brand_name }}</h1>
+        <p class="subtitle">{{ uiConfig.login_welcome }}</p>
       </div>
 
       <!-- 选项卡切换 -->
@@ -112,6 +112,7 @@
 <script>
 import { reactive, ref, getCurrentInstance } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { uiConfig } from '@/services/uiConfig.js'
 import { login, register, setAuthToken, setUserPermissions } from '@/services/api.js'
 
 export default {
@@ -222,6 +223,7 @@ export default {
     }
 
     return {
+      uiConfig,
       activeTab,
       loginForm,
       loginLoading,
@@ -261,6 +263,7 @@ export default {
 }
 
 .logo {
+  overflow-wrap: anywhere;
   font-size: 28px;
   font-weight: bold;
   color: #667eea;
@@ -268,6 +271,7 @@ export default {
 }
 
 .subtitle {
+  overflow-wrap: anywhere;
   color: #666;
   font-size: 14px;
   margin: 0;

@@ -303,6 +303,12 @@ const routes = [
     meta: { title: '权限管理', componentName: 'SystemPermissionsView' }
   },
   {
+    path: '/system/ui-config',
+    name: 'UiConfig',
+    component: () => import('../views/UiConfigView.vue'),
+    meta: { title: '界面配置', componentName: 'UiConfigView' }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: ProfileView,
@@ -332,6 +338,9 @@ router.beforeEach((to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if (to.path === '/system/ui-config' && !getUserPermissions().includes('system:ui_config')) {
+    return next('/403')
+  }
   if (to.path === '/daily-reports' && !getUserPermissions().includes('daily_reports:view')) {
     return next('/403')
   }

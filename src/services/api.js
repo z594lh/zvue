@@ -15,6 +15,12 @@ export const getConfig = () => {
   return api.get('/config');
 };
 
+// 界面配置管理：公开读取由独立uiConfig模块负责，管理操作不自动重试。
+export const getUiConfigManagement = () => api.get('/system/ui-config', { timeout: 15000 });
+export const saveUiConfig = (data) => api.put('/system/ui-config', data, { timeout: 15000 });
+export const resetUiConfig = (data) => api.post('/system/ui-config/reset', data, { timeout: 15000 });
+export const getUiConfigHistory = (params) => api.get('/system/ui-config/history', { params, timeout: 15000 });
+
 // ERP内部负责人分配与绩效查询，不修改Amazon Listing，也不生成人员报表任务。
 export const getListingPerformanceConfig = () => api.get('/performance/config');
 // 人员绩效专用筛选选项，后台按查看权限返回历史负责人，不要求分配权限。

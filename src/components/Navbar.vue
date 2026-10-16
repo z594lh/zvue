@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar">
     <div class="nav-brand">
-      <router-link to="/" class="brand-link">勤发跨境ERP</router-link>
+      <router-link to="/" class="brand-link" :title="uiConfig.brand_name">{{ uiConfig.brand_name }}</router-link>
     </div>
 
     <!-- 移动端汉堡菜单按钮 -->
@@ -119,6 +119,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { uiConfig } from '@/services/uiConfig.js'
 import { isAuthenticated, getUserProfile, getMenus, logout, setAuthToken, setUserPermissions, clearUserPermissions, getUserPermissions, setUserMenus, clearUserMenus } from '@/services/api.js'
 
 // 本地兜底菜单（当 /api/menus 接口不可用时使用）
@@ -182,6 +183,7 @@ const fallbackNavGroups = [
     label: '系统',
     children: [
       { label: '计划任务', path: '/system/cron-tasks' },
+      { label: '界面配置', path: '/system/ui-config' },
       { label: '权限管理', path: '/system/permissions' }
     ]
   }
@@ -273,6 +275,12 @@ export default {
         if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
         tools.children.push({ label: '运营日报', path: '/daily-reports' })
       }
+      if (getUserPermissions().includes('system:ui_config') &&
+          !groups.some(g => g.children.some(item => item.path === '/system/ui-config'))) {
+        let system = groups.find(g => g.label === '系统')
+        if (!system) { system = { label: '系统', children: [] }; groups.push(system) }
+        system.children.push({ label: '界面配置', path: '/system/ui-config' })
+      }
       return groups.filter((g) => g.children.length > 0)
     }
 
@@ -284,7 +292,8 @@ export default {
       const permissions = getUserPermissions()
       // 保持旧兜底项行为，新日报入口仍须具备独立查看权限。
       return fallbackNavGroups.map(group => ({ ...group, children: group.children.filter(item =>
-        item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) }))
+        (item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) &&
+        (item.path !== '/system/ui-config' || permissions.includes('system:ui_config'))) }))
     })
 
     const isGroupActive = (group) => {
@@ -390,6 +399,7 @@ export default {
     })
 
     return {
+      uiConfig,
       visibleNavGroups,
       route,
       isLoggedIn,
@@ -426,11 +436,17 @@ export default {
 }
 
 .nav-brand {
+  min-width: 0;
+  max-width: min(360px, 45vw);
   font-size: 20px;
   font-weight: bold;
 }
 
 .brand-link {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #667eea;
   text-decoration: none;
 }
