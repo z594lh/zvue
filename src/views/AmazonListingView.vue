@@ -325,7 +325,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="152" fixed="right" align="center">
+        <el-table-column label="操作" width="184" fixed="right" align="center">
           <template #default="scope">
             <el-tooltip content="查看与修改" placement="top">
               <el-button type="primary" link @click="viewDetail(scope.row)">
@@ -352,6 +352,7 @@
                 <el-icon><Connection /></el-icon>
               </el-button>
             </el-tooltip>
+            <el-tooltip content="卖家精灵关键词（当前仅美国站）" placement="top"><el-button type="success" link aria-label="卖家精灵关键词" :disabled="!scope.row.asin" @click="openSellersprite(scope.row)"><el-icon><DataAnalysis /></el-icon></el-button></el-tooltip>
             <el-tooltip content="修改记录" placement="top"><el-button type="info" link aria-label="修改记录" @click="openListingHistory(scope.row)"><el-icon><Clock /></el-icon></el-button></el-tooltip>
           </template>
         </el-table-column>
@@ -373,6 +374,7 @@
     </div>
 
     <ListingHistoryDialog v-if="historyTarget" :key="`${historyTarget.shopId}:${historyTarget.sku}`" :shop-id="historyTarget.shopId" :sku="historyTarget.sku" @close="historyTarget = null" />
+    <SellerspriteListingDialog v-if="spriteTarget" :key="`${spriteTarget.shopId}:${spriteTarget.sku}`" :shop-id="spriteTarget.shopId" :sku="spriteTarget.sku" @close="spriteTarget = null" />
 
     <!-- Listing 详情对话框 -->
     <el-dialog
@@ -715,7 +717,7 @@
 import { computed, ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown, Clock } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown, Clock, DataAnalysis } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
@@ -732,6 +734,7 @@ import ListingPriceEditor from '@/components/ListingPriceEditor.vue'
 import ListingTextEditor from '@/components/ListingTextEditor.vue'
 import ListingImageEditor from '@/components/ListingImageEditor.vue'
 import ListingHistoryDialog from '@/components/ListingHistoryDialog.vue'
+import SellerspriteListingDialog from '@/components/SellerspriteListingDialog.vue'
 import { useShopCache } from '@/composables/useShopCache'
 
 export default {
@@ -741,6 +744,8 @@ export default {
     ListingTextEditor,
     ListingImageEditor,
     ListingHistoryDialog,
+    SellerspriteListingDialog,
+    DataAnalysis,
     Clock,
     Search,
     Refresh,
@@ -761,6 +766,10 @@ export default {
     const syncLoading = ref(false)
     const listings = ref([])
     const historyTarget = ref(null)
+    const spriteTarget = ref(null)
+    const openSellersprite = (row) => {
+      if (selectedShopId.value && row.sku && row.asin) spriteTarget.value = { shopId: selectedShopId.value, sku: row.sku }
+    }
     const openListingHistory = (row) => {
       if (selectedShopId.value && row.sku) historyTarget.value = { shopId: selectedShopId.value, sku: row.sku }
     }
@@ -1650,6 +1659,8 @@ export default {
       syncLoading,
       listings,
       historyTarget,
+      spriteTarget,
+      openSellersprite,
       openListingHistory,
       searchForm,
       pagination,

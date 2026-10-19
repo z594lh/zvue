@@ -303,6 +303,12 @@ const routes = [
     meta: { title: '权限管理', componentName: 'SystemPermissionsView' }
   },
   {
+    path: '/system/sellersprite',
+    name: 'SellerspriteConfig',
+    component: () => import('../views/SellerspriteConfigView.vue'),
+    meta: { title: '卖家精灵ASIN配置', componentName: 'SellerspriteConfigView' }
+  },
+  {
     path: '/system/ui-config',
     name: 'UiConfig',
     component: () => import('../views/UiConfigView.vue'),
@@ -338,6 +344,9 @@ router.beforeEach((to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if (to.path === '/system/sellersprite' && !getUserPermissions().includes('system:sellersprite_config')) {
+    return next('/403')
+  }
   if (to.path === '/system/ui-config' && !getUserPermissions().includes('system:ui_config')) {
     return next('/403')
   }

@@ -21,6 +21,12 @@ export const saveUiConfig = (data) => api.put('/system/ui-config', data, { timeo
 export const resetUiConfig = (data) => api.post('/system/ui-config/reset', data, { timeout: 15000 });
 export const getUiConfigHistory = (params) => api.get('/system/ui-config/history', { params, timeout: 15000 });
 
+// 浏览器仅用ERP会话权限，不携带采集API密钥，不触发外部采集。
+export const getSellerspriteListing = (sku, params) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/sellersprite`, { params, timeout: 20000 });
+export const getSellerspriteAsins = (params) => api.get('/system/sellersprite/asins', { params, timeout: 20000 });
+export const addSellerspriteAsins = (data) => api.post('/system/sellersprite/asins', data, { timeout: 20000 });
+export const updateSellerspriteAsin = (id, data) => api.put(`/system/sellersprite/asins/${id}`, data, { timeout: 20000 });
+
 // ERP内部负责人分配与绩效查询，不修改Amazon Listing，也不生成人员报表任务。
 export const getListingPerformanceConfig = () => api.get('/performance/config');
 // 人员绩效专用筛选选项，后台按查看权限返回历史负责人，不要求分配权限。
