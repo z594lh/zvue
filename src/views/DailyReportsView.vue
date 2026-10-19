@@ -64,6 +64,7 @@
                 </template>
             <div class="sku-picker-bar"><div class="inline-controls"><el-select v-model="category" @change="skuPage = 1" style="width:165px"><el-option label="全部负责 SKU" value="" /><el-option label="优先关注" value="attention" /><el-option label="经营下滑" value="decline" /><el-option label="表现改善" value="improved" /><el-option label="数据缺口" value="missing" /></el-select><el-input v-model="skuSearch" clearable placeholder="搜索 SKU / 产品中文名" :prefix-icon="Search" @input="skuPage = 1" /></div><el-button :icon="MagicStick" @click="useRecommended">采用系统推荐</el-button></div>
             <div class="selected-skus"><span>本次重点 {{ editForm.selected_skus.length }}/10</span><el-tag v-for="sku in editForm.selected_skus" :key="sku" closable @close="editForm.selected_skus = editForm.selected_skus.filter(x => x !== sku)">{{ nameFor(sku) }} · {{ sku }}</el-tag><span v-if="!editForm.selected_skus.length" class="muted">建议选 3～5 个，也可只汇报整体概况，不强求凑数。</span></div>
+            <div class="sku-bulk-selection"><el-checkbox :model-value="skuPageState.all" :indeterminate="skuPageState.partial" :disabled="saving || opening || !candidatePage.length" aria-label="SKU全选本页" @change="toggleSkuPage">全选本页</el-checkbox><el-button text size="small" :disabled="saving || opening || !editForm.selected_skus.length" aria-label="SKU全不选" @click="clearSkus">全不选</el-button><span class="muted">全选作用当前筛选页，最多10个；全不选清空全部SKU选择</span></div>
             <el-table :data="candidatePage" size="small" max-height="350" empty-text="无匹配SKU，可更换筛选条件" class="candidate-table">
               <el-table-column label="重点" width="64"><template #default="{row}"><el-checkbox :model-value="editForm.selected_skus.includes(row.seller_sku)" :disabled="!editForm.selected_skus.includes(row.seller_sku) && editForm.selected_skus.length >= 10" :aria-label="`选择${row.seller_sku}`" @change="checked => selectSku(row.seller_sku, checked)" /></template></el-table-column>
               <el-table-column label="SKU / 产品中文名" min-width="225"><template #default="{row}"><strong>{{ row.product_name || '未维护中文名' }}</strong><small class="sku-code">{{ row.seller_sku }}</small></template></el-table-column>
@@ -78,7 +79,9 @@
             </el-collapse>
             <el-input v-model="editForm.situation_text" type="textarea" :rows="2" maxlength="4000" show-word-limit placeholder="选填：补充你的经营判断，例如异常原因、重点观察方向。不要重复抄表格。" />
           </div>
-          <div class="editor-section"><h2><span class="step">2</span>今天进行了什么调整与优化，思路是什么</h2><p class="muted">写清对象 → 动作 → 原因 → 接下来观察什么；没有调整时也请说明实际工作和判断。</p><el-input v-model="editForm.actions_text" type="textarea" :rows="5" maxlength="8000" show-word-limit placeholder="例如：SKU xxx，紧密匹配竞价从 $0.53 调整到 $0.45。原因是近期获客成本偏高，观察3天，重点关注订单量及广告费是否改善。\n只填写实际做过的操作，不由系统代写。" /></div>
+          <div class="editor-section"><h2><span class="step">2</span>今天进行了什么调整与优化，思路是什么</h2><p class="muted">可勾选实际操作并填写理由，系统整理到日报；没有操作记录时，直接在下方补充实际工作。</p>
+            <DailyReportOperations :key="`${editorScope.shop_id}:${editForm.work_date}:${editForm.report_id || 'new'}`" v-model="editForm.reported_operations" v-model:sections="editForm.operation_sections" :shop-id="editorScope.shop_id" :marketplace-id="editorScope.marketplace_id" :work-date="editForm.work_date" :sku-rows="snapshot.rows || []" :saved-operations="snapshot.reported_operations || []" :disabled="saving" @preview-update="operationPreviewEntries = $event" />
+            <p class="muted">调整与优化补充（已选操作无需重复抄写，可补充其他工作与观察计划）</p><el-input v-model="editForm.actions_text" type="textarea" :rows="4" maxlength="8000" show-word-limit placeholder="补充未包含在上方记录中的工作、调整思路或观察计划。没有勾选操作时，请在这里填写实际工作。" /></div>
           <div class="editor-section"><div class="section-heading"><h2><span class="step">3</span>发现了什么问题，需要什么协助</h2><el-checkbox v-model="editForm.no_issues" @change="confirmNoIssues">暂无需要协助的问题</el-checkbox></div><el-input v-model="editForm.issues_text" :disabled="editForm.no_issues" type="textarea" :rows="3" maxlength="4000" show-word-limit placeholder="请写清：问题是什么、影响什么、希望谁协助处理。" /></div>
         </template>
       </div>
@@ -87,7 +90,8 @@
 
     <el-dialog v-model="detailVisible" :title="detailPreview ? '日报预览 · 尚未保存本次内容' : '运营日报'" width="min(1000px, 95vw)" top="4vh" class="daily-detail" @close="detailVersion++">
       <div class="detail-scroll" v-loading="detailLoading"><article v-if="detailReport" class="report-paper"><header><span class="eyebrow">DAILY OPERATIONS</span><h2>{{ detailReport.snapshot.owner_name }} · 运营日报</h2><p>工作日期 {{ detailReport.work_date }}<el-tag :type="detailReport.status === 'submitted' && !detailPreview ? 'success' : 'info'" size="small">{{ detailPreview ? '未保存预览' : detailReport.status === 'submitted' ? '已提交' : '草稿' }}</el-tag></p></header><div v-for="(block, index) in detailBlocks" :key="index" :class="['report-block', `block-${block.kind}`]">
-          <template v-if="block.items"><span v-for="(item, itemIndex) in block.items" :key="itemIndex" class="report-metric-item" title="较上一日数据；上升绿色、下降红色"><span v-for="(part, partIndex) in dailyReportParts(item.text)" :key="partIndex" :class="part.direction ? `report-change-${part.direction}` : ''">{{ part.text }}</span></span></template>
+          <TextChangeDiff v-if="block.kind === 'text-diff'" :entries="[block.entry]" />
+          <template v-else-if="block.items"><span v-for="(item, itemIndex) in block.items" :key="itemIndex" class="report-metric-item" title="较上一日数据；上升绿色、下降红色"><span v-for="(part, partIndex) in dailyReportParts(item.text)" :key="partIndex" :class="part.direction ? `report-change-${part.direction}` : ''">{{ part.text }}</span></span></template>
           <template v-else-if="block.highlightChanges"><span v-for="(part, partIndex) in dailyReportParts(block.text)" :key="partIndex" :class="part.direction ? `report-change-${part.direction}` : ''">{{ part.text }}</span></template>
           <template v-else>{{ block.text }}</template>
         </div></article></div>
@@ -106,6 +110,9 @@ import { ArrowRight, Check, CopyDocument, Delete, Download, EditPen, MagicStick,
 import { getDailyReportConfig, getDailyReports, getCurrentDailyReport, getDailyReport, previewDailyReport, saveDailyReport, deleteDailyReport } from '@/services/api'
 import { dailyOverviewMetrics, dailyReportBlocks, dailyReportParts, dailyReportText, dailyReportImage, dailyReportTime } from '@/utils/dailyReportShare'
 import { useOperationGuide } from '@/utils/operationGuide'
+import DailyReportOperations from '@/components/DailyReportOperations.vue'
+import { pageSelection, selectPage } from '@/utils/dailyBulkSelection'
+import TextChangeDiff from '@/components/TextChangeDiff.vue'
 
 const config = ref({ shops: [], users: [], can_all: false, can_write: false, can_delete: false })
 // 首次进入默认展示填写说明，仍允许运营人员手动收起。
@@ -118,6 +125,7 @@ const initializing = ref(true), error = ref(''), shopId = ref(null), dates = ref
 const ownerFilter = ref(null), statusFilter = ref(''), reports = ref([]), total = ref(0), page = ref(1), pageSize = ref(20), loading = ref(false)
 const deletingId = ref(null)
 const editorVisible = ref(false), opening = ref(false), saving = ref(false), savingStatus = ref(''), snapshot = ref(null), editForm = ref({}), editorScope = ref(null), refreshed = ref(false)
+const operationPreviewEntries = ref([])
 // 等弹窗位移动画结束后再显示气泡，避免首次定位偏移、需要滚动才对齐。
 const editorPositionReady = ref(false)
 const category = ref(''), skuSearch = ref(''), skuPage = ref(1), baseline = ref('')
@@ -132,6 +140,7 @@ const formatMetric = (value, key) => value === null || value === undefined ? '�
 const message = err => err.response?.data?.message || err.message || '操作失败'
 const candidates = computed(() => (snapshot.value?.rows || []).filter(row => (!category.value || (category.value === 'decline' ? row.recommendation.signals?.some(signal => ['sales_decline', 'profit_decline'].includes(signal)) : row.recommendation.category === category.value)) && (!skuSearch.value || `${row.seller_sku} ${row.product_name}`.toLowerCase().includes(skuSearch.value.toLowerCase()))))
 const candidatePage = computed(() => candidates.value.slice((skuPage.value - 1) * 10, skuPage.value * 10))
+const skuPageState = computed(() => pageSelection(editForm.value.selected_skus || [], candidatePage.value.map(row => row.seller_sku)))
 const detailBlocks = computed(() => detailReport.value ? dailyReportBlocks(detailReport.value) : [])
 const canDelete = report => !!report?.id && config.value.can_delete && (config.value.can_all || report.owner_user_id === config.value.user_id)
 const nameFor = sku => snapshot.value?.rows.find(row => row.seller_sku === sku)?.product_name || '未维护中文名'
@@ -171,7 +180,8 @@ async function openEditor(day) {
   category.value = ''; skuSearch.value = ''; skuPage.value = 1; refreshed.value = false
   skuSections.value = []
   beginSkuSelectionGuide()
-  editForm.value = {report_id: null, work_date: day, version: 0, status: 'draft', selected_skus: [], situation_text: '', actions_text: '', issues_text: '', no_issues: false}
+  operationPreviewEntries.value = []
+  editForm.value = {report_id: null, work_date: day, version: 0, status: 'draft', selected_skus: [], situation_text: '', actions_text: '', issues_text: '', no_issues: false, operation_sections:[], reported_operations:[]}
   try {
     const response = await getCurrentDailyReport({...editorScope.value, work_date: day})
     let report = response.data.data, data
@@ -188,9 +198,18 @@ async function openEditor(day) {
 function adoptReport(report) {
   snapshot.value = report.snapshot
   editForm.value = {report_id: report.id, work_date: report.work_date, version: report.version, status: report.status, selected_skus: [...report.selected_skus], situation_text: report.situation_text, actions_text: report.actions_text, issues_text: report.issues_text, no_issues: !!report.no_issues}
+  editForm.value.operation_sections = [...(report.snapshot.operation_sections || [])]
+  editForm.value.reported_operations = (report.snapshot.reported_operations || []).map(row=>({kind:row.kind,id:String(row.id),reason:row.reason||''}))
+  operationPreviewEntries.value = [...(report.snapshot.reported_operations || [])]
   refreshed.value = false
 }
 function selectSku(sku, checked) { if (checked && editForm.value.selected_skus.length < 10) editForm.value.selected_skus.push(sku); else if (!checked) editForm.value.selected_skus = editForm.value.selected_skus.filter(x => x !== sku) }
+function toggleSkuPage(checked) {
+  if (saving.value || opening.value) return
+  try { editForm.value.selected_skus = selectPage(editForm.value.selected_skus, candidatePage.value.map(row => row.seller_sku), checked, 10) }
+  catch { ElMessage.warning('最多选择10个SKU，请先取消部分已选SKU或缩小筛选范围') }
+}
+function clearSkus() { if (!saving.value && !opening.value) editForm.value.selected_skus = [] }
 function useRecommended() { editForm.value.selected_skus = [...snapshot.value.recommended_skus]; category.value = ''; skuSearch.value = ''; skuPage.value = 1 }
 /** 刷新仅替换经营部分，人工文字不丢失；保存时仍由服务端重读固定截止日。 */
 async function refreshSnapshot() {
@@ -200,7 +219,7 @@ async function refreshSnapshot() {
   try {
     const response = await previewDailyReport({...editorScope.value, work_date: editForm.value.work_date})
     if (disposed || version !== editorVersion || !editorVisible.value) return
-    snapshot.value = response.data.data; refreshed.value = true
+    snapshot.value = {...response.data.data,operation_sections:snapshot.value.operation_sections || [],reported_operations:snapshot.value.reported_operations || []}; refreshed.value = true
     const skus = new Set(snapshot.value.rows.map(row => row.seller_sku))
     editForm.value.selected_skus = editForm.value.selected_skus.filter(sku => skus.has(sku)); skuPage.value = 1
   } catch (err) { if (!disposed && version === editorVersion) ElMessage.error(message(err)) }
@@ -213,11 +232,14 @@ async function confirmNoIssues(value) {
 /** 保存具备版本门禁，不自动重试；成功返回的服务端快照才可供分享。 */
 async function persist(status) {
   if (saving.value || opening.value || !snapshot.value) return
-  if ((status === 'submitted' || editForm.value.status === 'submitted') && (!editForm.value.actions_text.trim() || (!editForm.value.no_issues && !editForm.value.issues_text.trim()))) return ElMessage.warning('请填写今日调整优化，以及问题协助（或勾选暂无）')
+  const selectedOperations = editForm.value.reported_operations.filter(row=>editForm.value.operation_sections.includes(row.kind))
+  if (status === 'submitted' || editForm.value.status === 'submitted') {
+    if ((!selectedOperations.length && !editForm.value.actions_text.trim()) || (!editForm.value.no_issues && !editForm.value.issues_text.trim())) return ElMessage.warning('请勾选汇报操作，或补充实际工作；同时填写问题协助（或勾选暂无）')
+  }
   saving.value = true; savingStatus.value = status
   const version = editorVersion, fixed = {...editorScope.value}
   try {
-    const response = await saveDailyReport({...fixed, ...editForm.value, status, refresh_data: refreshed.value, data_date: snapshot.value.report_date || undefined})
+    const response = await saveDailyReport({...fixed, ...editForm.value, reported_operations:selectedOperations, status, refresh_data: refreshed.value, data_date: snapshot.value.report_date || undefined})
     if (disposed || version !== editorVersion) return
     adoptReport(response.data.data); baseline.value = fingerprint(); ElMessage.success(status === 'submitted' ? '日报已保存，可分享至微信群' : '日报已保存')
     loadList()
@@ -248,7 +270,7 @@ async function openDetail(row) {
 function previewContent() {
   if (saving.value || opening.value || !snapshot.value) return
   detailVersion++; detailPreview.value = true; detailLoading.value = false; detailScope.value = {...editorScope.value}
-  detailReport.value = JSON.parse(JSON.stringify({...editForm.value, snapshot: snapshot.value, owner_user_id: config.value.user_id, is_preview: true}))
+  detailReport.value = JSON.parse(JSON.stringify({...editForm.value, snapshot: {...snapshot.value,reported_operations:operationPreviewEntries.value}, owner_user_id: config.value.user_id, is_preview: true}))
   detailVisible.value = true
 }
 
@@ -355,6 +377,8 @@ onMounted(async () => {
 .block-summary-profit,.block-summary-loss,.block-summary-neutral{padding:9px 12px;border-radius:7px;font-weight:600;margin:8px 0;line-height:1.7}
 .block-summary-profit{color:#047857;background:#f0f9f5}.block-summary-loss{color:#b45309;background:#fffbf1}.block-summary-neutral{color:#475569;background:#f6f8fb}
 .block-comparison{font-size:12px;color:#657a96;line-height:1.8;padding-bottom:14px;border-bottom:1px solid #edf1f6}
+.sku-bulk-selection{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+.block-operation-time{font-size:11px;color:#94a3b8;margin:8px 0}.block-operation-reason,.block-operation-reason-missing{font-weight:500;padding:10px 12px;border-radius:5px;border-left:3px solid #3b82f6;color:#1d4ed8;background:#eff6ff;margin:8px 0 20px}.block-operation-reason-missing{color:#b91c1c;background:#fef2f2;border-left-color:#ef4444}
 /* 括号变化紧邻指标，保持一组不拆开；上升绿、下降红不代表经营好坏。 */
 .report-metric-item{display:inline-block;margin-right:18px}.report-metric-item:last-child{margin-right:0}
 .report-block .report-change-up,.overview-grid .report-change-up{color:#16a34a}.report-block .report-change-down,.overview-grid .report-change-down{color:#dc2626}

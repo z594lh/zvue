@@ -325,7 +325,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="152" fixed="right" align="center">
           <template #default="scope">
             <el-tooltip content="查看与修改" placement="top">
               <el-button type="primary" link @click="viewDetail(scope.row)">
@@ -352,6 +352,7 @@
                 <el-icon><Connection /></el-icon>
               </el-button>
             </el-tooltip>
+            <el-tooltip content="修改记录" placement="top"><el-button type="info" link aria-label="修改记录" @click="openListingHistory(scope.row)"><el-icon><Clock /></el-icon></el-button></el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -371,12 +372,17 @@
       </div>
     </div>
 
+    <ListingHistoryDialog v-if="historyTarget" :key="`${historyTarget.shopId}:${historyTarget.sku}`" :shop-id="historyTarget.shopId" :sku="historyTarget.sku" @close="historyTarget = null" />
+
     <!-- Listing 详情对话框 -->
     <el-dialog
       v-model="detailDialogVisible"
       :title="`Listing 详情 - ${currentListing?.sku}`"
       width="80%"
       :destroy-on-close="true"
+      :close-on-click-modal="!textWriteBusy && !editingSection"
+      :close-on-press-escape="!textWriteBusy && !editingSection"
+      :show-close="!textWriteBusy && !editingSection"
       align-center
     >
       <div v-loading="detailLoading">
@@ -388,13 +394,13 @@
             style="margin-bottom:16px;"
           >
             <template #title>
-              提示：可修改 标题、价格、描述、卖点 ，带有 <el-icon style="vertical-align:middle;"><Edit /></el-icon> 图标的均可修改，点击保存后即提交到 Amazon。
+              可编辑标题、价格、描述、卖点及搜索词。编辑前读取实时数据；提交已接受不代表最终生效，以回读结果为准。
             </template>
           </el-alert>
           <div style="display:flex;justify-content:flex-end;margin-bottom:12px;gap:8px;">
-            <el-button size="small" @click="openLanguageDialog" :disabled="!listingDetail">
-              <el-icon><Switch /></el-icon> 输入语言切换
-            </el-button>
+            <el-tooltip content="语言标签不是翻译功能；强制切换可能新增重复内容或被平台判为无效语言。文字编辑会保留原标签。" placement="top">
+              <el-tag type="info">文字语言：{{ listingLanguageTag }} · 保留原标签</el-tag>
+            </el-tooltip>
             <el-tooltip
               effect="dark"
               placement="top"
@@ -469,32 +475,8 @@
               <el-descriptions-item label="父 SKU">{{ listingDetail.parent_sku || '-' }}</el-descriptions-item>
               <el-descriptions-item label="品牌">{{ listingDetail.brand || '-' }}</el-descriptions-item>
               <el-descriptions-item label="价格">
-                <template v-if="editingSection === 'price'">
-                  <div style="display:flex;flex-direction:column;gap:10px;">
-                    <div style="display:flex;align-items:center;gap:8px;">
-                      <span style="font-size:13px;color:#333;white-space:nowrap;min-width:60px;">标准售价:</span>
-                      <el-input-number v-model="editForm.standardPrice" :min="0" :precision="2" style="width:150px;" />
-                      <span style="font-size:12px;color:#888;white-space:nowrap;">{{ getPriceCurrency() }}</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                      <span style="font-size:13px;color:#333;white-space:nowrap;min-width:60px;">促销价:</span>
-                      <el-input-number v-model="editForm.salePrice" :min="0" :precision="2" style="width:150px;" />
-                      <span style="font-size:12px;color:#888;white-space:nowrap;">{{ getPriceCurrency() }} (选填)</span>
-                    </div>
-                    <template v-if="editForm.salePrice > 0">
-                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <span style="font-size:13px;color:#333;white-space:nowrap;min-width:60px;">促销时段:</span>
-                        <el-date-picker v-model="editForm.saleStartDate" type="datetime" placeholder="开始时间" value-format="YYYY-MM-DDTHH:mm:ss[Z]" style="width:190px;" />
-                        <el-date-picker v-model="editForm.saleEndDate" type="datetime" placeholder="结束时间" value-format="YYYY-MM-DDTHH:mm:ss[Z]" style="width:190px;" />
-                      </div>
-                    </template>
-                    <div style="display:flex;gap:8px;">
-                      <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
-                      <el-button size="small" @click="cancelEdit">取消</el-button>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
+                <ListingPriceEditor v-if="editingSection === 'price'" :key="`${selectedShopId}:${listingDetail.sku}`" :shop-id="selectedShopId" :sku="listingDetail.sku" @close="cancelEdit" @updated="onPriceUpdated" />
+                <template v-if="editingSection !== 'price'">
                   <div>
                     <div v-if="getPriceDisplay().primary !== null">
                       <span style="font-weight:600;color:#1a1a2e;font-size:15px;">
@@ -512,33 +494,14 @@
                 </template>
               </el-descriptions-item>
               <el-descriptions-item label="商品标题" :span="3">
-                <template v-if="editingSection === 'title'">
-                  <div style="display:flex;flex-direction:column;gap:12px;">
-                    <div>
-                      <div style="font-size:13px;color:#333;margin-bottom:6px;font-weight:500;">标题（最多 75 字符）</div>
-                      <el-input v-model="editForm.title" type="textarea" :rows="2" maxlength="75" show-word-limit style="width:100%;" />
-                    </div>
-                    <div>
-                      <div style="font-size:13px;color:#333;margin-bottom:6px;font-weight:500;">亮点（最多 125 字符）</div>
-                      <el-input v-model="editForm.titleDifferentiation" type="textarea" :rows="2" maxlength="125" show-word-limit style="width:100%;" />
-                    </div>
-                  </div>
-                  <div style="display:flex;gap:8px;margin-top:12px;">
-                    <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
-                    <el-button size="small" @click="cancelEdit">取消</el-button>
-                  </div>
-                </template>
-                <template v-else>
-                  <div style="display:flex;align-items:flex-start;gap:8px;">
-                    <span style="flex:1;">{{ listingDetail.item_name || '-' }}</span>
-                    <el-button type="primary" size="small" @click="startEdit('title')">
-                      <el-icon><Edit /></el-icon> 编辑
-                    </el-button>
-                  </div>
-                </template>
+                <ListingTextEditor :key="`${selectedShopId}:${listingDetail.sku}:item_name`" v-bind="textEditorProps('item_name', '商品标题')" @updated="onTextUpdated" @busy="onTextBusy('item_name', $event)">
+                  {{ listingDetail.item_name || '-' }}
+                </ListingTextEditor>
               </el-descriptions-item>
               <el-descriptions-item label="商品亮点" :span="3">
-                {{ listingDetail.title_differentiation || '-' }}
+                <ListingTextEditor :key="`${selectedShopId}:${listingDetail.sku}:title_differentiation`" v-bind="textEditorProps('title_differentiation', '商品亮点')" @updated="onTextUpdated" @busy="onTextBusy('title_differentiation', $event)">
+                  {{ listingDetail.title_differentiation || '-' }}
+                </ListingTextEditor>
               </el-descriptions-item>
               <el-descriptions-item label="同步时间">{{ formatDate(listingDetail.sync_time) }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(listingDetail.created_at) }}</el-descriptions-item>
@@ -550,21 +513,13 @@
           <div class="detail-section">
             <div class="section-header">
               <h4>商品描述</h4>
-              <el-button v-if="editingSection !== 'description'" type="primary" size="small" @click="startEdit('description')">
-                <el-icon><Edit /></el-icon> 编辑
-              </el-button>
             </div>
-            <template v-if="editingSection === 'description'">
-              <el-input v-model="editForm.description" type="textarea" :rows="5" />
-              <div style="display:flex;gap:8px;margin-top:8px;">
-                <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
-                <el-button size="small" @click="cancelEdit">取消</el-button>
-              </div>
-            </template>
-            <template v-else-if="listingDetail.product_description">
+            <ListingTextEditor :key="`${selectedShopId}:${listingDetail.sku}:product_description`" v-bind="textEditorProps('product_description', '商品描述')" @updated="onTextUpdated" @busy="onTextBusy('product_description', $event)">
+            <template v-if="listingDetail.product_description">
               <div class="description-box">{{ listingDetail.product_description }}</div>
             </template>
             <el-empty v-else description="暂无描述" :image-size="60" />
+            </ListingTextEditor>
           </div>
 
           <!-- Issues -->
@@ -584,33 +539,9 @@
           <div class="detail-section">
             <div class="section-header">
               <h4>卖点{{ listingDetail.bullets?.length ? ` (${listingDetail.bullets.length})` : '' }}</h4>
-              <el-button v-if="editingSection !== 'bullets'" type="primary" size="small" @click="startEdit('bullets')">
-                <el-icon><Edit /></el-icon> 编辑
-              </el-button>
             </div>
-            <template v-if="editingSection === 'bullets'">
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div v-for="(bullet, idx) in editForm.bullets" :key="idx" style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-size:13px;color:#888;min-width:20px;flex-shrink:0;">{{ idx + 1 }}.</span>
-                  <el-input v-model="bullet.content" :placeholder="`第 ${idx + 1} 点`" maxlength="500" show-word-limit style="flex:1;" />
-                  <el-select v-model="bullet.language_tag" style="width:100px;" size="small" placeholder="语言">
-                    <el-option label="en_US" value="en_US" />
-                    <el-option label="zh_CN" value="zh_CN" />
-                  </el-select>
-                  <el-button type="danger" size="small" circle plain @click="editForm.bullets.splice(idx, 1)" :disabled="editForm.bullets.length <= 1">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </div>
-              </div>
-              <div style="display:flex;gap:8px;margin-top:12px;">
-                <el-button size="small" @click="editForm.bullets.push({ content: '', language_tag: 'en_US' })">
-                  <el-icon><Plus /></el-icon> 添加卖点
-                </el-button>
-                <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
-                <el-button size="small" @click="cancelEdit">取消</el-button>
-              </div>
-            </template>
-            <template v-else-if="listingDetail.bullets && listingDetail.bullets.length > 0">
+            <ListingTextEditor :key="`${selectedShopId}:${listingDetail.sku}:bullet_point`" v-bind="textEditorProps('bullet_point', '卖点')" @updated="onTextUpdated" @busy="onTextBusy('bullet_point', $event)">
+            <template v-if="listingDetail.bullets && listingDetail.bullets.length > 0">
               <el-table :data="listingDetail.bullets" stripe border size="small" style="width: 100%">
                 <el-table-column type="index" label="序号" width="60" align="center" />
                 <el-table-column prop="content" label="内容" min-width="300" show-overflow-tooltip />
@@ -618,48 +549,25 @@
               </el-table>
             </template>
             <el-empty v-else description="暂无卖点" :image-size="60" />
+            </ListingTextEditor>
           </div>
 
           <!-- 搜索关键字 -->
           <div class="detail-section">
             <div class="section-header">
               <h4>搜索关键字</h4>
-              <el-button v-if="editingSection !== 'search_terms'" type="primary" size="small" @click="startEdit('search_terms')">
-                <el-icon><Edit /></el-icon> 编辑
-              </el-button>
             </div>
-            <template v-if="editingSection === 'search_terms'">
-              <el-input v-model="editForm.searchTerms" type="textarea" :rows="3" placeholder="请输入搜索关键字" />
-              <div style="display:flex;gap:8px;margin-top:8px;">
-                <el-button type="primary" size="small" :loading="editSaving" @click="saveEdit">保存</el-button>
-                <el-button size="small" @click="cancelEdit">取消</el-button>
-              </div>
-            </template>
-            <template v-else-if="getGenericKeyword()">
+            <ListingTextEditor :key="`${selectedShopId}:${listingDetail.sku}:generic_keyword`" v-bind="textEditorProps('generic_keyword', '搜索关键字')" @updated="onTextUpdated" @busy="onTextBusy('generic_keyword', $event)">
+            <template v-if="getGenericKeyword()">
               <div class="description-box">{{ getGenericKeyword() }}</div>
             </template>
             <el-empty v-else description="暂无搜索关键字" :image-size="60" />
+            </ListingTextEditor>
           </div>
 
-          <!-- 图片列表 -->
-          <div v-if="listingDetail.images && listingDetail.images.length > 0" class="detail-section">
-            <h4>图片 ({{ listingDetail.images.length }})</h4>
-            <div class="image-list">
-              <div
-                v-for="img in listingDetail.images"
-                :key="img.sort_order"
-                class="image-item"
-              >
-                <el-image
-                  :src="img.media_location"
-                  fit="cover"
-                  :preview-src-list="listingDetail.images.map(i => i.media_location)"
-                  preview-teleported
-                  style="width: 120px; height: 120px; border-radius: 6px"
-                />
-                <div class="image-label">{{ img.image_type }}</div>
-              </div>
-            </div>
+          <!-- 图片原位管理；目录图与本次提交分开，避免旧图冒充新图。 -->
+          <div class="detail-section">
+            <ListingImageEditor :key="`${selectedShopId}:${listingDetail.sku}:images`" :shop-id="selectedShopId" :sku="listingDetail.sku" :initial-images="listingDetail.images || []" @updated="onImagesUpdated" @busy="onTextBusy('images', $event)" />
           </div>
 
           <!-- Offers -->
@@ -695,37 +603,10 @@
           </div>
         </div>
         <div v-if="listingDetail" class="detail-sticky-close">
-          <el-button type="primary" @click="detailDialogVisible = false">关闭</el-button>
+          <el-button type="primary" :disabled="textWriteBusy" @click="detailDialogVisible = false">关闭</el-button>
         </div>
         <el-empty v-else description="暂无详情数据" />
       </div>
-    </el-dialog>
-
-    <!-- 切换语言弹框 -->
-    <el-dialog
-      v-model="languageDialogVisible"
-      title="切换语言"
-      width="400px"
-      align-center
-    >
-      <div style="text-align:center;padding:16px 0;">
-        <p style="margin-bottom:16px;color:#555;">
-          将 SKU <b>{{ currentListing?.sku }}</b> 的全部语言标签切换为：
-        </p>
-        <el-radio-group v-model="languageDialogSelected" size="default">
-          <el-radio-button value="en_US">en_US</el-radio-button>
-          <el-radio-button value="zh_CN">zh_CN</el-radio-button>
-        </el-radio-group>
-        <p style="margin-top:12px;font-size:12px;color:#999;">
-          含标题、品牌、描述、卖点、材质等全部字段
-        </p>
-      </div>
-      <template #footer>
-        <el-button @click="languageDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="listingLanguageLoading" @click="confirmLanguageChange">
-          确认切换
-        </el-button>
-      </template>
     </el-dialog>
 
     <!-- 同步字段到变体弹框 -->
@@ -831,28 +712,36 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, Delete, Plus, Switch, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown, Clock } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
+  getAmazonListingText,
   getAmazonListingBsrTrend,
   syncAmazonListings,
   syncListingToProduct,
-  patchAmazonListing,
-  patchAmazonListingLanguage,
   syncAmazonListing,
   getAmazonListingVariants,
   syncAmazonListingToVariants
 } from '@/services/api.js'
 import * as echarts from 'echarts'
+import ListingPriceEditor from '@/components/ListingPriceEditor.vue'
+import ListingTextEditor from '@/components/ListingTextEditor.vue'
+import ListingImageEditor from '@/components/ListingImageEditor.vue'
+import ListingHistoryDialog from '@/components/ListingHistoryDialog.vue'
 import { useShopCache } from '@/composables/useShopCache'
 
 export default {
   name: 'AmazonListingView',
   components: {
+    ListingPriceEditor,
+    ListingTextEditor,
+    ListingImageEditor,
+    ListingHistoryDialog,
+    Clock,
     Search,
     Refresh,
     RefreshRight,
@@ -861,9 +750,6 @@ export default {
     WarningFilled,
     Edit,
     Connection,
-    Delete,
-    Plus,
-    Switch,
     DocumentCopy,
     CopyDocument,
     TrendCharts,
@@ -874,6 +760,10 @@ export default {
     const loading = ref(false)
     const syncLoading = ref(false)
     const listings = ref([])
+    const historyTarget = ref(null)
+    const openListingHistory = (row) => {
+      if (selectedShopId.value && row.sku) historyTarget.value = { shopId: selectedShopId.value, sku: row.sku }
+    }
 
     const { shopList, fetchShopList, refreshShopList, getShopName, defaultShopId } = useShopCache()
     const selectedShopId = ref(null)
@@ -916,14 +806,14 @@ export default {
     const syncDetailLoading = ref(false)
     const currentListing = ref(null)
     const listingDetail = ref(null)
+    let detailRevision = 0
 
     // 编辑状态
     const editingSection = ref(null)
-    const editSaving = ref(false)
+    const textBusyFields = reactive({})
+    const textWriteBusy = computed(() => Object.values(textBusyFields).some(Boolean))
+    let textSnapshot = null, textSnapshotRequest = null, textSnapshotAt = 0, textSnapshotRevision = 0
     const listingLanguageTag = ref('en_US')
-    const listingLanguageLoading = ref(false)
-    const languageDialogVisible = ref(false)
-    const languageDialogSelected = ref('en_US')
 
     // 变体字段同步弹窗
     const syncVariantDialogVisible = ref(false)
@@ -953,17 +843,6 @@ export default {
       { label: '搜索关键字', value: 'generic_keyword' }
     ]
 
-    const editForm = reactive({
-      title: '',
-      titleDifferentiation: '',
-      standardPrice: 0,
-      salePrice: 0,
-      saleStartDate: null,
-      saleEndDate: null,
-      description: '',
-      bullets: [{ content: '', language_tag: 'en_US' }],
-      searchTerms: ''
-    })
 
     // 获取 Listing 列表
     const fetchListings = async () => {
@@ -1039,6 +918,11 @@ export default {
 
     // 切换店铺
     const handleShopChange = async (val) => {
+      detailRevision++
+      detailDialogVisible.value = false
+      invalidateTextSnapshot()
+      editingSection.value = null
+      listingDetail.value = null
       if (val === '__refresh__') {
         await refreshShopList()
         selectedShopId.value = defaultShopId()
@@ -1104,13 +988,17 @@ export default {
       }
 
       currentListing.value = row
+      const revision = ++detailRevision
+      const shopId = selectedShopId.value
       detailDialogVisible.value = true
       detailLoading.value = true
       listingDetail.value = null
       editingSection.value = null
+      invalidateTextSnapshot()
 
       try {
-        const response = await getAmazonListing(row.sku, selectedShopId.value)
+        const response = await getAmazonListing(row.sku, shopId)
+        if (revision !== detailRevision || shopId !== selectedShopId.value || !detailDialogVisible.value) return
         if (response.data.status === 'success') {
           listingDetail.value = response.data.data || null
           updateListingLanguageTag()
@@ -1121,7 +1009,7 @@ export default {
         console.error('获取 Listing 详情失败:', error)
         ElMessage.error('获取 Listing 详情失败: ' + (error.response?.data?.message || error.message))
       } finally {
-        detailLoading.value = false
+        if (revision === detailRevision) detailLoading.value = false
       }
     }
 
@@ -1170,178 +1058,84 @@ export default {
 
     // ===== Listing 编辑方法 =====
     const startEdit = (section) => {
-      const detail = listingDetail.value
-      if (!detail) return
-
-      if (section === 'title') {
-        editForm.title = typeof detail.item_name === 'string'
-          ? detail.item_name
-          : (detail.item_name?.[0]?.value || '')
-        editForm.titleDifferentiation = typeof detail.title_differentiation === 'string'
-          ? detail.title_differentiation
-          : (detail.title_differentiation?.[0]?.value || '')
-      } else if (section === 'price') {
-        const offers = detail.offers || []
-        const primaryOffer = offers.find(o => o.audience === 'ALL') || offers[0]
-        editForm.standardPrice = primaryOffer?.our_price ?? detail.our_price ?? 0
-        editForm.salePrice = 0
-        editForm.saleStartDate = null
-        editForm.saleEndDate = null
-      } else if (section === 'description') {
-        editForm.description = typeof detail.product_description === 'string'
-          ? detail.product_description || ''
-          : (detail.product_description?.[0]?.value || '')
-      } else if (section === 'bullets') {
-        const existingBullets = detail.bullets || []
-        const count = Math.max(existingBullets.length, 5)
-        editForm.bullets = existingBullets.slice(0, count).map(b => ({
-          content: b?.content || '',
-          language_tag: b?.language_tag || 'en_US'
-        }))
-        while (editForm.bullets.length < count) {
-          editForm.bullets.push({ content: '', language_tag: 'en_US' })
-        }
-      } else if (section === 'search_terms') {
-        editForm.searchTerms = getGenericKeyword()
-      }
-      editingSection.value = section
+      if (!listingDetail.value) return
+      if (section === 'price') editingSection.value = section
     }
 
     const cancelEdit = () => {
       editingSection.value = null
     }
 
-    const saveEdit = async () => {
-      if (!listingDetail.value || !selectedShopId.value) return
-
-      const sku = listingDetail.value.sku
-      const shopId = selectedShopId.value
-      const productType = listingDetail.value.product_type || ''
-
-      let patches = []
-      let sectionLabel = ''
-
-      if (editingSection.value === 'title') {
-        sectionLabel = '标题/亮点'
-        patches = [
-          { op: 'replace', path: '/attributes/item_name', value: [{ value: editForm.title, language_tag: 'en_US' }] },
-          { op: 'replace', path: '/attributes/title_differentiation', value: [{ value: editForm.titleDifferentiation, language_tag: 'en_US' }] }
-        ]
-      } else if (editingSection.value === 'price') {
-        sectionLabel = '价格'
-        const currencyCode = getPriceCurrency()
-        const marketplaceId = listingDetail.value.marketplace_id || ''
-        const purchasableOffer = {
-          marketplace_id: marketplaceId,
-          currency: currencyCode,
-          our_price: [
-            {
-              schedule: [
-                { value_with_tax: Number(editForm.standardPrice) }
-              ]
-            }
-          ]
-        }
-        if (editForm.salePrice > 0 && editForm.saleStartDate && editForm.saleEndDate) {
-          purchasableOffer.discounted_price = [
-            {
-              schedule: [
-                {
-                  value_with_tax: Number(editForm.salePrice),
-                  start_at: editForm.saleStartDate,
-                  end_at: editForm.saleEndDate
-                }
-              ]
-            }
-          ]
-        }
-        patches = [{ op: 'replace', path: '/attributes/purchasable_offer', value: [purchasableOffer] }]
-      } else if (editingSection.value === 'description') {
-        sectionLabel = '描述'
-        patches = [{ op: 'replace', path: '/attributes/product_description', value: [{ value: editForm.description, language_tag: 'en_US' }] }]
-      } else if (editingSection.value === 'bullets') {
-        sectionLabel = '五点描述'
-        patches = [{ op: 'replace', path: '/attributes/bullet_point', value: editForm.bullets
-          .filter(b => b.content.trim() !== '')
-          .map(b => ({ value: b.content, language_tag: b.language_tag })) }]
-      } else if (editingSection.value === 'search_terms') {
-        sectionLabel = '搜索关键字'
-        patches = [{ op: 'replace', path: '/attributes/generic_keyword', value: [{ value: editForm.searchTerms, language_tag: 'en_US' }] }]
-      } else {
-        return
+    const invalidateTextSnapshot = () => {
+      textSnapshotRevision++
+      textSnapshot = null; textSnapshotRequest = null; textSnapshotAt = 0
+      for (const field of Object.keys(textBusyFields)) delete textBusyFields[field]
+    }
+    const onTextBusy = (field, value) => { textBusyFields[field] = value }
+    const loadTextSnapshot = (force = false) => {
+      const shopId = selectedShopId.value, sku = listingDetail.value?.sku
+      if (!shopId || !sku) return Promise.reject(new Error('请重新打开Listing详情'))
+      if (!force && textSnapshot && Date.now() - textSnapshotAt < 60000) return Promise.resolve(textSnapshot)
+      if (textSnapshotRequest) return textSnapshotRequest
+      const revision = textSnapshotRevision
+      const pending = getAmazonListingText(sku, shopId).then(response => {
+        if (revision !== textSnapshotRevision || shopId !== selectedShopId.value || sku !== listingDetail.value?.sku) throw new Error('当前Listing已切换，请重新编辑')
+        textSnapshot = response.data.data; textSnapshotAt = Date.now()
+        onTextUpdated(textSnapshot)
+        return textSnapshot
+      }).finally(() => { if (textSnapshotRequest === pending) textSnapshotRequest = null })
+      textSnapshotRequest = pending
+      return pending
+    }
+    const textEditorProps = (field, label) => {
+      let attrs = {}
+      try { attrs = JSON.parse(listingDetail.value.attributes_json || '{}') } catch { /* 空缓存由实时读取补全 */ }
+      let rows = (Array.isArray(attrs[field]) ? attrs[field] : []).filter(row => row.marketplace_id === listingDetail.value.marketplace_id)
+      if (!rows.length) {
+        const fallback = { item_name: listingDetail.value.item_name, title_differentiation: listingDetail.value.title_differentiation, product_description: listingDetail.value.product_description, generic_keyword: getGenericKeyword() }[field]
+        if (field === 'bullet_point') rows = (listingDetail.value.bullets || []).map(row => ({ value: row.content, language_tag: row.language_tag, marketplace_id: listingDetail.value.marketplace_id }))
+        else if (fallback) rows = [{ value: fallback, language_tag: listingLanguageTag.value, marketplace_id: listingDetail.value.marketplace_id }]
       }
+      return { shopId: selectedShopId.value, sku: listingDetail.value.sku, field, label, initialRows: rows, loadSnapshot: loadTextSnapshot, writeBusy: textWriteBusy.value }
+    }
 
-      try {
-        await ElMessageBox.confirm(
-          `确认修改 ${listingDetail.value.sku} 的${sectionLabel}并提交到 Amazon？`,
-          '确认修改',
-          { confirmButtonText: '确认提交', cancelButtonText: '取消', type: 'warning' }
-        )
-      } catch {
-        return
+    const onTextUpdated = (snapshot) => {
+      if (!listingDetail.value || String(snapshot.shop_id) !== String(selectedShopId.value) || snapshot.sku !== listingDetail.value.sku) return
+      textSnapshot = snapshot; textSnapshotAt = Date.now()
+      const values = name => snapshot.fields[name].rows
+      let attrs = {}
+      try { attrs = JSON.parse(listingDetail.value.attributes_json || '{}') } catch { /* 兼容空缓存 */ }
+      for (const name of Object.keys(snapshot.fields)) {
+        if (values(name).length) attrs[name] = values(name)
+        else delete attrs[name]
       }
+      const updated = { ...listingDetail.value, attributes_json: JSON.stringify(attrs),
+        item_name: values('item_name')[0]?.value || '', title_differentiation: values('title_differentiation')[0]?.value || '',
+        product_description: values('product_description')[0]?.value || '',
+        generic_keyword: values('generic_keyword'),
+        bullets: values('bullet_point').map((row, index) => ({ content: row.value, language_tag: row.language_tag, sort_order: index })) }
+      listingDetail.value = updated
+      const index = listings.value.findIndex(row => row.sku === snapshot.sku)
+      if (index !== -1) listings.value[index] = { ...listings.value[index], ...updated }
+      updateListingLanguageTag()
+    }
 
-      editSaving.value = true
-      try {
-        const response = await patchAmazonListing(sku, {
-          shop_id: shopId,
-          product_type: productType,
-          patches
-        })
-
-        if (response.data.status === 'success') {
-          const updatedData = response.data.data
-          if (updatedData && updatedData.sku) {
-            // 后端已同步最新 Listing 详情，直接用响应数据刷新本地状态
-            listingDetail.value = updatedData
-            const idx = listings.value.findIndex(l => l.sku === sku)
-            if (idx !== -1) {
-              listings.value[idx] = { ...listings.value[idx], ...updatedData }
-            }
-          } else {
-            // 兼容旧响应：本地回显
-            if (editingSection.value === 'title') {
-              listingDetail.value.item_name = editForm.title
-              listingDetail.value.title_differentiation = editForm.titleDifferentiation
-            } else if (editingSection.value === 'price') {
-              if (!listingDetail.value.offers) listingDetail.value.offers = []
-              const primaryOffer = listingDetail.value.offers.find(o => o.audience === 'ALL')
-              if (primaryOffer) {
-                primaryOffer.our_price = Number(editForm.standardPrice)
-              } else {
-                listingDetail.value.offers.unshift({
-                  currency: getPriceCurrency(),
-                  audience: 'ALL',
-                  our_price: Number(editForm.standardPrice),
-                  start_at: null,
-                  end_at: null
-                })
-              }
-            } else if (editingSection.value === 'description') {
-              listingDetail.value.product_description = editForm.description
-            } else if (editingSection.value === 'bullets') {
-              listingDetail.value.bullets = editForm.bullets
-                .filter(b => b.content.trim() !== '')
-                .map((b, i) => ({ content: b.content, language_tag: b.language_tag, sort_order: i + 1 }))
-            } else if (editingSection.value === 'search_terms') {
-              listingDetail.value.generic_keyword = editForm.searchTerms
-            }
-          }
-          ElMessage.success(response.data.message || '修改已提交并同步成功')
-          editingSection.value = null
-        } else {
-          const issues = response.data.data?.issues
-          if (issues && issues.length > 0) {
-            ElMessage.warning(issues.map(i => i.message).join('; '))
-          } else {
-            ElMessage.error(response.data.message || '修改失败')
-          }
-        }
-      } catch (error) {
-        console.error('修改 Listing 失败:', error)
-        ElMessage.error('修改失败: ' + (error.response?.data?.message || error.message))
-      } finally {
-        editSaving.value = false
+    const onImagesUpdated = (snapshot) => {
+      if (!listingDetail.value || String(snapshot.shop_id) !== String(selectedShopId.value) || snapshot.sku !== listingDetail.value.sku) return
+      let attrs = {}
+      try { attrs = JSON.parse(listingDetail.value.attributes_json || '{}') } catch { /* 兼容空属性 */ }
+      const images = []
+      snapshot.slots.forEach((slot, index) => {
+        const name = index ? `other_product_image_locator_${index}` : 'main_product_image_locator'
+        if (slot.rows.length) attrs[name] = slot.rows
+        else delete attrs[name]
+        if (slot.url) images.push({ image_type: index ? `other_${index}` : 'main', media_location: slot.url, sort_order: index })
+      })
+      listingDetail.value = { ...listingDetail.value, images, attributes_json: JSON.stringify(attrs) }
+      if (snapshot.main_image?.link) {
+        listingDetail.value.main_image_url = snapshot.main_image.link
+        const index = listings.value.findIndex(row => row.sku === snapshot.sku)
+        if (index !== -1) listings.value[index].main_image_url = snapshot.main_image.link
       }
     }
 
@@ -1373,44 +1167,6 @@ export default {
         listingLanguageTag.value = detail.bullets[0].language_tag || 'en_US'
       }
       return listingLanguageTag.value
-    }
-
-    const openLanguageDialog = () => {
-      if (!listingDetail.value) return
-      listingLanguageTag.value = updateListingLanguageTag()
-      languageDialogSelected.value = listingLanguageTag.value
-      languageDialogVisible.value = true
-    }
-
-    const confirmLanguageChange = async () => {
-      if (!listingDetail.value || !selectedShopId.value) return
-
-      const sku = listingDetail.value.sku
-      const val = languageDialogSelected.value
-
-      listingLanguageLoading.value = true
-      try {
-        const response = await patchAmazonListingLanguage(sku, {
-          shop_id: selectedShopId.value,
-          language_tag: val
-        })
-        if (response.data.status === 'success') {
-          ElMessage.success(`已更新 ${response.data.data?.updated_nodes || 0} 个节点`)
-          const resp = await getAmazonListing(sku, selectedShopId.value)
-          if (resp.data.status === 'success') {
-            listingDetail.value = resp.data.data || null
-            updateListingLanguageTag()
-          }
-        } else {
-          ElMessage.error(response.data.message || '切换失败')
-        }
-      } catch (error) {
-        console.error('切换语言失败:', error)
-        ElMessage.error('切换失败: ' + (error.response?.data?.message || error.message))
-      } finally {
-        listingLanguageLoading.value = false
-        languageDialogVisible.value = false
-      }
     }
 
     // ===== 变体字段同步 =====
@@ -1598,10 +1354,22 @@ export default {
     const getPriceCurrency = () => {
       const detail = listingDetail.value
       if (!detail) return 'USD'
+      if (detail.pricing_snapshot) return detail.pricing_snapshot.currency
       if (detail.currency) return detail.currency
       const offers = detail.offers || []
       if (offers.length > 0 && offers[0].currency) return offers[0].currency
       return detail.currency || 'USD'
+    }
+
+    // 仅接收当前弹窗上下文的实时结果，不让旧SKU迟到响应覆盖新页面。
+    const onPriceUpdated = (snapshot) => {
+      if (snapshot.sku !== listingDetail.value?.sku || String(snapshot.shop_id) !== String(selectedShopId.value)) return
+      listingDetail.value.pricing_snapshot = snapshot
+      const row = listings.value.find(item => item.sku === snapshot.sku)
+      if (row) {
+        row.our_price = snapshot.fields.standard_price.value
+        row.discounted_price = snapshot.fields.sale_price.value
+      }
     }
 
     // 获取价格展示数据：primary=实际售价, msrp=划线价
@@ -1609,6 +1377,12 @@ export default {
       const detail = listingDetail.value
       const result = { primary: null, msrp: null }
       if (!detail) return result
+      if (detail.pricing_snapshot) {
+        const live = detail.pricing_snapshot
+        const actual = live.effective_offers.find(row => row.offerType === 'B2C')
+        result.primary = actual?.price?.amount ?? live.fields.standard_price.value
+        return result
+      }
       if (detail.our_price != null) {
         result.primary = detail.our_price
       } else {
@@ -1875,6 +1649,8 @@ export default {
       loading,
       syncLoading,
       listings,
+      historyTarget,
+      openListingHistory,
       searchForm,
       pagination,
       detailDialogVisible,
@@ -1912,18 +1688,17 @@ export default {
       getRowClassName,
       getPriceCurrency,
       getPriceDisplay,
+      onPriceUpdated,
       getGenericKeyword,
       editingSection,
-      editSaving,
-      editForm,
+      listingLanguageTag,
+      textWriteBusy,
+      textEditorProps,
+      onTextBusy,
+      onTextUpdated,
+      onImagesUpdated,
       startEdit,
       cancelEdit,
-      saveEdit,
-      listingLanguageLoading,
-      languageDialogVisible,
-      languageDialogSelected,
-      openLanguageDialog,
-      confirmLanguageChange,
       syncVariantDialogVisible,
       syncVariantLoading,
       syncVariantSubmitLoading,

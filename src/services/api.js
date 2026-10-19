@@ -56,6 +56,7 @@ export const getDailyReports = (params) => api.get('/daily-reports', { params })
 export const getCurrentDailyReport = (params) => api.get('/daily-reports/current', { params });
 export const getDailyReport = (id, params) => api.get(`/daily-reports/${id}`, { params });
 export const previewDailyReport = (params) => api.get('/daily-reports/preview', { params });
+export const getDailyReportOperations = (params) => api.get('/daily-reports/operations', { params, timeout: 20000 });
 export const saveDailyReport = (data) => api.put('/daily-reports', data);
 // 删除仅针对已确认的存档版本，不自动重试，也不影响SKU来源报表。
 export const deleteDailyReport = (id, data) => api.delete(`/daily-reports/${id}`, { data });
@@ -1049,13 +1050,21 @@ export const getAmazonListingSpApi = (sku, shop_id, included_data = 'summaries,a
 
 /**
  * 上传 Listing 图片到 OSS
- * @param {FormData} formData 包含 image 文件
+ * @param {FormData} formData 包含 image、shop_id、sku、position
  */
 export const uploadAmazonListingImage = (formData) => {
   return api.post('/amazon/listings/upload-image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' }, timeout: 90000
   });
 };
+
+export const getAmazonListingImages = (sku, shop_id) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/image-editor`, { params: { shop_id }, timeout: 90000 });
+// 仅查询本地ERP修改历史，不触发Amazon同步或重发修改。
+export const getAmazonListingChangeHistory = (sku, params) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/change-history`, { params, timeout: 20000 });
+export const getAmazonListingChangeHistoryDetail = (sku, id, shop_id) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/change-history/${id}`, { params: { shop_id }, timeout: 20000 });
+export const submitAmazonListingImages = (sku, data) => api.post(`/amazon/listings/${encodeURIComponent(sku)}/image-editor`, data, { timeout: 180000 });
+export const verifyAmazonListingImages = (sku, data) => api.post(`/amazon/listings/${encodeURIComponent(sku)}/image-editor/verify`, data, { timeout: 90000 });
+export const getAmazonCatalogImages = (sku, shop_id) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/image-editor/catalog`, { params: { shop_id }, timeout: 90000 });
 
 /**
  * 上架新 Listing
@@ -1082,6 +1091,15 @@ export const updateAmazonListing = (sku, data) => {
 export const patchAmazonListing = (sku, data) => {
   return api.patch(`/amazon/listings/${sku}`, data);
 };
+
+// 价格独立编辑：读实时快照、提交显式变更、只读核对提交结果。
+export const getAmazonListingPricing = (sku, shop_id) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/pricing`, { params: { shop_id }, timeout: 90000 });
+export const submitAmazonListingPricing = (sku, data) => api.post(`/amazon/listings/${encodeURIComponent(sku)}/pricing`, data, { timeout: 180000 });
+export const verifyAmazonListingPricing = (sku, data) => api.post(`/amazon/listings/${encodeURIComponent(sku)}/pricing/verify`, data, { timeout: 90000 });
+
+export const getAmazonListingText = (sku, shop_id) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/text-editor`, { params: { shop_id }, timeout: 90000 });
+export const submitAmazonListingText = (sku, data) => api.post(`/amazon/listings/${encodeURIComponent(sku)}/text-editor`, data, { timeout: 180000 });
+export const verifyAmazonListingText = (sku, data) => api.post(`/amazon/listings/${encodeURIComponent(sku)}/text-editor/verify`, data, { timeout: 90000 });
 
 export const patchAmazonListingLanguage = (sku, data) => {
   return api.patch(`/amazon/listings/${sku}/language`, data);

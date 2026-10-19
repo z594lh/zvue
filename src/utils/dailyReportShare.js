@@ -1,4 +1,6 @@
 // 日报正文用于填写预览与保存后分享；图片仅导出已保存快照，不请求AI或外链图片。
+import { diffRowText, operationTextSummary, textDiffEntries, textDiffRows } from '@/utils/listingTextDiff'
+import { dailyOperationLabel } from '@/utils/dailyOperationLabel'
 const number = (value, places = 2) => value === null || value === undefined ? '—' : Number(value).toLocaleString('zh-CN', { minimumFractionDigits: places, maximumFractionDigits: places })
 const pct = value => value === null || value === undefined ? '—' : `${(Number(value) * 100).toFixed(2)}%`
 
@@ -167,7 +169,24 @@ export function dailyReportBlocks(report) {
   }
   if (!rows.length) blocks.push({ kind: 'body', text: '本次未选择重点SKU，以上为全部当前负责SKU的整体概况。' })
   if (report.situation_text) blocks.push({ kind: 'sku', text: '运营补充判断' }, { kind: 'body', text: report.situation_text })
-  blocks.push({ kind: 'heading', text: '二、今日调整与优化' }, { kind: 'body', text: report.actions_text || '尚未填写' },
+  blocks.push({ kind: 'heading', text: '二、今日调整与优化' })
+  const operations = snapshot.reported_operations || []
+  for (const kind of ['listing','ads']) {
+    const entries = operations.filter(row=>row.kind===kind)
+    if (entries.length) blocks.push({kind:'sku',text:`${kind==='listing'?'Listing修改':'广告调整'}（${entries.length}条）`})
+    for (const [index,row] of entries.entries()) {
+      const differences = textDiffEntries(row.text_changes)
+      const summary = operationTextSummary(row)
+      blocks.push({kind:'body',text:`${index+1}. ${dailyOperationLabel(row,snapshot.rows)}${summary ? `\n${summary}` : ''}`})
+      for (const entry of differences) blocks.push({kind:'text-diff',entry,text:`${entry.label}\n${textDiffRows(entry).map(diffRowText).join('\n')}`})
+      const reason = typeof row.reason === 'string' ? row.reason.trim() : ''
+      blocks.push({kind:'operation-time',text:`操作时间：${dailyReportTime(row.occurred_at)}`},
+        {kind:reason ? 'operation-reason' : 'operation-reason-missing',text:`调整理由：${reason || '尚未填写'}`})
+    }
+  }
+  if (report.actions_text) blocks.push({kind:'body',text:`${operations.length?'补充：\n':''}${report.actions_text}`})
+  else if (!operations.length) blocks.push({kind:'body',text:'尚未填写'})
+  blocks.push(
     { kind: 'heading', text: '三、问题与协助' }, { kind: report.no_issues ? 'body' : 'warning', text: report.no_issues ? '暂无需要协助的问题。' : report.issues_text || '尚未填写' },
     { kind: 'note', text: '经营数据为当前负责SKU历史，非个人绩效；利润沿用SKU日报，缺数据不当零。广告归因可能回补，规则提醒不等于调整指令。' })
   return blocks
@@ -200,6 +219,22 @@ function wrap(context, value, width) {
   return lines
 }
 
+// 将已折叠的差异片段按像素换行，保留词句强调与红绿底色，不使用HTML截图或外链图。
+function wrapDiff(context, parts, width) {
+  const lines = [[]]; let x = 0
+  for (const part of parts) for (const char of Array.from(part.text)) {
+    if (char === '\r') continue
+    if (char === '\n') { lines.push([]); x = 0; continue }
+    const size = context.measureText(char).width
+    if (x + size > width && x) { lines.push([]); x = 0 }
+    const line = lines[lines.length - 1], previous = line[line.length - 1]
+    if (previous && previous.changed === part.changed) previous.text += char
+    else line.push({text:char, changed:part.changed})
+    x += size
+  }
+  return lines
+}
+
 /** 导出一张完整PNG长图，保持原字号；先测高度，超出安全范围则报错，不裁剪或拆页。 */
 export async function dailyReportImage(report) {
   if (!report?.id || !report?.snapshot || report.is_preview) throw new Error('请先保存日报再下载图片')
@@ -207,20 +242,33 @@ export async function dailyReportImage(report) {
   const styles = {
     meta: [24, '#64748b', 34], heading: [34, '#1e3a5f', 56], body: [28, '#334155', 42],
     metric: [30, '#2563eb', 46], warning: [27, '#b45309', 40], sku: [29, '#0f766e', 46], note: [24, '#64748b', 36],
-    'summary-loss': [28, '#b45309', 42], 'summary-profit': [28, '#047857', 42], 'summary-neutral': [28, '#475569', 42], comparison: [26, '#64748b', 40]
+    'summary-loss': [28, '#b45309', 42], 'summary-profit': [28, '#047857', 42], 'summary-neutral': [28, '#475569', 42], comparison: [26, '#64748b', 40],
+    'operation-time': [22, '#94a3b8', 32], 'operation-reason': [28, '#1d4ed8', 44], 'operation-reason-missing': [28, '#b91c1c', 44]
   }
   const measureCanvas = document.createElement('canvas'), measure = measureCanvas.getContext('2d')
   if (!measure) throw new Error('当前浏览器无法生成日报图片，请使用复制文字')
   const layout = []; let content = 0
   for (const block of dailyReportBlocks(report)) {
+    if (block.kind === 'text-diff') {
+      const size = 26, height = 40
+      measure.font = `${size}px "Microsoft YaHei", sans-serif`
+      layout.push({gap:12}); content += 12
+      for (const label of wrap(measure,block.entry.label,920)) { layout.push({line:label,size,color:'#475569',height,weight:''}); content += height }
+      for (const row of textDiffRows(block.entry)) {
+        const lines = wrapDiff(measure,row.parts,880)
+        for (const [index,parts] of lines.entries()) { layout.push({diff:row.type,diffParts:parts,sign:index ? '' : row.type === 'remove' ? '−' : row.type === 'add' ? '+' : '=',size,height,weight:''}); content += height }
+      }
+      continue
+    }
     const [size, color, height] = styles[block.kind]
-    const weight = ['heading', 'sku', 'metric'].includes(block.kind) || block.kind.startsWith('summary-') ? '600 ' : ''
+    const reasonPanel = ['operation-reason', 'operation-reason-missing'].includes(block.kind)
+    const weight = ['heading', 'sku', 'metric'].includes(block.kind) || block.kind.startsWith('summary-') ? '600 ' : reasonPanel ? '500 ' : ''
     measure.font = `${weight}${size}px "Microsoft YaHei", sans-serif`
-    const lines = wrap(measure, block.text, 920)
+    const lines = wrap(measure, block.text, reasonPanel ? 888 : 920)
     const gap = block.kind === 'heading' ? 22 : 12
     layout.push({ gap }); content += gap
     for (const line of lines) {
-      layout.push({ line, parts: block.highlightChanges ? dailyReportParts(line) : null, size, color, height, weight }); content += height
+      layout.push({ line, parts: block.highlightChanges ? dailyReportParts(line) : null, reasonPanel, missingReason:block.kind === 'operation-reason-missing', size, color, height, weight }); content += height
     }
   }
   measureCanvas.width = 1; measureCanvas.height = 1
@@ -246,7 +294,22 @@ export async function dailyReportImage(report) {
     for (const line of layout) {
       if (line.gap) { y += line.gap; continue }
       ctx.font = `${line.weight}${line.size}px "Microsoft YaHei", sans-serif`; ctx.fillStyle = line.color
-      if (line.parts) {
+      if (line.reasonPanel) {
+        ctx.fillStyle = line.missingReason ? '#fef2f2' : '#eff6ff'; ctx.fillRect(76,y,928,line.height)
+        ctx.fillStyle = line.missingReason ? '#ef4444' : '#3b82f6'; ctx.fillRect(76,y,6,line.height)
+        ctx.fillStyle = line.color; ctx.fillText(line.line,96,y + line.height * .76)
+      } else if (line.diff) {
+        const removed = line.diff === 'remove', added = line.diff === 'add'
+        ctx.fillStyle = removed ? '#fff0f0' : added ? '#edfaf1' : '#f8fafc'; ctx.fillRect(76,y,928,line.height)
+        ctx.fillStyle = removed ? '#9e3030' : added ? '#226c3d' : '#64748b'; ctx.fillText(line.sign,82,y + line.height * .76)
+        let x = 116
+        for (const part of line.diffParts) {
+          const width = ctx.measureText(part.text).width
+          if (part.changed) { ctx.fillStyle = removed ? '#ffcaca' : '#bceccc'; ctx.fillRect(x,y,width,line.height) }
+          ctx.fillStyle = removed ? '#8f2727' : added ? '#175e32' : '#64748b'; ctx.fillText(part.text,x,y + line.height * .76)
+          x += width
+        }
+      } else if (line.parts) {
         // 与页面共用片段，逐段着色，不把人工文字中的箭头自动染色。
         let x = 80
         for (const part of line.parts) {

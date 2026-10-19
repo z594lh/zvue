@@ -44,6 +44,7 @@ export function historyTime(value, timeZone = 'Asia/Shanghai') {
 }
 
 export function historyChange(row) {
+  if (typeof row.display?.change === 'string') return row.display.change
   const entity = ({ CAMPAIGN: '广告活动', AD_GROUP: '广告组', AD: '广告商品', KEYWORD: '关键词',
     NEGATIVE_KEYWORD: '否定关键词', PRODUCT_TARGETING: '投放项', NEGATIVE_PRODUCT_TARGETING: '否定商品', THEME: '主题投放' })[row.entityType] || row.entityType || '未知对象'
   if (row.changeType === 'PLACEMENT_GROUP') {
@@ -63,6 +64,7 @@ export function historyChange(row) {
 }
 
 export function historyDetail(row) {
+  if (typeof row.display?.detail === 'string') return row.display.detail
   // 所属层级显式展示，同名否定词也不能把活动级、组级混为一条。
   const group = Object.prototype.hasOwnProperty.call(row, 'adGroupId') ? row.adGroupId : row.metadata?.adGroupId
   const scope = group ? `广告组 ID：${group}` : row.campaignId || row.metadata?.campaignId ? '广告活动级' : ''
@@ -71,6 +73,9 @@ export function historyDetail(row) {
 }
 
 export function historyValue(row, key, timeZone = 'Asia/Shanghai') {
+  // 新接口以统一后端展示为准；旧接口/旧时区响应仍保留原兼容计算。
+  const dateChange = ['START_DATE', 'END_DATE', 'CREATION_DATE'].includes(row.changeType)
+  if (typeof row.display?.[key] === 'string' && (!dateChange || row.display.timezone === timeZone)) return row.display[key]
   const value = row[key]
   if (value == null || value === '' || value === 'null') return '—'
   const raw = typeof value === 'object' ? JSON.stringify(value) : String(value)

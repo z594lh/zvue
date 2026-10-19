@@ -134,7 +134,7 @@
                 </div>
               </td>
               <td align="center">{{ matchTypeLabel(row.match_type) }}</td>
-              <td align="center">{{ stateLabel(row.state) }}</td>
+              <td align="center">{{ row.state_label || stateLabel(row.state) }}</td>
               <td align="right">
                 <div v-if="row.suggested_bid != null">${{ formatNum(row.suggested_bid) }}</div>
                 <div v-else>--</div>
@@ -390,7 +390,7 @@ const fetchData = async () => {
       if (res.data.status === 'success') {
         let list = res.data.data.list || []
         list = list.filter(item => autoExpressions.includes(item.resolved_expression))
-          .map(item => ({ ...item, resolved_expression_label: expressionMap[item.resolved_expression] || item.resolved_expression }))
+          .map(item => ({ ...item, resolved_expression_label: item.resolved_expression_label || expressionMap[item.resolved_expression] || item.resolved_expression }))
         tableData.value = list.map(item => ({ ...item, _editing: false, _editBid: item.bid, _selected: false, _loading: false, _saving: false, state: (item.state || '').toUpperCase() }))
         total.value = tableData.value.length
       }
