@@ -4,7 +4,7 @@
     <section class="kr-query kr-panel">
       <el-tag effect="plain">美国站 US</el-tag>
       <el-select v-model="shopId" placeholder="全部店铺" clearable aria-label="选择店铺" class="kr-shop" @change="changeShop"><el-option v-for="shop in shops" :key="shop.id" :value="String(shop.id)" :label="shop.shop_name" /></el-select>
-      <el-select v-model="pickedAsin" placeholder="选择店铺ASIN，可搜索中文名 / SKU" filterable remote :remote-method="searchOptions" :loading="optionsLoading" clearable aria-label="选择店铺ASIN" class="kr-asin-picker" @change="selectAsin">
+      <el-select v-model="pickedAsin" placeholder="选择店铺ASIN，可搜索中文名 / SKU" filterable :filter-method="searchOptions" :loading="optionsLoading" loading-text="正在搜索店铺ASIN" no-data-text="暂无店铺ASIN" clearable aria-label="选择店铺ASIN" class="kr-asin-picker" @change="selectAsin">
         <el-option v-for="item in options" :key="item.asin" :label="`${item.product_name || item.asin} · ${item.asin}`" :value="item.asin"><div class="kr-option"><strong>{{ item.product_name || '中文名未维护' }}</strong><span>{{ item.asin }} · {{ (item.related_products || []).map(p=>`${p.shop_name} / ${p.sku}`).join('；') }}</span></div></el-option>
         <template v-if="optionsMore" #footer><el-button link :loading="optionsLoading" @click="loadMoreOptions">加载更多店铺ASIN</el-button></template>
       </el-select>
@@ -97,6 +97,7 @@ const valueOf=(key,value)=>spriteValue(reverseMetrics.find(m=>m.key===key) || {t
 const growthClass=value=>hasValue(value)?Number(value)>0?'kr-positive':Number(value)<0?'kr-negative':'':''
 const validAsins=values=>Array.isArray(values)?values.filter(v=>/^[A-Z0-9]{10}$/.test(v)):[]
 let disposed=false,active=true,revision=0,optionsRevision=0,optionsPage=1,optionsSearch='',timer=null,lastRouteKey=''
+let optionsLoadedKey='',optionsRequestKey=''
 let boundBody=null,tableObserver=null,measureFrame=null
 
 function columnPreset(preset){const defaults=defaultColumnPrefs();columnOrder.value=defaults.order;visibleColumns.value=preset==='all'?defaults.order:preset==='none'?[]:defaults.visible}
@@ -143,14 +144,27 @@ function syncRoute(){
 function openAsin(){const asin=asinInput.value.trim().toUpperCase();if(!/^[A-Z0-9]{10}$/.test(asin)){ElMessage.warning('请输入10位英文字母或数字组成的ASIN');return}if(route.query.asin===asin && !route.query.task_id && String(route.query.shop_id || '')===shopId.value){snapshotId.value='';page.value=1;load();return}router.push({path:'/tools/keyword-reverse',query:{asin,shop_id:shopId.value || undefined}})}
 function selectAsin(value){if(value){asinInput.value=value;openAsin()}}
 function changeShop(){pickedAsin.value='';optionsSearch='';loadOptions()}
-function searchOptions(query){optionsSearch=query;clearTimeout(timer);timer=setTimeout(()=>loadOptions(),300)}
+function optionsKey(){return shopId.value+':'+optionsSearch}
+function searchOptions(query){
+  const value=String(query || '')
+  // 展开会回调过滤函数；相同条件不清空选项、不重复请求，避免下拉反复弹出。
+  if(value===optionsSearch && (optionsLoadedKey===optionsKey() || optionsLoading.value))return
+  optionsSearch=value;optionsRevision++;optionsRequestKey='';clearTimeout(timer)
+  timer=setTimeout(()=>{timer=null;loadOptions()},300)
+}
 async function loadOptions(append=false){
   if(disposed || !active)return
-  if(!append){optionsPage=1;options.value=[]}
+  clearTimeout(timer);timer=null
+  const key=optionsKey()
+  if(!append && ((optionsLoadedKey===key && !optionsLoading.value && !optionsError.value) || (optionsRequestKey===key && optionsLoading.value)))return
+  if(append && optionsLoadedKey!==key)return
+  // 保留现有选项直到新响应到达；普通选择框在加载/空结果时也保持单次展开。
+  if(!append)optionsPage=1
   const request=++optionsRevision,requestedPage=append?optionsPage+1:1;optionsLoading.value=true;optionsError.value=''
-  try{const res=await getKeywordReverseOptions({shop_id:shopId.value || undefined,search:optionsSearch,page:requestedPage});if(disposed || !active || request!==optionsRevision)return;shops.value=res.data.data.shops;options.value=append?[...options.value,...res.data.data.list]:res.data.data.list;optionsMore.value=res.data.data.has_more;optionsPage=requestedPage}catch(err){if(!disposed && active && request===optionsRevision){optionsError.value=err.response?.data?.message || '店铺ASIN读取失败，请重新选择店铺';optionsMore.value=false}}finally{if(!disposed && active && request===optionsRevision)optionsLoading.value=false}
+  optionsRequestKey=key
+  try{const res=await getKeywordReverseOptions({shop_id:shopId.value || undefined,search:optionsSearch,page:requestedPage});if(disposed || !active || request!==optionsRevision)return;shops.value=res.data.data.shops;options.value=append?[...options.value,...res.data.data.list]:res.data.data.list;optionsMore.value=res.data.data.has_more;optionsPage=requestedPage;optionsLoadedKey=key}catch(err){if(!disposed && active && request===optionsRevision){optionsError.value=err.response?.data?.message || '店铺ASIN读取失败，请重新选择店铺';options.value=[];optionsLoadedKey='';optionsMore.value=false}}finally{if(!disposed && active && request===optionsRevision)optionsLoading.value=false}
 }
-function loadMoreOptions(){if(optionsLoading.value)return;loadOptions(true)}
+function loadMoreOptions(){if(optionsLoading.value || timer)return;loadOptions(true)}
 function applyFilters(){applied.value=JSON.parse(JSON.stringify(draft));page.value=1;load()}
 function resetFilters(){Object.assign(draft,blankFilters());applyFilters()}
 function useWord(word){draft.include=String(word);applyFilters()}
