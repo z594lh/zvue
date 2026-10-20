@@ -1693,6 +1693,9 @@ export const getCronTasks = (params = {}) => {
 export const executeCronTask = (taskId, data) => api.post(`/cron/tasks/${taskId}/execute`, data, { timeout: 15000 });
 export const getCronTaskRuns = (taskId, params) => api.get(`/cron/tasks/${taskId}/runs`, { params, timeout: 15000 });
 export const getCronTaskRun = (id) => api.get(`/cron/runs/${id}`, { timeout: 15000 });
+// 状态只读；人工恢复不触发翻译，不重置账户预算或现存冷却。
+export const getTranslationStatus = () => api.get('/cron/translation/status', { timeout: 15000 });
+export const resumeTranslation = (data) => api.post('/cron/translation/resume', data, { timeout: 15000 });
 
 /**
  * 获取当前用户的菜单列表（后端已按权限过滤）

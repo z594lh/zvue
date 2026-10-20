@@ -2,6 +2,7 @@
   <div class="translator-container">
     <div class="container">
       <h1>🌐 智能翻译</h1>
+      <p v-if="needsLogin" class="translation-login-note">翻译需要登录 ERP，<router-link :to="{path:'/login',query:{redirect:'/fanyi'}}">点击登录</router-link>后可继续使用。</p>
 
       <!-- 统一输入区 -->
       <div id="input-container" class="input-box" :class="{ 'has-image': hasImage }">
@@ -55,7 +56,8 @@
 <script>
 
 import { 
-  getConfig, 
+  getConfig,
+  isAuthenticated,
   translateText, 
   translateImage, 
   translateAIText, 
@@ -76,6 +78,7 @@ export default {
       imageSrc: '',
       hasImage: false,
       isLoading: false,
+      needsLogin: !isAuthenticated(),
       authorLink: '#' // 请替换为实际链接
     }
   },
@@ -153,6 +156,13 @@ export default {
 
     // 执行翻译
     async doTranslate(type = 'machine') {
+      if (this.isLoading) return;
+      this.needsLogin = !isAuthenticated();
+      if (this.needsLogin) {
+        this.resultFormat = 'text';
+        this.translationResult = '请先登录 ERP 后使用翻译服务';
+        return;
+      }
       // 验证输入
       if (!this.inputText && !this.imageBase64) {
         alert("请输入文字或粘贴图片");
@@ -215,7 +225,8 @@ export default {
       } catch (err) {
         console.error('翻译错误:', err);
         this.resultFormat = 'text';
-        this.translationResult = err.response?.data?.error || '翻译暂不可用，请稍后重试';
+        this.needsLogin = err.response?.status === 401;
+        this.translationResult = err.response?.data?.error || err.response?.data?.message || '翻译暂不可用，请稍后重试';
       } finally {
         this.isLoading = false;
       }

@@ -9,6 +9,7 @@
           </h1>
           <p class="page-desc">查看定时计划，安全触发任务并追踪执行记录 · 手动执行不改变原定时计划</p>
         </div>
+        <el-button @click="openTranslation">翻译队列与账户</el-button>
       </div>
 
       <el-alert v-if="capabilities.message" :title="capabilities.message" :type="capabilities.supported ? 'warning' : 'info'" :closable="false" show-icon class="environment-note" />
@@ -190,6 +191,27 @@
         />
       </div>
       <p v-if="tasks.length" class="page-desc execution-help">时间按当前设备时区显示。执行结束不等于所有业务同步成功；点击记录核对日志。撞锁不重复启动，不自动重试。</p>
+      <el-dialog v-model="translationVisible" title="翻译队列与账户" width="min(700px, 94vw)" append-to-body>
+        <div v-loading="translationLoading">
+          <el-alert v-if="translationError" :title="translationError" type="error" :closable="false" show-icon />
+          <template v-else-if="translationData">
+            <el-alert :title="translationState" :type="translationData.paused ? 'warning' : 'info'" :closable="false" show-icon />
+            <div class="translation-counts">
+              <div v-for="item in translationCounters" :key="item[0]"><strong>{{ translationData.queue[item[0]] || 0 }}</strong><span>{{ item[1] }}</span></div>
+            </div>
+            <p>今日预留字符：{{ translationData.reserved_chars }} / {{ translationData.char_limit }}</p>
+            <p>今日预留请求：{{ translationData.reserved_requests }} / {{ translationData.request_limit }}</p>
+            <p class="page-desc">预算按 UTC 日重置（北京时间 08:00），包含手动翻译及失败请求的保守预留，不是百度账单。</p>
+            <p v-if="translationData.cooling_down">冷却至：{{ formatTime(translationData.cooldown_until) }}</p>
+            <p class="page-desc">恢复仅解除暂停并重新排队阻塞任务。不会清空成功译文、重置日预算、跳过现存冷却或立即调用百度。永久失败记录不自动重试。</p>
+          </template>
+        </div>
+        <template #footer>
+          <el-button :disabled="translationLoading || translationResuming" @click="loadTranslation">刷新状态</el-button>
+          <el-button v-if="translationData?.can_resume" type="warning" :loading="translationResuming" :disabled="translationLoading || !!translationError || !(translationData.paused || translationData.queue.blocked)" @click="restoreTranslation">确认修复后恢复</el-button>
+          <el-button @click="translationVisible=false">关闭</el-button>
+        </template>
+      </el-dialog>
       <el-dialog v-model="historyVisible" :title="`${historyTask?.task_name || ''} · 执行记录`" width="min(960px, 94vw)" append-to-body>
         <p class="page-desc" style="margin-bottom:12px">已结束的执行记录及日志保留最近7天，系统自动清理；等待执行、执行中或状态待核实的记录不会清理。</p>
         <el-table v-loading="historyLoading" :data="records" @row-click="openDetail" class="history-table">
@@ -219,9 +241,9 @@
 export default { name: 'CronTasksView' }
 </script>
 <script setup>
-import { ref, onMounted, onActivated, onDeactivated, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, onBeforeUnmount } from 'vue'
 import { Timer, Refresh, Search } from '@element-plus/icons-vue'
-import { getCronTasks, executeCronTask, getCronTaskRuns, getCronTaskRun } from '@/services/api.js'
+import { getCronTasks, executeCronTask, getCronTaskRuns, getCronTaskRun, getTranslationStatus, resumeTranslation } from '@/services/api.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const tasks = ref([])
@@ -240,12 +262,28 @@ const detailVisible = ref(false)
 const detailRecord = ref(null)
 const detailLog = ref('')
 const detailLoading = ref(false)
+const translationVisible = ref(false)
+const translationLoading = ref(false)
+const translationResuming = ref(false)
+const translationData = ref(null)
+const translationError = ref('')
+const translationCounters = [['pending','待翻译'],['running','翻译中'],['retry','待重试'],['succeeded','已完成'],['blocked','已阻塞'],['failed','已失败']]
+const translationState = computed(() => {
+  const data = translationData.value
+  if (!data) return ''
+  if (data.paused) return `账户已暂停${data.pause_code ? `（错误码 ${data.pause_code}）` : ''}，请先核实百度余额与授权，再由管理员恢复`
+  if (data.cooling_down) return '账户冷却中，后台将在冷却到期后按原定时计划继续'
+  if (data.reserved_chars >= data.char_limit || data.reserved_requests >= data.request_limit) return '今日安全预算已用完，等待下一预算日；恢复操作不会重置预算'
+  if (data.queue.blocked) return '账户未暂停，但仍有阻塞任务，可由管理员核实后重新排队'
+  return '账户未暂停，后台按原定时计划补译；查看和刷新状态不会调用百度'
+})
 const requestIds = new Map()
 let active = false
 let timer = null
 let sequence = 0
 let historySequence = 0
 let detailSequence = 0
+let translationSequence = 0
 let confirming = false
 
 const pagination = ref({
@@ -259,6 +297,51 @@ const statusType = status => ({ running: 'primary', pending: 'primary', external
 const formatTime = value => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
 const duration = seconds => seconds == null ? '—' : seconds < 60 ? `${seconds}秒` : `${Math.floor(seconds / 60)}分${seconds % 60}秒`
 const errorMessage = error => error?.response?.data?.message || '暂时无法连接服务器，请刷新核对状态，不会自动重试执行任务'
+
+const loadTranslation = async () => {
+  if (!active || !translationVisible.value) return
+  const ticket = ++translationSequence
+  translationLoading.value = true
+  translationError.value = ''
+  try {
+    const { data } = await getTranslationStatus()
+    if (!data.success) throw new Error('读取翻译状态失败')
+    if (active && translationVisible.value && ticket === translationSequence) translationData.value = data.data
+  } catch (error) {
+    if (active && translationVisible.value && ticket === translationSequence) translationError.value = errorMessage(error)
+  } finally {
+    if (ticket === translationSequence) translationLoading.value = false
+  }
+}
+const openTranslation = () => {
+  translationData.value = null
+  translationVisible.value = true
+  loadTranslation()
+}
+const restoreTranslation = async () => {
+  if (translationResuming.value || translationLoading.value || !translationData.value?.can_resume) return
+  const version = translationData.value.version
+  translationResuming.value = true
+  confirming = true
+  try {
+    await ElMessageBox.confirm('请确认已在百度控制台解决余额或授权问题。恢复只重新排队阻塞任务，不重置预算、不跳过冷却、不立即请求百度。', '恢复翻译任务', { confirmButtonText:'确认已修复并恢复',cancelButtonText:'取消',type:'warning' })
+  } catch {
+    translationResuming.value = false
+    return
+  } finally {
+    confirming = false
+  }
+  try {
+    if (!active || !translationVisible.value) return
+    const { data } = await resumeTranslation({ confirm:true,version })
+    if (active && translationVisible.value) ElMessage.success(data.message || '已恢复，等待定时计划')
+  } catch (error) {
+    if (active && translationVisible.value) ElMessage.error(errorMessage(error))
+  } finally {
+    translationResuming.value = false
+    if (active && translationVisible.value) await loadTranslation()
+  }
+}
 
 const fromNow = (ts) => {
   if (!ts) return ''
@@ -470,9 +553,10 @@ const start = () => {
 }
 const stop = () => {
   active = false
-  sequence++; historySequence++; detailSequence++
+  sequence++; historySequence++; detailSequence++; translationSequence++
   loading.value = historyLoading.value = detailLoading.value = false
   historyVisible.value = detailVisible.value = false
+  translationVisible.value = translationLoading.value = false
   if (confirming) ElMessageBox.close()
   clearInterval(timer)
   timer = null
@@ -484,6 +568,9 @@ onBeforeUnmount(stop)
 </script>
 
 <style scoped>
+.translation-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }
+.translation-counts div { display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px; background:#f5f7fa; border-radius:8px; }
+.translation-counts strong { font-size:22px; color:#334155; }
 .environment-note { margin-bottom: 16px; }
 .task-actions { display: flex; align-items: center; gap: 8px; }
 .task-actions .el-button { margin-left: 0; }
