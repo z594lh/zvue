@@ -23,6 +23,8 @@ export const getUiConfigHistory = (params) => api.get('/system/ui-config/history
 
 // 浏览器仅用ERP会话权限，不携带采集API密钥，不触发外部采集。
 export const getSellerspriteListing = (sku, params) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/sellersprite`, { params, timeout: 20000 });
+export const getKeywordReverse = (asin, params) => api.get(`/tools/keyword-reverse/${encodeURIComponent(asin)}`, { params, timeout: 20000 });
+export const getKeywordReverseOptions = (params) => api.get('/tools/keyword-reverse/options', { params, timeout: 20000 });
 export const getSellerspriteAsins = (params) => api.get('/system/sellersprite/asins', { params, timeout: 20000 });
 export const addSellerspriteAsins = (data) => api.post('/system/sellersprite/asins', data, { timeout: 20000 });
 export const updateSellerspriteAsin = (id, data) => api.put(`/system/sellersprite/asins/${id}`, data, { timeout: 20000 });

@@ -176,6 +176,7 @@ const fallbackNavGroups = [
       { label: '箱唛助手', path: '/label-organize' },
       { label: '发票助手', path: '/invoice-export' },
       { label: '运营日报', path: '/daily-reports' },
+      { label: '关键词反查', path: '/tools/keyword-reverse' },
       { label: 'PDF工具', path: '/pdf-tools' }
     ]
   },
@@ -275,6 +276,13 @@ export default {
         if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
         tools.children.push({ label: '运营日报', path: '/daily-reports' })
       }
+      // 沿用原Listing关键词查看权，兼容已登录用户的旧菜单缓存。
+      if (getUserPermissions().includes('amazon_listings:page') &&
+          !groups.some(g => g.children.some(item => item.path === '/tools/keyword-reverse'))) {
+        let tools = groups.find(g => g.label === '工具')
+        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
+        tools.children.push({ label: '关键词反查', path: '/tools/keyword-reverse' })
+      }
       if (getUserPermissions().includes('system:ui_config') &&
           !groups.some(g => g.children.some(item => item.path === '/system/ui-config'))) {
         let system = groups.find(g => g.label === '系统')
@@ -293,6 +301,7 @@ export default {
       // 保持旧兜底项行为，新日报入口仍须具备独立查看权限。
       return fallbackNavGroups.map(group => ({ ...group, children: group.children.filter(item =>
         (item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) &&
+        (item.path !== '/tools/keyword-reverse' || permissions.includes('amazon_listings:page')) &&
         (item.path !== '/system/ui-config' || permissions.includes('system:ui_config'))) }))
     })
 

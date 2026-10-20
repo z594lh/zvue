@@ -309,6 +309,12 @@ const routes = [
     meta: { title: '卖家精灵ASIN配置', componentName: 'SellerspriteConfigView' }
   },
   {
+    path: '/tools/keyword-reverse',
+    name: 'KeywordReverse',
+    component: () => import('../views/KeywordReverseView.vue'),
+    meta: { title: '关键词反查', componentName: 'KeywordReverseView' }
+  },
+  {
     path: '/system/ui-config',
     name: 'UiConfig',
     component: () => import('../views/UiConfigView.vue'),
@@ -344,6 +350,9 @@ router.beforeEach((to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if (to.path === '/tools/keyword-reverse' && !getUserPermissions().includes('amazon_listings:page')) {
+    return next('/403')
+  }
   if (to.path === '/system/sellersprite' && !getUserPermissions().includes('system:sellersprite_config')) {
     return next('/403')
   }

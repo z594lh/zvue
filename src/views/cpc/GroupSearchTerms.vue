@@ -76,6 +76,7 @@
                 {{ row.customer_search_term.toUpperCase() }}
               </a>
               <span v-else class="search-term">{{ row.customer_search_term }}</span>
+              <div v-if="row.translation_status!=='skipped' && !isAsinRow(row)" class="search-term-translation" :title="translationTip(row)">{{ translationStatus(row) }}</div>
             </td>
             <td align="center">{{ row.targeting_type_label || '--' }}</td>
             <td align="right">{{ fmtInt(row.impressions) }}</td>
@@ -109,6 +110,7 @@ import { Warning } from '@element-plus/icons-vue'
 import { getCpcSearchTerms } from '@/services/cpc'
 import { exportToCSV } from '@/utils/export'
 import { useCpcDateRange } from '@/composables/useCpcDateRange'
+import { translationStatus, translationTip } from '@/utils/translationStatus'
 
 const props = defineProps({
   shopId: { type: [Number, String], default: null },
@@ -294,6 +296,7 @@ useCpcEntityRefresh(fetchData)
 .cpc-table td { border: 1px solid #ebeef5; padding: 6px 6px; vertical-align: middle; }
 .cpc-table tbody tr:hover { background: #f5f7fa; }
 .search-term { color: #303133; }
+.search-term-translation { margin-top:4px; color:#7d8fa3; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
 .link-asin {
   color: #ff0000;
   text-decoration: underline;

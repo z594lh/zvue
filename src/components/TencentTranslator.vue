@@ -36,7 +36,7 @@
       </div>
 
       <!-- 结果展示 -->
-      <div class="result-box" id="result-box" v-html="translationResult"></div>
+      <div class="result-box" id="result-box"><div v-if="resultFormat === 'html'" v-html="translationResult"></div><div v-else style="white-space: pre-wrap; overflow-wrap: anywhere">{{ translationResult }}</div></div>
     </div>
 
     <footer>
@@ -71,6 +71,7 @@ export default {
       sourceLang: 'auto',
       targetLang: 'zh',
       translationResult: '翻译结果显示在这里', // 定义翻译结果变量
+      resultFormat: 'text', // 普通文本不解释为HTML；图片对照和原AI展示保持
       imageBase64: '',
       imageSrc: '',
       hasImage: false,
@@ -111,6 +112,7 @@ export default {
       this.imageSrc = '';
       this.hasImage = false;
       this.translationResult = ''; // 清空翻译结果
+      this.resultFormat = 'text';
     },
 
     // 处理粘贴事件
@@ -160,6 +162,7 @@ export default {
       // 显示加载状态
       this.isLoading = true;
       this.translationResult = '翻译中...'; // 显示加载状态
+      this.resultFormat = 'text';
 
       let target = this.targetLang;
       let isImage = this.hasImage;
@@ -205,12 +208,14 @@ export default {
         // 处理响应
         if (response.data && response.data.translated) {
           this.translationResult = response.data.translated;
+          this.resultFormat = (type === 'ai' || isImage) ? 'html' : 'text';
         } else {
           this.translationResult = "翻译失败，请重试";
         }
       } catch (err) {
         console.error('翻译错误:', err);
-        this.translationResult = "翻译出错，请查看控制台";
+        this.resultFormat = 'text';
+        this.translationResult = err.response?.data?.error || '翻译暂不可用，请稍后重试';
       } finally {
         this.isLoading = false;
       }
