@@ -32,13 +32,15 @@ export const updateSellerspriteAsin = (id, data) => api.put(`/system/sellersprit
 // AI托管会话：选项、启停、每日运行及只读历史；不暴露旧单次生成/虚拟收益接口。
 export const getAiOperationsOptions = (params) => api.get('/ai-operations/options', { params, timeout: 20000 });
 // 具体方案：同次输入自动留存，刷新历史不调用模型，不自动重试收费POST。
-// AI分析真实计费；Listing与广告的执行/回读强制模拟，浏览器不能选择真实写入。
+// AI分析真实计费；Listing与广告正式执行，浏览器不能替换服务端保存的行动值。
 export const getAiManagedAsins = (params) => api.get('/ai-operations/managed', { params, timeout: 20000 });
 export const addAiManagedAsin = (data) => api.post('/ai-operations/managed', data, { timeout: 20000 });
 export const updateAiManagedAsin = (id, data) => api.patch(`/ai-operations/managed/${encodeURIComponent(id)}`, data, { timeout: 20000 });
 export const getAiManagedRuns = (id, params) => api.get(`/ai-operations/managed/${encodeURIComponent(id)}/runs`, { params, timeout: 20000 });
 export const runAiManagedAsin = (id) => api.post(`/ai-operations/managed/${encodeURIComponent(id)}/run`, {}, { timeout: 600000 });
 export const getAiManagedRun = (id) => api.get(`/ai-operations/runs/${encodeURIComponent(id)}`, { timeout: 20000 });
+// 仅补原方案明确未发送的广告，不重新收费分析；结果未知时不能借此重发。
+export const retryAiUnsentAds = (id, executions) => api.post(`/ai-operations/runs/${encodeURIComponent(id)}/retry-ads`, { executions, confirm_execute: true }, { timeout: 600000 });
 export const getListingPerformanceConfig = () => api.get('/performance/config');
 // 人员绩效专用筛选选项，后台按查看权限返回历史负责人，不要求分配权限。
 export const getPerformanceOwners = (params) => api.get('/performance/owners', { params });

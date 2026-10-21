@@ -90,8 +90,8 @@ export function buildConversationMessages(plan) {
       message.title = 'ERP · 请修正方案'
       message.text = `${payload.validation_feedback.message}\n\n${payload.validation_feedback.instruction}`
       message.files = [attachment('方案校验反馈.json', payload)]
-    } else if (event.event_type === 'execution_feedback') {
-      message.title = 'ERP · 执行结果反馈'
+    } else if (event.event_type === 'execution_feedback' || event.event_type === 'execution_recovery') {
+      message.title = event.event_type === 'execution_recovery' ? 'ERP · 广告补执行结果' : 'ERP · 执行结果反馈'
       message.text = [payload.message, `本次记录 ${payload.executions?.length || 0} 项执行结果，已交由后续会话恢复。`, payload.note].filter(Boolean).join('\n\n')
       message.files = [attachment('正式执行与回读结果.json', payload, '实际记录的正式提交与独立回读结果')]
     } else continue

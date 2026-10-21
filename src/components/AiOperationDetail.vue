@@ -9,7 +9,7 @@
         <el-tab-pane label="AI会话" name="conversation"><AiOperationAnalysis v-if="detail.plan" :plan="detail.plan" /><el-empty v-else description="本次尚未产生AI调用记录" /></el-tab-pane>
         <el-tab-pane :label="`本次改动（${detail.run.summary.change_count || 0}）`" name="changes" lazy><AiOperationChanges v-if="detail.plan" :plan="detail.plan" /></el-tab-pane>
         <el-tab-pane label="往期改动待观察" name="observations" lazy><AiOperationObservations :detail="detail" /></el-tab-pane>
-        <el-tab-pane label="执行与回读" name="executions" lazy><AiOperationExecutions v-if="detail.plan" :plan="detail.plan" :initial-records="detail.executions" /></el-tab-pane>
+        <el-tab-pane label="执行与回读" name="executions" lazy><AiOperationExecutions v-if="detail.plan" :plan="detail.plan" :run-id="detail.run.id" :initial-records="detail.executions" @recovered="loadDetail" /></el-tab-pane>
         <el-tab-pane label="资料快照" name="facts" lazy><AiOperationFacts v-if="detail.plan" :result="detail.plan.facts" /></el-tab-pane>
       </el-tabs>
     </template>
