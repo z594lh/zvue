@@ -5,14 +5,14 @@
       <el-option label="全部负责人" value="all" />
       <el-option label="我负责的" value="mine" />
       <el-option v-if="showUnassignedFilter" label="尚未分配" value="unassigned" />
-      <el-option v-for="user in owners" :key="user.id" :label="user.nickname || user.username" :value="String(user.id)" />
+      <el-option v-for="user in owners" :key="user.id" :label="ownerLabel(user)" :value="String(user.id)" />
     </el-select>
     <el-button v-if="canAssign" type="primary" :icon="UserFilled" :disabled="!selection.length" @click="openAssignment()">
       分配选中 Listing（{{ selection.length }}）
     </el-button>
 
     <el-dialog v-model="visible" title="分配 Listing 负责人" width="min(820px, 94vw)" class="ownership-dialog" destroy-on-close :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy">
-      <el-alert title="交接从站点指定日期零点生效；此前订单仍归原负责人。父体将展开为当前子 SKU。" type="info" :closable="false" />
+      <el-alert title="北京时间15:00前变更，默认次日生效；15:00起默认后天生效。此前业绩归原负责人，父体展开为当前子SKU。暂停AI托管后再交给人工，可避免任务继续启动。" type="info" :closable="false" />
       <el-form label-width="100px" style="margin-top:20px" :disabled="busy">
         <el-form-item label="操作">
           <el-radio-group v-model="action">
@@ -24,11 +24,12 @@
           <el-form-item label="负责人">
             <el-select v-model="ownerId" placeholder="请选择负责人">
               <el-option label="解除分配（未分配）" :value="0" />
-              <el-option v-for="user in owners" :key="user.id" :label="user.nickname || user.username" :value="user.id" />
+              <el-option v-for="user in owners" :key="user.id" :label="ownerLabel(user)" :value="user.id" />
             </el-select>
           </el-form-item>
           <el-form-item label="生效日期">
-            <el-date-picker v-model="effectiveDate" value-format="YYYY-MM-DD" type="date" placeholder="默认站点第二天" />
+            <el-date-picker v-model="effectiveDate" value-format="YYYY-MM-DD" type="date" placeholder="默认按北京时间15点规则" />
+            <small style="margin-left:10px;color:#71849b">{{ effectiveDate ? '指定日期仍须符合交接规则' : `默认生效日：${preview?.items?.[0]?.effective_date || '由服务器计算'}` }}</small>
           </el-form-item>
         </template>
         <el-form-item label="变更理由">
@@ -42,11 +43,12 @@
         <el-table-column prop="seller_sku" label="实际变更子 SKU" min-width="180" />
         <el-table-column label="原负责人" width="120"><template #default="{row}">{{ row.current?.owner_name || '未分配' }}</template></el-table-column>
         <el-table-column prop="timezone" label="业务时区" min-width="160" />
+        <el-table-column prop="effective_date" label="生效业务日" width="120" />
         <el-table-column prop="effective_from_utc" label="生效时间（UTC）" min-width="195" />
       </el-table>
       <template #footer>
         <el-button @click="visible=false" :disabled="busy">关闭</el-button>
-        <el-button :icon="Refresh" @click="makePreview" :loading="previewLoading" :disabled="busy || (action==='assign' && !effectiveDate)">刷新范围</el-button>
+        <el-button :icon="Refresh" @click="makePreview" :loading="previewLoading" :disabled="busy">刷新范围</el-button>
         <el-button type="primary" :icon="Check" @click="submit" :loading="busy" :disabled="!preview || previewLoading || (action==='assign' && ownerId===null)">确认变更</el-button>
       </template>
     </el-dialog>
@@ -79,6 +81,8 @@
 </template>
 
 <script setup>
+// 固定北京时间15:00交接规则：2026-10-26 14:00→27日，15:00→28日。
+// 默认日期由后端冻结在签名预览中，前端不再使用浏览器/站点“明天”重复推算。
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UserFilled, User, List, Refresh, Check, Right } from '@element-plus/icons-vue'
@@ -115,6 +119,8 @@ watch([ownerId,effectiveDate,reason,action], () => {
 onUnmounted(() => { invalidate(); ++historyVersion; ++operationsVersion })
 const message = error => error.response?.data?.message || error.message || '操作失败'
 const formatTime = value => value ? String(value).replace('T',' ').replace(/\.\d+Z?$/,'').replace(/Z$/,'') : '—'
+/** 将AI与普通人员在负责人候选中明确区分，不改变用户主键。 */
+const ownerLabel = user => `${user.nickname || user.username}${user.account_type==='ai'?' · AI系统人员':''}`
 const changeFilter = () => {
   emit('filter', filter.value==='mine' ? { only_mine:'1' } : filter.value==='unassigned' ? { unassigned:'1' } : filter.value==='all' ? {} : { owner_user_id:filter.value })
 }
@@ -126,24 +132,19 @@ const openAssignment = (selected = props.selection) => {
   try {
     const timezone = markets.value[frozenItems.value[0]?.marketplace_id]?.timezone
     if (!timezone) throw new Error('该站点尚未配置业务时区')
-    effectiveDate.value = tomorrow(timezone)
+    effectiveDate.value = ''
   } catch (err) { ElMessage.error(message(err)); return }
   error.value = ''; invalidate(); visible.value = true
   makePreview()
 }
-const tomorrow = (timezone, now = new Date()) => {
-  const parts = new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now)
-  const value = type => Number(parts.find(part => part.type===type).value)
-  return new Date(Date.UTC(value('year'),value('month')-1,value('day')+1)).toISOString().slice(0,10)
-}
 const makePreview = async () => {
   invalidate()
-  if (!visible.value || busy.value || (action.value==='assign' && !effectiveDate.value)) return
+  if (!visible.value || busy.value) return
   const version = previewVersion
   previewLoading.value = true; error.value = ''
   try {
     const response = await previewListingAssignments({ action:action.value, items:frozenItems.value,
-      owner_user_id:ownerId.value || null, effective_date:effectiveDate.value, reason:reason.value, expand_parents:true })
+      owner_user_id:ownerId.value || null, effective_date:effectiveDate.value || undefined, reason:reason.value, expand_parents:true })
     if (version !== previewVersion || !visible.value) return
     preview.value = response.data.data
     requestId = window.crypto?.randomUUID?.() || `ownership-${Date.now()}-${Math.random().toString(36).slice(2)}`

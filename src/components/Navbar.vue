@@ -177,6 +177,7 @@ const fallbackNavGroups = [
       { label: '发票助手', path: '/invoice-export' },
       { label: '运营日报', path: '/daily-reports' },
       { label: '关键词反查', path: '/tools/keyword-reverse' },
+      { label: 'AI托管', path: '/tools/ai-operations' },
       { label: 'PDF工具', path: '/pdf-tools' }
     ]
   },
@@ -289,6 +290,13 @@ export default {
         if (!system) { system = { label: '系统', children: [] }; groups.push(system) }
         system.children.push({ label: '界面配置', path: '/system/ui-config' })
       }
+      // AI托管是工具独立菜单；即使菜单缓存残留也必须满足专用权限。
+      groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/tools/ai-operations') })
+      if (getUserPermissions().includes('ai_operations:manage')) {
+        let tools = groups.find(g => g.label === '工具')
+        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
+        tools.children.push({ label: 'AI托管', path: '/tools/ai-operations' })
+      }
       return groups.filter((g) => g.children.length > 0)
     }
 
@@ -302,6 +310,7 @@ export default {
       return fallbackNavGroups.map(group => ({ ...group, children: group.children.filter(item =>
         (item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) &&
         (item.path !== '/tools/keyword-reverse' || permissions.includes('amazon_listings:page')) &&
+        (item.path !== '/tools/ai-operations' || permissions.includes('ai_operations:manage')) &&
         (item.path !== '/system/ui-config' || permissions.includes('system:ui_config'))) }))
     })
 

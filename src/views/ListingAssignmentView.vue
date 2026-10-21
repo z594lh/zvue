@@ -1,7 +1,7 @@
 <template>
   <div class="ownership-workbench">
     <header class="workbench-heading">
-      <div><div class="workbench-eyebrow">AMAZON · OWNERSHIP</div><h1>Listing 负责人分配</h1><p>让每一个 SKU 的责任清晰可追溯。交接从站点次日零点生效，原订单业绩仍归原负责人。</p></div>
+      <div><div class="workbench-eyebrow">AMAZON · OWNERSHIP</div><h1>Listing 负责人分配</h1><p>支持普通人员和AI运营。北京时间15:00前变更默认次日生效，15:00起默认后天生效；历史业绩不变。</p></div>
       <div class="workbench-header-actions"><el-button :icon="Refresh" @click="fetchRows" :loading="loading">刷新列表</el-button></div>
     </header>
     <section class="workbench-card">

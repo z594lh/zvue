@@ -1,7 +1,7 @@
 <template>
   <div class="ownership-workbench performance-page">
     <header class="workbench-heading"><div><div class="workbench-eyebrow">FINANCE · TEAM PERFORMANCE</div><h1>人员绩效</h1><p>直接使用 SKU 日报，按当天历史负责人汇总。</p></div>
-      <div class="workbench-header-actions"><el-tag type="info" effect="plain">真实数据 · 经营指标</el-tag></div>
+      <div class="workbench-header-actions"><el-button v-if="canPreviewFacts" @click="$router.push('/tools/ai-operations')">AI托管 · ASIN列表</el-button><el-tag type="info" effect="plain">真实数据 · 经营指标</el-tag></div>
     </header>
     <el-alert :title="notice" type="info" :closable="false" show-icon />
     <section class="workbench-card"><div class="workbench-filters">
@@ -11,7 +11,7 @@
       <div class="workbench-field"><label>业务日期</label><el-date-picker v-model="dates" type="daterange" value-format="YYYY-MM-DD" start-placeholder="开始日期" end-placeholder="结束日期" @change="resetResults" /></div>
       <div class="workbench-field"><label>人员筛选</label><el-select v-model="ownerFilter" filterable style="width:180px" :loading="ownersLoading" :disabled="ownersLoading" @change="resetResults">
         <el-option v-if="canAll" label="全部负责人" :value="0" />
-        <template v-if="canAll"><el-option v-for="person in ownerList" :key="person.id" :label="person.name" :value="person.id" /></template>
+        <template v-if="canAll"><el-option v-for="person in ownerList" :key="person.id" :label="person.name+(person.account_type==='ai'?' · AI运营':'')" :value="person.id" /></template>
         <el-option v-if="!canAll" :label="ownerList[0]?.name || '我的绩效'" value="me" />
       </el-select></div>
       <el-button type="primary" :icon="Search" :loading="loading" :disabled="ownersLoading" @click="load">查询指标</el-button>
@@ -26,7 +26,7 @@
     <section class="workbench-card"><div class="workbench-card-heading"><h2>人员经营表现 <small> · {{ rows.length }} 个负责人 / 币种组合</small></h2><div class="performance-table-tools"><el-tooltip :content="performanceColorGuide" placement="top" popper-class="performance-color-tooltip"><span class="performance-color-guide" tabindex="0">颜色参考 <i class="is-green" />正常 <i class="is-yellow" />关注 <i class="is-red" />重点关注 <el-icon><QuestionFilled /></el-icon></span></el-tooltip><span class="workbench-muted">不同币种单独统计，不直接相加</span></div></div>
     <el-table class="workbench-table" :data="rows" v-loading="loading" stripe>
       <el-table-column label="负责人" width="320" fixed="left"><template #default="{row}"><div class="performance-owner-analysis">
-        <div class="workbench-owner"><span class="workbench-avatar">{{ (row.owner_name || '?').slice(0,1) }}</span><span class="performance-owner-name" :title="row.owner_name">{{ row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人') }}</span></div>
+        <div class="workbench-owner"><span class="workbench-avatar">{{ row.account_type==='ai'?'AI':(row.owner_name || '?').slice(0,1) }}</span><span class="performance-owner-name" :title="row.owner_name">{{ row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人') }}</span><el-tag v-if="row.account_type==='ai'" size="small" effect="plain">AI运营</el-tag></div>
         <div class="performance-analysis-actions">
           <el-popover :visible="analysisGuideShown(row)" placement="bottom-start" :width="320" popper-class="performance-config-onboarding">
             <template #reference><span><el-tooltip :disabled="analysisGuideShown(row)" :content="canAnalyze(row) ? '分析配置：选择关注 SKU 和指标' : '需要本人或全员 SKU 经营分析权限，授权后刷新页面'" placement="top"><span><el-button size="small" plain circle :icon="Setting" :class="{'analysis-config-guided': analysisGuideShown(row)}" :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="分析配置" @click="openAnalysisConfig(row)" /></span></el-tooltip></span></template>
@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onDeactivated, onMounted, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown, Calendar, DataAnalysis, Search, Setting, Document, QuestionFilled } from '@element-plus/icons-vue'
 import PerformanceSkuDetails from '@/components/PerformanceSkuDetails.vue'
@@ -88,6 +88,7 @@ import { useOperationGuide } from '@/utils/operationGuide'
 import { getUserPermissions, getMyPerformance, getUsersPerformance, getListingPerformanceConfig, getPerformanceOwners } from '@/services/api.js'
 
 const codes = getUserPermissions()
+const canPreviewFacts = codes.includes('ai_operations:manage')
 const canAll = codes.includes('performance:view_all')
 const chartCurrency=ref(null), route=useRoute()
 const shopList = ref([])
@@ -98,6 +99,19 @@ const skuDetails=ref(null), loadedParams=ref(null)
 const ownerDaily=ref(null)
 const skuAnalysis=ref(null), analysisAccess=ref({user_id:null,self:false,all:false})
 const pageActive=ref(true)
+let initialized=false,operatorRoute=''
+/** 缓存绩效页接收托管列表带来的店铺/AI人员筛选，不因普通刷新反复覆盖人工筛选。 */
+async function applyOperatorRoute(){
+  if(!initialized || route.path!=='/performance')return
+  const key=`${route.query.shop_id || ''}:${route.query.user_id || ''}`
+  if(key===operatorRoute || !route.query.user_id)return
+  operatorRoute=key
+  const shop=shopList.value.find(item=>String(item.id)===String(route.query.shop_id))
+  if(shop && shop.id!==shopId.value){shopId.value=shop.id;await changeShop()}
+  const person=ownerList.value.find(item=>String(item.id)===String(route.query.user_id))
+  if(canAll && person){ownerFilter.value=person.id;await load()}
+}
+watch(()=>route.fullPath,applyOperatorRoute)
 const { pending: analysisGuidePending, dontRemind: analysisGuideDontRemind, begin: beginAnalysisGuide, dismiss: dismissAnalysisGuide } = useOperationGuide('performance:analysis-config-guide:v1', () => analysisAccess.value.user_id)
 const rows = computed(() => result.value?.list || [])
 // 使用同一次查询的逐日SKU覆盖，不用当前负责数量推算历史日均销量。
@@ -108,7 +122,7 @@ const refundLabel = computed(() => 'SKU 报表退款')
 const chartCurrencies=computed(()=>[...new Set((result.value?.trend || []).map(row=>row.currency))])
 const chartDays=computed(()=>result.value && loadedParams.value && chartCurrency.value ? aggregatePerformanceDays(result.value.trend || [],chartCurrency.value,profitKey.value,loadedParams.value.date_from,loadedParams.value.date_to) : [])
 const homeMetrics=[{key:'sales_amount',label:'销售额',axis:'amount',color:'#527eea'}, {key:'profit',label:'利润',axis:'amount',color:'#34b7a5'}]
-const notice = '按每个 SKU、每天的历史负责人汇总；没有负责人或没有日报的日期不计入个人绩效。销售额、广告费、退款和利润沿用 SKU 报表，不重新计算、不重复扣退款。'
+const notice = '人工与AI运营统一按每个SKU、每天的历史负责人汇总；交接生效前业绩归原负责人，生效后归新负责人。没有负责人或没有日报的日期不计入；销售额、广告费、退款和利润沿用SKU报表，不重新计算。'
 // 数据范围展示实际计入日期的并集，分段说明保留中间断档，避免误解为全区间负责。
 const rangeDescription = row => (row.data_ranges || []).map(range=>`${range.date_from} ～ ${range.date_to}（${range.days}天）`).join('；')
 const money = value => value === null || value === undefined ? '—' : Number(value).toLocaleString('zh-CN', { minimumFractionDigits:2, maximumFractionDigits:2 })
@@ -162,7 +176,7 @@ const analysisGuideShown=row=>pageActive.value && analysisGuidePending.value && 
 const openAnalysisConfig=row=>{if(loadedParams.value && canAnalyze(row)){dismissAnalysisGuide();skuAnalysis.value?.openConfig(row,{...loadedParams.value})}}
 const openAnalysis=(row,days)=>{if(loadedParams.value && canAnalyze(row)){dismissAnalysisGuide();skuAnalysis.value?.openData(row,{...loadedParams.value},Number(days))}}
 // 缓存页签失活隐藏Teleport气泡；未勾选“不再提醒”时重新进入仍提供指引。
-onActivated(()=>{pageActive.value=true;if(analysisAccess.value.user_id)beginAnalysisGuide()})
+onActivated(()=>{pageActive.value=true;if(analysisAccess.value.user_id)beginAnalysisGuide();applyOperatorRoute()})
 onDeactivated(()=>{pageActive.value=false})
 onMounted(async () => {
   try {
@@ -170,11 +184,14 @@ onMounted(async () => {
     shopList.value = response.data.data.shops
     analysisAccess.value = response.data.data.analysis_access || {user_id:null,self:false,all:false}
     beginAnalysisGuide()
-    shopId.value = shopList.value[0]?.id || null
-    dates.value=recentPerformanceDates(shopList.value[0]?.sku_report_date_to,response.data.data.markets[shopList.value[0]?.marketplace_id]?.timezone)
+    const selectedShop=shopList.value.find(shop=>String(shop.id)===String(route.query.shop_id)) || shopList.value[0]
+    shopId.value = selectedShop?.id || null
+    dates.value=recentPerformanceDates(selectedShop?.sku_report_date_to,response.data.data.markets[selectedShop?.marketplace_id]?.timezone)
     if(/^\d{4}-\d{2}-\d{2}$/.test(route.query.date_from || '') && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date_to || '')) dates.value=[route.query.date_from,route.query.date_to]
     await loadOwnerOptions()
+    if(canAll && route.query.user_id){const person=ownerList.value.find(owner=>String(owner.id)===String(route.query.user_id));if(person)ownerFilter.value=person.id}
     await load()
+    initialized=true;operatorRoute=`${route.query.shop_id || ''}:${route.query.user_id || ''}`
   } catch (err) { error.value = errorMessage(err) }
 })
 </script>

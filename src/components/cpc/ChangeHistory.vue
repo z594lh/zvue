@@ -60,6 +60,8 @@
             <span>{{ row.source === 'ERP' ? 'ERP' : '平台（来源未确认）' }}{{ row.match_method === 'rule_unique' ? ' · 规则关联' : '' }}</span>
           </el-tooltip>
           <div v-if="row.operator_name" class="history-detail">{{ row.operator_name }}</div>
+          <el-tag v-if="row.audit_context?.source==='AI'" size="small" effect="plain">AI托管 · #{{ row.audit_context.run_id }}</el-tag>
+          <div v-if="row.audit_context" class="history-detail">发起：{{ row.audit_context.initiated_by.name }}</div>
         </template>
       </el-table-column>
       <el-table-column label="同步状态" width="130">

@@ -7,6 +7,8 @@
         <!-- 用户管理 -->
         <el-tab-pane label="用户管理" name="users">
           <div class="toolbar">
+            <el-button type="primary" @click="openCreateUser('human')">＋ 新增人员</el-button>
+            <el-button @click="openCreateUser('ai')">创建 AI 运营账号</el-button>
             <el-input
               v-model="userSearch.keyword"
               placeholder="搜索用户名/昵称"
@@ -39,6 +41,7 @@
             </el-table-column>
             <el-table-column prop="username" label="用户名" width="120" />
             <el-table-column prop="nickname" label="昵称" width="120" />
+            <el-table-column label="人员类型" width="145"><template #default="{row}"><el-tag :type="row.account_type==='ai'?'primary':'info'">{{ row.account_type==='ai'?'AI运营 · 不可登录':'普通人员' }}</el-tag></template></el-table-column>
             <el-table-column label="角色" min-width="160">
               <template #default="{ row }">
                 <el-tag v-for="role in row.roles" :key="role.id" size="small" style="margin-right: 4px">
@@ -54,8 +57,9 @@
             </el-table-column>
             <el-table-column label="操作" width="260" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" type="primary" @click="openUserRoleDialog(row)">分配角色</el-button>
-                <el-button size="small" @click="openUserPermDialog(row)">直接权限</el-button>
+                <el-button v-if="row.account_type!=='ai'" size="small" type="primary" @click="openUserRoleDialog(row)">分配角色</el-button>
+                <el-button v-if="row.account_type!=='ai'" size="small" @click="openUserPermDialog(row)">直接权限</el-button>
+                <span v-else style="color:#8393a8;margin-right:12px">系统执行身份</span>
                 <el-button size="small" :type="row.status ? 'danger' : 'success'" @click="toggleUserStatus(row)">
                   {{ row.status ? '禁用' : '启用' }}
                 </el-button>
@@ -174,6 +178,17 @@
     </div>
 
     <!-- 权限定义弹窗 -->
+    <el-dialog v-model="createUserDialog.visible" title="新增人员" width="min(480px, 94vw)" :close-on-click-modal="false" :show-close="!createUserDialog.loading" :close-on-press-escape="!createUserDialog.loading">
+      <el-form label-position="top" :disabled="createUserDialog.loading">
+        <el-form-item label="人员类型"><el-radio-group v-model="createUserDialog.form.account_type" @change="changeCreateUserType"><el-radio value="human">普通人员</el-radio><el-radio value="ai">AI运营</el-radio></el-radio-group></el-form-item>
+        <el-alert v-if="createUserDialog.form.account_type==='ai'" title="统一 AI 运营账号用于操作留痕、负责人分配和绩效；不支持登录，无需分配角色。" type="info" :closable="false" style="margin-bottom:16px" />
+        <el-form-item label="用户名"><el-input v-model="createUserDialog.form.username" maxlength="50" autocomplete="off" placeholder="3~50位字母、数字、下划线、点或短横线" /></el-form-item>
+        <el-form-item label="显示名称"><el-input v-model="createUserDialog.form.nickname" maxlength="50" placeholder="例如：AI运营" /></el-form-item>
+        <el-form-item v-if="createUserDialog.form.account_type==='human'" label="初始密码"><el-input v-model="createUserDialog.form.password" type="password" show-password maxlength="128" autocomplete="new-password" placeholder="8~128位；创建后另行分配角色" /></el-form-item>
+      </el-form>
+      <el-alert v-if="createUserDialog.error" :title="createUserDialog.error" type="error" :closable="false" />
+      <template #footer><el-button :disabled="createUserDialog.loading" @click="createUserDialog.visible=false">取消</el-button><el-button type="primary" :loading="createUserDialog.loading" @click="submitCreateUser">创建人员</el-button></template>
+    </el-dialog>
     <el-dialog v-model="permDefDialog.visible" :title="permDefDialog.isEdit ? '编辑权限' : '新增权限'" width="460px">
       <el-form :model="permDefDialog.form" label-width="80px">
         <el-form-item label="权限码" required>
@@ -330,6 +345,7 @@ import {
   getRolePermissions,
   assignRolePermissions,
   getAdminUsers,
+  createAdminUser,
   assignUserRoles,
   updateUserStatus,
   getUserDirectPermissions,
@@ -345,6 +361,30 @@ export default {
   setup() {
     const { proxy } = getCurrentInstance()
     const activeTab = ref('users')
+    const createUserDialog=reactive({visible:false,loading:false,error:'',form:{account_type:'human',username:'',nickname:'',password:''}})
+    /** 切换人员类型时重置凭证，AI只使用不可登录的系统身份。 */
+    const changeCreateUserType=()=>{
+      const ai=createUserDialog.form.account_type==='ai'
+      Object.assign(createUserDialog.form,{username:ai?'ai_operator':'',nickname:ai?'AI运营':'',password:''})
+      createUserDialog.error=''
+    }
+    /** 打开普通人员或AI账号创建弹框，不自动授予角色或触发运营任务。 */
+    const openCreateUser=(kind)=>{createUserDialog.form.account_type=kind;changeCreateUserType();createUserDialog.visible=true}
+    /** 提交人员并刷新可搜索分页；凭证只发送到新增接口，不进入列表或日志。 */
+    const submitCreateUser=async()=>{
+      if(createUserDialog.loading)return
+      const form=createUserDialog.form
+      if(!form.username.trim() || (form.account_type==='human' && form.password.trim().length<8)){createUserDialog.error='请填写用户名；普通人员密码至少8位';return}
+      createUserDialog.loading=true;createUserDialog.error=''
+      try{
+        const body={account_type:form.account_type,username:form.username.trim(),nickname:form.nickname.trim()}
+        if(form.account_type==='human')body.password=form.password
+        await createAdminUser(body);form.password='';createUserDialog.visible=false
+        proxy.$message.success({message:'人员已创建；普通人员请按需分配角色，AI无需登录',offset:60})
+        userSearch.page=1;userSearch.keyword='';await fetchUsers()
+      }catch(error){createUserDialog.error=error.response?.data?.message || '新增人员失败，请重试'}
+      finally{createUserDialog.loading=false}
+    }
     const permTreeRef = ref(null)
 
     // ========== 权限定义 ==========
@@ -838,6 +878,7 @@ export default {
       permDialog,
       permissionTree,
       users,
+      createUserDialog,openCreateUser,changeCreateUserType,submitCreateUser,
       usersLoading,
       userTotal,
       userSearch,

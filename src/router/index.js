@@ -309,6 +309,12 @@ const routes = [
     meta: { title: '卖家精灵ASIN配置', componentName: 'SellerspriteConfigView' }
   },
   {
+    path: '/tools/ai-operations',
+    name: 'AiOperations',
+    component: () => import('../views/AiOperationsView.vue'),
+      meta: { title: 'AI托管 · ASIN列表', componentName: 'AiOperationsView' }
+  },
+  {
     path: '/tools/keyword-reverse',
     name: 'KeywordReverse',
     component: () => import('../views/KeywordReverseView.vue'),
@@ -350,6 +356,9 @@ router.beforeEach((to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
+  if ((to.path === '/tools/ai-operations' || to.path.startsWith('/tools/ai-operations/')) && !getUserPermissions().includes('ai_operations:manage')) {
+    return next('/403')
+  }
   if (to.path === '/tools/keyword-reverse' && !getUserPermissions().includes('amazon_listings:page')) {
     return next('/403')
   }
