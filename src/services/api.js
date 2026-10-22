@@ -28,6 +28,11 @@ export const getKeywordReverseOptions = (params) => api.get('/tools/keyword-reve
 export const getSellerspriteAsins = (params) => api.get('/system/sellersprite/asins', { params, timeout: 20000 });
 export const addSellerspriteAsins = (data) => api.post('/system/sellersprite/asins', data, { timeout: 20000 });
 export const updateSellerspriteAsin = (id, data) => api.put(`/system/sellersprite/asins/${id}`, data, { timeout: 20000 });
+// 任务历史只读；人工补救仅入队，不在浏览器启动网页采集。
+export const getSellerspriteTasks = (asin, params, manage = false) => api.get(manage ? `/system/sellersprite/tasks/${encodeURIComponent(asin)}` : `/tools/keyword-reverse/${encodeURIComponent(asin)}/tasks`, { params, timeout: 20000 });
+export const recoverSellerspriteTask = (id, data) => api.post(`/system/sellersprite/tasks/${id}/recover`, data, { timeout: 20000 });
+export const resumeSellerspriteAccount = () => api.post('/system/sellersprite/recovery/resume', { confirm: true }, { timeout: 20000 });
+export const cancelSellerspriteRecovery = id => api.post(`/system/sellersprite/recovery/${id}/cancel`, {}, { timeout: 20000 });
 
 // AI托管会话：选项、启停、每日运行及只读历史；不暴露旧单次生成/虚拟收益接口。
 export const getAiOperationsOptions = (params) => api.get('/ai-operations/options', { params, timeout: 20000 });

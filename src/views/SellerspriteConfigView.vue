@@ -41,7 +41,7 @@
         </el-table-column>
         <el-table-column label="采集开关" width="100" align="center"><template #default="{row}"><el-switch :model-value="!!row.enabled" :disabled="saving || loading" :loading="busyId===row.id" :aria-label="`启用${row.asin}`" @change="value=>toggle(row,value)" /><div class="sprite-switch-note">{{ row.enabled ? '已启用' : '已停用' }}</div></template></el-table-column>
         <el-table-column prop="priority" label="优先级" width="80" align="center" />
-        <el-table-column label="最近任务" width="120"><template #default="{row}"><el-tag :type="taskTone(row.latest_status)" size="small" effect="light">{{ spriteStates[row.latest_status] || row.latest_status || '尚无任务' }}</el-tag></template></el-table-column>
+        <el-table-column label="最近任务 / 诊断" min-width="230"><template #default="{row}"><el-tag :type="taskTone(row.latest_status)" size="small" effect="light">{{ spriteStates[row.latest_status] || row.latest_status || '尚无任务' }}</el-tag><small class="sprite-task-date">{{ row.latest_date || '' }}</small><p v-if="row.latest_status && row.latest_status!=='completed'" class="sprite-task-reason">{{ row.diagnostic?.stage_label }}：{{ row.diagnostic?.message }}</p><el-button link type="primary" @click="openTasks(row)">任务与补救</el-button></template></el-table-column>
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip><template #default="{row}"><span :class="{'sprite-no-owner': !row.remark}">{{ row.remark || '未填写' }}</span></template></el-table-column>
         <el-table-column label="最近修改" width="165"><template #default="{row}"><div class="sprite-updated"><span>{{ row.updated_by_name || '—' }}</span><small>{{ spriteTime(row.updated_at) }}</small><small>北京时间</small></div></template></el-table-column>
         <el-table-column label="操作" width="78" fixed="right"><template #default="{row}"><el-button link type="primary" :disabled="saving || loading" @click="openEdit(row)">编辑</el-button></template></el-table-column>
@@ -49,6 +49,7 @@
       </el-table>
       <el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" :disabled="loading || saving" @current-change="load" />
     </section>
+    <SellerspriteTaskDialog v-model="tasksVisible" :asin="tasksAsin" can-recover @changed="load" />
     <el-dialog v-model="visible" :title="editing ? '编辑ASIN配置' : '批量添加ASIN'" width="min(580px, 94vw)" append-to-body :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving">
       <el-form label-position="top" :disabled="saving"><el-form-item v-if="!editing" label="ASIN（每行一个，最多200个；重复项保持原设置）"><el-input v-model="form.asins" type="textarea" :rows="6" maxlength="3000" placeholder="B0XXXXXXXX&#10;B0YYYYYYYY" aria-label="待抓取ASIN列表" /></el-form-item><el-form-item v-else label="ASIN / 站点"><strong>{{ form.asin }} · US</strong></el-form-item><el-form-item label="启用采集"><el-switch v-model="form.enabled" /></el-form-item><el-form-item label="优先级（越大越先采集）"><el-input-number v-model="form.priority" :min="0" :max="9999" :precision="0" /></el-form-item><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit /></el-form-item></el-form>
       <template #footer><el-button :disabled="saving" @click="visible=false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存配置</el-button></template>
@@ -62,6 +63,10 @@ import { ElMessage } from 'element-plus'
 import { Plus, Search, Refresh, DataAnalysis, Picture, CopyDocument } from '@element-plus/icons-vue'
 import { addSellerspriteAsins, getSellerspriteAsins, updateSellerspriteAsin } from '@/services/api'
 import { spriteStates, spriteTime } from '@/utils/sellersprite'
+import SellerspriteTaskDialog from '@/components/SellerspriteTaskDialog.vue'
+const tasksVisible=ref(false),tasksAsin=ref('')
+// 在独立弹框查看该ASIN的任务、失败原因和补救队列，不触发网页采集。
+function openTasks(row){tasksAsin.value=row.asin;tasksVisible.value=true}
 const rows=ref([]),total=ref(0),page=ref(1),search=ref(''),enabled=ref(''),ownership=ref(''),loading=ref(false),saving=ref(false),error=ref(''),visible=ref(false),editing=ref(null),busyId=ref(null),form=ref({})
 let disposed=false,revision=0
 const message=err=>err.response?.data?.message || '保存结果待确认，请刷新查看，勿反复提交'
@@ -79,6 +84,7 @@ async function toggle(row,value){if(saving.value)return;saving.value=true;busyId
 onMounted(load);onBeforeUnmount(()=>{disposed=true;revision++})
 </script>
 <style scoped>
+.sprite-task-date{margin-left:8px;font-size:11px;color:#8b9ab0}.sprite-task-reason{font-size:12px;line-height:1.7;color:#ae6454;margin:7px 0;overflow-wrap:anywhere}
 .sprite-config{max-width:1640px;margin:0 auto;padding:28px 24px;color:#334a64}
 .sprite-config-header,.sprite-config-title{display:flex;align-items:center;gap:14px}.sprite-config-header{justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}.sprite-config-mark{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:#e8f0ff;color:#4776d9;font-size:25px}.sprite-config h1{margin:0 0 6px;font-size:24px;color:#223c5b}.sprite-config-title p{margin:0;font-size:13px;color:#8695a9}.sprite-config-hint{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;font-size:12px;color:#8796ab;line-height:1.8}
 .sprite-config-panel{background:#fff;border:1px solid #e8edf5;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px #28486c05}.sprite-config-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:20px}.sprite-config-tools .el-input{width:340px}.sprite-config-tools .el-select{width:190px}.sprite-config-tools .sprite-enabled-filter{width:150px}.sprite-config-caption{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 20px 16px;font-size:12px;color:#96a2b3}.sprite-config-caption strong{color:#3f5570;font-size:14px}.sprite-config-caption strong span{font-weight:400;color:#8295b2;font-size:12px;margin-left:8px}.sprite-config-panel>.el-alert{width:auto;margin:0 20px 16px}.sprite-config-panel>.el-pagination{justify-content:flex-end;padding:18px 20px;overflow:auto}

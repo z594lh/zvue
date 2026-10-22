@@ -15,7 +15,8 @@
     <template v-if="activeAsin">
       <section class="kr-context kr-panel"><div><strong>{{ data.product?.product_name || activeAsin }}</strong><span>{{ activeAsin }}</span><el-tag v-if="data.product" :type="data.product.ownership==='owned'?'success':'info'" size="small">{{ data.product.ownership==='owned'?'本店商品':data.product.ownership==='catalog'?'系统商品':'竞品 / 未关联本店' }}</el-tag><span v-if="data.product?.related_products?.length">{{ [...new Set(data.product.related_products.map(p=>p.shop_name).filter(Boolean))].join(' / ') }}</span></div><div><span>采集快照</span><el-select v-model="snapshotId" placeholder="暂无成功快照" aria-label="采集快照" :disabled="loading || !data.snapshots?.length" @change="changeSnapshot"><el-option v-for="item in data.snapshots || []" :key="item.id" :value="item.id" :label="`${item.record_date} · ${item.row_count}个关键词`" /></el-select><el-button link :disabled="loading" @click="latestSnapshot">最新快照</el-button><el-button link :icon="Refresh" :loading="loading" @click="load">重读本地</el-button></div></section>
       <div class="kr-data-note">ASIN流量占比：近30天 · 月度指标：来源自然月口径，采集日不等于统计月 · 金额 USD · 入库时间 {{ spriteTime(data.snapshot?.completed_at) }}（北京时间）<br><strong>展示量、点击量、月搜索量及购买量是关键词市场数据，不是当前ASIN的经营数据。排名为导出快照值，非实时，来源更新时间见每行。</strong>缺失值不记为0；筛选及表头的 ? 可查看说明。</div>
-      <el-alert v-if="data.latest_attempt && data.latest_attempt.status!=='completed'" :title="`最近一次任务${spriteStates[data.latest_attempt.status] || data.latest_attempt.status}；${data.snapshot?'保留成功快照，不影响查看':'暂无成功快照，请等待采集完成'}`" type="warning" :closable="false" />
+      <el-alert v-if="data.latest_attempt && data.latest_attempt.status!=='completed'" :title="`${data.latest_attempt.record_date}：${spriteStates[data.latest_attempt.status] || data.latest_attempt.status}；${data.latest_attempt.diagnostic?.stage_label || ''}：${data.latest_attempt.diagnostic?.message || '原因待核实'}`" type="warning" :closable="false"><span>{{ data.snapshot?'保留成功快照，不影响查看。':'暂无成功快照。' }}</span><el-button link type="primary" @click="tasksVisible=true">查看原因与补救</el-button></el-alert>
+      <el-button link type="primary" @click="tasksVisible=true">采集任务历史 / 补救队列</el-button>
       <section class="kr-filters kr-panel" :aria-busy="loading">
         <div class="kr-filter-title"><strong>关键词筛选</strong><span>区间包含边界；比例指标按百分数填写，如 5 表示 5%</span></div>
         <div class="kr-check-line"><span>流量词类型 <KeywordMetricHelp metric="traffic_type" /></span><el-checkbox-group v-model="draft.traffic_type"><el-checkbox v-for="value in data.facet_options?.traffic_type || []" :key="value" :value="value">{{ reverseLabel(value) }}</el-checkbox></el-checkbox-group><small v-if="!data.facet_options?.traffic_type?.length">暂无来源标签</small></div>
@@ -65,6 +66,7 @@
       <el-drawer v-model="columnsOpen" title="自定义关键词列" size="min(440px, 96vw)" append-to-body><div class="kr-column-settings"><p>关键词和选择列始终固定。勾选显示指标，拖动行或用箭头调整顺序；合并列中的上下指标可分别点击表头排序。</p><div class="kr-column-presets"><el-button size="small" @click="columnPreset('common')">常用列</el-button><el-button size="small" @click="columnPreset('all')">全部显示</el-button><el-button size="small" @click="columnPreset('none')">清空可选列</el-button></div><div v-for="(column,index) in orderedColumns" :key="column.key" class="kr-column-setting-row" draggable="true" @dragstart="startColumnDrag($event,column.key)" @dragover.prevent @drop.prevent="dropColumn(column.key)" @dragend="dragColumn=null"><span class="kr-column-grip" title="拖动调整顺序">⠿</span><el-checkbox :model-value="visibleColumns.includes(column.key)" @change="value=>toggleColumn(column.key,value)">{{ column.label }}</el-checkbox><div><el-button link :icon="ArrowUp" :disabled="index===0" :aria-label="`上移${column.label}`" @click="moveColumn(column.key,-1)" /><el-button link :icon="ArrowDown" :disabled="index===orderedColumns.length-1" :aria-label="`下移${column.label}`" @click="moveColumn(column.key,1)" /></div></div><div class="kr-column-save-note">{{ prefsUnavailable?'浏览器存储不可用，列设置仅本次有效。':'列设置自动保存在当前浏览器，刷新和切换ASIN后仍保留。' }}</div></div></el-drawer>
     </template>
     <section v-else class="kr-welcome kr-panel"><el-icon><Search /></el-icon><h2>输入ASIN，查看已导入的关键词数据</h2><p>支持本店商品和竞品ASIN，也可以从上方店铺列表中选择商品。</p></section>
+    <SellerspriteTaskDialog v-model="tasksVisible" :asin="activeAsin" :can-recover="canRecover" @changed="load" />
   </main>
 </template>
 <script>export default {name:'KeywordReverseView'}</script>
@@ -73,13 +75,15 @@ import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMoun
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CopyDocument, Download, Filter, Refresh, RefreshLeft, Search, Setting } from '@element-plus/icons-vue'
-import { getKeywordReverse, getKeywordReverseOptions } from '@/services/api'
+import { getKeywordReverse, getKeywordReverseOptions, getUserPermissions } from '@/services/api'
 import { spriteStates, spriteTime, spriteValue } from '@/utils/sellersprite'
 import { reverseMetrics, reverseLabel, hasValue, percentWidth, reverseCsv, reverseColumns, defaultColumnPrefs, normalizeColumnPrefs, rankPageText } from '@/utils/keywordReverse'
 import KeywordMetricHelp from '@/components/KeywordMetricHelp.vue'
+import SellerspriteTaskDialog from '@/components/SellerspriteTaskDialog.vue'
 import { translationStatus, translationTip } from '@/utils/translationStatus'
 
 const route=useRoute(),router=useRouter(),table=ref(null)
+const tasksVisible=ref(false),canRecover=getUserPermissions().includes('system:sellersprite_config')
 const data=ref({}),error=ref(''),loading=ref(false),asinInput=ref(''),activeAsin=ref(''),shopId=ref(''),pickedAsin=ref(''),snapshotId=ref(''),page=ref(1),pageSize=ref(50)
 const options=ref([]),shops=ref([]),optionsLoading=ref(false),optionsMore=ref(false),optionsError=ref(''),expandWords=ref(false),selectedRows=ref([])
 const blankFilters=()=>({ranges:Object.fromEntries(reverseMetrics.map(m=>[m.key,{min:'',max:''}])),traffic_type:[],conversion_label:[],include:'',exclude:'',include_match:'broad'})
