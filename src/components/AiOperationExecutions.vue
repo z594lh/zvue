@@ -1,11 +1,11 @@
 <template>
   <section class="execution-panel">
-    <header><p>查看详情不会重新执行；仅“确定未发送”的广告可手动补执行，成功或未知项不会重发。</p><div><el-tooltip content="只补原方案明确未发送的广告，不调用AI、不重跑Listing；24小时内且没有更新的每日任务才可操作。会重新核对亚马逊前值，变化则不提交。" placement="top"><el-button v-if="retryable.length" type="warning" plain :loading="recovering" :disabled="recovering" @click="retryAds">补执行未发送广告（{{ retryable.length }}）</el-button></el-tooltip><el-button :disabled="!records.length || recovering" @click="download">下载执行记录</el-button></div></header>
+    <header><p>{{ runId?'查看详情不会重新执行；仅“确定未发送”的每日广告可手动补执行，成功或未知项不会重发。':'人工确认执行的原始记录；查看或下载不会重试修改。失败/未知请核对原因后重新分析，不自动重发旧行动。' }}</p><div><el-tooltip content="只补原方案明确未发送的广告，不调用AI、不重跑Listing；24小时内且没有更新的每日任务才可操作。会重新核对亚马逊前值，变化则不提交。" placement="top"><el-button v-if="retryable.length" type="warning" plain :loading="recovering" :disabled="recovering" @click="retryAds">补执行未发送广告（{{ retryable.length }}）</el-button></el-tooltip><el-button :disabled="!records.length || recovering" @click="download">下载执行记录</el-button></div></header>
     <el-alert v-if="retryError" :title="retryError" type="error" :closable="false" show-icon />
     <el-empty v-if="!records.length" description="本次没有产生需要提交的新改动" />
     <article v-for="record in records" :key="record.id" class="execution-card"><header><strong>{{ record.action.label }}</strong><el-tag :type="record.status==='confirmed'?'success':record.status==='rejected' || record.status==='conflict'?'danger':'info'">{{ statusName(record.status) }}</el-tag></header>
       <p class="execution-note">记录 #{{ record.id }} · {{ record.receipt?.message }}</p>
-      <p v-if="record.audit_context" class="execution-note">执行人：<strong>{{ record.audit_context.executor.name }}（AI运营）</strong> · 人工发起人：{{ record.audit_context.initiated_by.name }} · 每日记录 #{{ record.audit_context.run_id }} / {{ record.audit_context.action_id }}</p>
+      <p v-if="record.audit_context" class="execution-note">执行人：<strong>{{ record.audit_context.executor.name }}（AI运营）</strong> · {{ record.audit_context.confirmation_id?'确认人':'人工发起人' }}：{{ record.audit_context.initiated_by.name }} · {{ record.audit_context.confirmation_id?'确认批次':'每日记录' }} #{{ record.audit_context.confirmation_id || record.audit_context.run_id }} / {{ record.audit_context.action_id }}<template v-if="record.audit_context.proposed_by"> · 提问人：{{ record.audit_context.proposed_by.name }}</template></p>
       <p v-else class="execution-note">历史操作人编号：{{ record.actor_id }}（旧记录保留原身份，未回填AI人员）</p>
       <p v-if="record.receipt?.diagnostic" class="execution-error">{{ diagnosticLabel(record.receipt.diagnostic) }}</p>
       <p v-if="record.receipt?.recovery_attempts?.length" class="execution-note">已补执行 {{ record.receipt.recovery_attempts.length }} 次 · 原失败记录保留在下方回执原文<template v-if="record.receipt.recovery_context"> · 本次发起人：{{ record.receipt.recovery_context.initiated_by.name }}</template></p>
@@ -19,10 +19,10 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { retryAiUnsentAds } from '@/services/api.js'
-const props=defineProps({plan:{type:Object,required:true},runId:{type:[String,Number],required:true},initialRecords:{type:Array,required:true}})
+const props=defineProps({plan:{type:Object,required:true},runId:{type:[String,Number],default:null},initialRecords:{type:Array,required:true}})
 const emit=defineEmits(['recovered'])
 const records=computed(()=>props.initialRecords)
-const retryable=computed(()=>records.value.filter(row=>row.can_retry))
+const retryable=computed(()=>props.runId?records.value.filter(row=>row.can_retry):[])
 const recovering=ref(false),retryError=ref('')
 let active=true
 onBeforeUnmount(()=>{active=false})

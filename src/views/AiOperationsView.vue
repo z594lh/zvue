@@ -1,11 +1,11 @@
 <template>
   <main class="managed-workbench">
-    <header class="managed-heading"><div><span class="eyebrow">AI STORE MANAGEMENT</span><h1>托管 ASIN</h1><p>每日接续上次的运营思路，让调整与观察形成连续记录。</p></div><div class="heading-actions"><el-tag type="warning" effect="plain">DeepSeek真实分析 · Amazon正式执行</el-tag><el-button type="primary" :disabled="!canAssign" :title="canAssign?'预约ASIN全部子SKU给AI运营':'需要AI托管权限'" @click="showAdd">＋ 添加托管ASIN</el-button></div></header>
-    <section class="schedule-card"><div class="schedule-clock">18:30 <small>北京时间 · 每日</small></div><div><strong>恢复ASIN会话 → 核心资料与观察 → AI按需取数 → 最终方案 → 正式执行 / 回读</strong><p>每日启动一次，任务内最多3轮分析，可能需要数分钟；DeepSeek会计费。ERP保存运营记忆和完整会话，次日接续，将按方案真实修改Listing与广告并写入原操作日志。服务器需部署定时任务。</p></div></section>
+    <header class="managed-heading"><div><span class="eyebrow">AI STORE MANAGEMENT</span><h1>托管 ASIN</h1><p>每日接续上次的运营思路，让调整与观察形成连续记录。</p></div><div class="heading-actions"><el-tag type="warning" effect="plain">DeepSeek真实分析 · Amazon正式执行</el-tag><el-button :disabled="!canAssign" @click="configVisible=true">AI交互配置</el-button><el-button type="primary" :disabled="!canAssign" :title="canAssign?'预约ASIN全部子SKU给AI运营':'需要AI托管权限'" @click="showAdd">＋ 添加托管ASIN</el-button></div></header>
+    <section class="schedule-card"><div class="schedule-clock">18:30 <small>北京时间 · 每日</small></div><div><strong>统一排队 → 恢复共享会话 → AI按需分析 → 每日自动执行 / 人工建议确认后执行</strong><p>定时任务每日入队一次，问答、每日优化和确认执行按同ASIN顺序处理；每次分析最多3轮，DeepSeek会计费。已入队不代表完成，服务器须同时部署AI独立消费者与原18:30定时任务。</p></div></section>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <section class="managed-card">
       <div class="managed-filters"><el-input v-model="keyword" placeholder="搜索中文名、ASIN或SKU" clearable @keyup.enter="load(true)" /><el-select v-model="shopFilter" clearable placeholder="全部店铺" @change="load(true)"><el-option v-for="s in shops" :key="s.id" :value="s.id" :label="s.shop_name" /></el-select><el-select v-model="enabledFilter" clearable placeholder="全部托管状态" @change="load(true)"><el-option label="托管中" value="1" /><el-option label="已暂停" value="0" /></el-select><el-button :loading="loading" @click="load(true)">查询 / 刷新</el-button></div>
-      <el-table :data="rows" v-loading="loading" class="managed-table" row-key="id" @row-click="openHistory">
+      <el-table :data="rows" v-loading="loading" class="managed-table" row-key="id" @row-click="openChat">
         <el-table-column label="托管商品" min-width="320"><template #default="{row}"><div class="managed-product"><el-image v-if="row.main_image_url" :src="row.main_image_url" fit="contain" loading="lazy" /><span v-else class="image-fallback">商品</span><div><strong>{{ row.product_name || row.products?.[0]?.item_name || '商品资料暂不可用' }}</strong><p>{{ row.asin }} <span>｜ {{ row.shop_name }}</span></p><small>{{ row.skus.join(' / ') || '有效Listing已移除，运行时会记录异常' }}</small></div></div></template></el-table-column>
         <el-table-column label="状态" width="110"><template #default="{row}"><el-tag :type="!row.enabled?'info':row.ownership_consistent===false?'warning':'success'">{{ !row.enabled?'已暂停':row.ownership_consistent===false?'归属待同步':'托管中' }}</el-tag><p v-if="row.executor_status===0" class="table-note" style="color:#d45c5c">AI账号已停用</p></template></el-table-column>
         <el-table-column label="AI人员 / 绩效归属" min-width="240"><template #default="{row}"><strong>{{ row.executor_name || '尚未绑定AI账号' }}</strong><el-tag v-if="row.executor_user_id" size="small" effect="plain" style="margin-left:7px">AI运营</el-tag><p class="table-note">人工启用：{{ row.initiated_by_name || '—' }}</p><div v-for="owner in row.ownership" :key="owner.sku" class="table-note">{{ row.ownership.length>1?owner.sku+'：':'' }}当前 {{ owner.current_owner || '未分配' }}<template v-if="owner.has_scheduled"><br>{{ owner.effective_date }} 起 → {{ owner.scheduled_owner || '解除分配' }}</template></div><el-button v-if="row.executor_user_id && canViewAll" link type="primary" @click.stop="viewPerformance(row)">查看AI绩效</el-button></template></el-table-column>
@@ -13,16 +13,17 @@
         <el-table-column label="操作" width="270" :fixed="wideScreen?'right':false">
           <template #header><span class="action-header">操作<el-tooltip content="运行今日会产生AI费用，并可能真实修改亚马逊；查看历史和同步归属不调用AI。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></span></template>
           <template #default="{row}"><div class="operation-actions" @click.stop>
-            <el-tooltip content="查看每日方案、ERP与AI会话、执行日志及观察进展。只读，不计费、不修改店铺。" placement="top"><el-button class="history-action" :icon="Clock" size="small" @click="openHistory(row)">优化历史</el-button></el-tooltip>
-            <el-tooltip content="立即运行今天的托管：DeepSeek收费分析，随后真实修改Listing或广告并回读。同日已有记录不重复执行。" placement="top"><span><el-button type="primary" :icon="VideoPlay" size="small" :loading="runningId===row.id" :disabled="!row.enabled || !row.executor_user_id || !row.ownership_consistent || !!runningId" @click="runToday(row)">运行今日</el-button></span></el-tooltip>
-            <el-tooltip content="仅在ERP中绑定AI账号，并预约全部子SKU的负责人交接。不调用AI，不修改亚马逊；历史绩效不回填。归属一致时无需操作。" placement="top"><span><el-button :icon="Connection" size="small" :disabled="!row.enabled || !canAssign || row.ownership_consistent || !!changingId || !!runningId" @click="syncOwner(row)">同步归属</el-button></span></el-tooltip>
-            <el-tooltip :content="row.enabled?'停止后续定时任务及尚未发送的步骤。已提交操作不会撤回，负责人不会自动交回人工。':'恢复每日18:30真实托管，并预约子SKU归属AI；后续分析会收费且可能真实修改店铺。'" placement="top"><span><el-button :icon="row.enabled?VideoPause:VideoPlay" :type="row.enabled?'warning':'success'" plain size="small" :disabled="!!changingId || (!row.enabled && !canAssign)" @click="toggle(row)">{{ row.enabled?'暂停托管':'恢复托管' }}</el-button></span></el-tooltip>
+            <el-tooltip content="查看该ASIN跨日的ERP与AI共享对话、真实消息时间和资料；可新建会话。打开不调用AI、不修改店铺。" placement="top"><el-button type="primary" plain :icon="ChatDotRound" size="small" @click="openChat(row)">AI对话</el-button></el-tooltip>
+            <el-tooltip content="查看每日具体改动、执行结果及观察进展。只读，不计费、不修改店铺。" placement="top"><el-button class="history-action" :icon="Clock" size="small" @click="openHistory(row)">优化记录</el-button></el-tooltip>
+            <el-tooltip content="把今天的托管加入统一队列，排在同ASIN当前作业之后；后台随后收费分析并真实执行。同日已有记录不重复入队。" placement="top"><span><el-button type="primary" :icon="VideoPlay" size="small" :loading="runningId===row.id" :disabled="!row.enabled || !row.executor_user_id || !row.ownership_consistent || !!runningId" @click="runToday(row)">运行今日</el-button></span></el-tooltip>
+            <el-dropdown trigger="click" @command="command=>moreAction(command,row)"><el-button size="small">更多操作 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="sync" :disabled="!row.enabled || !canAssign || row.ownership_consistent || !!changingId || !!runningId"><span title="仅预约全部子SKU的AI负责交接，不调用AI或修改亚马逊">同步AI负责归属</span></el-dropdown-item><el-dropdown-item command="toggle" :disabled="!!changingId || (!row.enabled && !canAssign)"><span :title="row.enabled?'停止后续任务，已提交操作不撤回，负责人不自动交回人工':'恢复后续每日真实托管，可能产生AI费用和真实修改'">{{ row.enabled?'暂停托管':'恢复托管' }}</span></el-dropdown-item></el-dropdown-menu></template></el-dropdown>
           </div></template>
         </el-table-column>
       </el-table>
       <el-empty v-if="!loading && !rows.length" description="尚无托管商品，添加ASIN后可开始真实AI分析与正式执行" />
       <div class="managed-footer"><span>共 {{ total }} 个托管ASIN · 开启/恢复会预约全部子SKU给AI；15:00前变更次日生效，15:00起后天生效。暂停仅停止任务，不自动交回人工。</span><el-pagination v-if="total>20" v-model:current-page="page" :page-size="20" :total="total" layout="prev, pager, next" @current-change="load(false)" /></div>
     </section>
+    <el-dialog v-model="chatVisible" title="ASIN · AI运营对话" width="92vw" top="3vh" :fullscreen="!wideScreen" append-to-body destroy-on-close :close-on-click-modal="false" class="ai-shared-chat-dialog"><AiManagedConversation v-if="chatVisible && chatTarget" :product="chatTarget" :initial-session-id="chatSessionId" :initial-plan-id="chatPlanId" /></el-dialog>
     <el-dialog v-if="selected" v-model="historyVisible" title="每日优化历史" width="min(1280px, calc(100% - 28px))" top="5vh" append-to-body class="ai-managed-history" :close-on-click-modal="false" @closed="closeHistory">
     <section class="daily-history">
       <div class="managed-heading"><div><span class="eyebrow">OPTIMIZATION HISTORY</span><h2>{{ selected.product_name || selected.asin }} · 每日优化历史</h2><p>{{ selected.asin }} · 每日一条，包含输入快照、先前观察、AI结论和执行结果。</p></div><el-button :loading="historyLoading" @click="loadHistory">刷新优化历史</el-button></div>
@@ -39,7 +40,7 @@
       <el-pagination v-if="historyTotal>20" v-model:current-page="historyPage" :page-size="20" :total="historyTotal" layout="prev, pager, next" @current-change="loadHistory" />
     </section>
     </el-dialog>
-    <el-dialog v-model="detailVisible" title="每日优化详情" width="min(1380px, calc(100% - 24px))" top="3vh" append-to-body destroy-on-close class="ai-managed-detail" :close-on-click-modal="false" @closed="closeDetail"><AiOperationDetail v-if="detailVisible && selectedRun" :run-id="selectedRun" /></el-dialog>
+    <el-dialog v-model="detailVisible" title="每日优化详情" width="min(1380px, calc(100% - 24px))" top="3vh" append-to-body destroy-on-close class="ai-managed-detail" :close-on-click-modal="false" @closed="closeDetail"><AiOperationDetail v-if="detailVisible && selectedRun" :run-id="selectedRun" @open-chat="openLinkedChat" /></el-dialog>
     <el-dialog v-model="addVisible" title="添加托管ASIN" :width="wideScreen?'560px':'calc(100% - 28px)'" class="managed-add" :close-on-click-modal="false">
       <p class="add-description">每天北京时间18:30参与托管，DeepSeek会真实分析并计费；ERP将根据方案真实修改Listing与广告并记录AI操作，可随时暂停后续任务。</p>
       <el-alert title="开启后预约全部有效子SKU给AI运营；北京时间15:00前变更默认次日生效，15:00起默认后天生效。历史绩效不回填；暂停不会自动交回人工。" type="info" :closable="false" show-icon style="margin-bottom:18px" />
@@ -47,20 +48,31 @@
       <el-alert v-if="addError" :title="addError" type="error" :closable="false" />
       <template #footer><el-button :disabled="adding" @click="addVisible=false">取消</el-button><el-button type="primary" :loading="adding" :disabled="!addShop || !addAsin || optionsLoading" @click="add">开启托管（真实AI）</el-button></template>
     </el-dialog>
+    <el-dialog v-model="configVisible" title="AI交互配置与资料溯源" class="ai-interaction-config-dialog" width="min(1200px, calc(100% - 24px))" top="4vh" append-to-body destroy-on-close :close-on-click-modal="false"><AiInteractionConfig v-if="configVisible" :products="rows" /></el-dialog>
   </main>
 </template>
 
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Clock, VideoPlay, Connection, VideoPause, QuestionFilled } from '@element-plus/icons-vue'
+import { Clock, VideoPlay, QuestionFilled, ChatDotRound } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import AiOperationDetail from '@/components/AiOperationDetail.vue'
+import AiManagedConversation from '@/components/AiManagedConversation.vue'
+import AiInteractionConfig from '@/components/AiInteractionConfig.vue'
 import { getUserPermissions, getAiOperationsOptions, getAiManagedAsins, addAiManagedAsin, updateAiManagedAsin, getAiManagedRuns, runAiManagedAsin } from '@/services/api.js'
 const router=useRouter(),userCodes=getUserPermissions(),canViewAll=userCodes.includes('performance:view_all'),canAssign=userCodes.includes('ai_operations:manage')
 /** 跳到同店铺、同AI人员的绩效筛选，不更改绩效数据或重新分析。 */
 function viewPerformance(row){router.push({path:'/performance',query:{shop_id:String(row.shop_id),user_id:String(row.executor_user_id)}})}
 const wideScreen=ref(window.innerWidth>700)
+const configVisible=ref(false)
+const chatVisible=ref(false),chatTarget=ref(null),chatSessionId=ref(''),chatPlanId=ref('')
+/** 从托管行独立打开跨日对话，不触发AI或每日流程。 */
+function openChat(row){chatTarget.value=row;chatSessionId.value='';chatPlanId.value='';chatVisible.value=true}
+/** 从每日详情定位原会话与方案，关闭旧弹框避免三层滚动。 */
+function openLinkedChat(info){const row=rows.value.find(r=>String(r.id)===String(info.managed_id)) || selected.value;if(!row)return;openChat(row);chatSessionId.value=String(info.conversation_id);chatPlanId.value=String(info.plan_id);detailVisible.value=false;historyVisible.value=false}
+/** 配套归属与启停操作收进菜单，仍使用原权限和提示。 */
+function moreAction(command,row){if(command==='sync')syncOwner(row);else if(command==='toggle')toggle(row)}
 /** 跟随窗口宽度切换列表固定操作列，不改变弹框的当前记录。 */
 function resize(){wideScreen.value=window.innerWidth>700}
 const shops=ref([]),rows=ref([]),total=ref(0),page=ref(1),keyword=ref(''),shopFilter=ref(null),enabledFilter=ref(null),loading=ref(false),error=ref('')
@@ -69,7 +81,7 @@ const historyVisible=ref(false),detailVisible=ref(false),selectedRun=ref(null)
 const addVisible=ref(false),addShop=ref(null),addAsin=ref(''),rawProducts=ref([]),optionsLoading=ref(false),adding=ref(false),addError=ref(''),runningId=ref(''),changingId=ref('')
 let revision=0,historyRevision=0,optionRevision=0,active=true,initialized=false
 /** 用中文展示当前会话任务阶段。 */
-function stateName(state){return {preparing:'整理资料',analyzing:'AI分析中',executing:'执行回读中',completed:'优化完成',partial:'部分待核对',failed:'执行异常',paused:'中途暂停'}[state] || state}
+function stateName(state){return {queued:'统一队列等待中',preparing:'整理资料',analyzing:'AI分析中',executing:'执行回读中',completed:'优化完成',partial:'部分待核对',failed:'执行异常',paused:'已停止'}[state] || state}
 /** 提取可展示的异常，超时明确提示勿重复发起付费请求。 */
 function message(error){return error.response?.data?.message || (error.code==='ECONNABORTED'?'等待超时不代表后台任务停止，请刷新优化历史，不要重复发起付费分析':'读取或处理未完成，请刷新历史核对')}
 // 把店铺多个SKU按ASIN合并为添加托管时的一条选项。
@@ -134,12 +146,12 @@ async function syncOwner(row){
   catch(e){if(active)error.value=message(e)}
   finally{changingId.value=''}
 }
-/** 显式运行今日任务，结束后打开历史弹框；同日由服务端保证幂等。 */
+/** 显式登记今日任务，入队后打开历史弹框；同日由服务端保证幂等。 */
 async function runToday(row){
   if(runningId.value || !row.enabled)return
   runningId.value=row.id;error.value=''
-  try{await ElMessageBox.confirm('将立即调用DeepSeek分析（可能计费），并按方案通过正式接口修改该ASIN的Listing或关联广告。操作会记录为AI运营；同日已完成任务只查看原记录。','运行今日 · 真实运营',{confirmButtonText:'确认分析并执行',cancelButtonText:'取消',type:'warning',closeOnClickModal:false})}catch{runningId.value='';return}
-  try{const {data}=await runAiManagedAsin(row.id);if(active){ElMessage.info(data.data.reused?'今日记录已存在，未重复分析或提交':'今日AI分析与正式执行已记录，可查看优化历史');await load();await openHistory(rows.value.find(r=>r.id===row.id) || row)}}
+  try{await ElMessageBox.confirm('将把今日任务加入统一队列，后台随后调用DeepSeek（可能计费），并按每日方案真实修改Listing或关联广告。与人工分析/确认执行按同ASIN顺序处理；同日已有记录不重复入队。','运行今日 · 排队后真实运营',{confirmButtonText:'确认入队并授权每日执行',cancelButtonText:'取消',type:'warning',closeOnClickModal:false})}catch{runningId.value='';return}
+  try{const {data}=await runAiManagedAsin(row.id);if(active){ElMessage.info(data.data.reused?'今日记录已存在，未重复入队或提交':'今日任务已进入统一队列；后台稍后分析和执行，可在AI对话查看进度');await load();await openHistory(rows.value.find(r=>r.id===row.id) || row)}}
   catch(e){if(active){error.value=message(e);await openHistory(row)}}
   finally{runningId.value=''}
 }
@@ -151,7 +163,7 @@ async function initialize(){
   await load()
 }
 /** 离开页签时关闭所有弹框，使未完成请求失效。 */
-function stop(){active=false;revision++;historyRevision++;optionRevision++;loading.value=false;historyLoading.value=false;optionsLoading.value=false;detailVisible.value=false;historyVisible.value=false;addVisible.value=false}
+function stop(){active=false;revision++;historyRevision++;optionRevision++;loading.value=false;historyLoading.value=false;optionsLoading.value=false;detailVisible.value=false;historyVisible.value=false;addVisible.value=false;chatVisible.value=false}
 /** 首次挂载绑定尺寸变化并初始化列表。 */
 function mount(){window.addEventListener('resize',resize);initialize()}
 /** 销毁时释放窗口监听器，避免页签重复注册。 */
