@@ -5,18 +5,19 @@
       <el-button type="primary" link size="small" @click="start">编辑</el-button>
     </div>
     <div v-else class="inline-text-form">
+      <div v-if="constraints.help" class="inline-policy"><strong>{{ constraints.help }}</strong><el-tooltip :content="snapshot?.content_policy?.note || ''"><small>规范 {{ snapshot?.content_policy?.checked_on }} · {{ snapshot?.content_policy?.schema_status==='ptd_unconditional_intersection'?'已核对类目上限':'保守安全线' }}</small></el-tooltip></div>
       <div v-for="(row, index) in rows" :key="index" class="inline-text-row">
         <span v-if="field === 'bullet_point'" class="bullet-index">{{ index + 1 }}.</span>
         <div class="inline-input">
           <el-input ref="inputs" v-model="row.value" :aria-label="`${label}内容${index + 1}`" type="textarea" :autosize="{ minRows: field === 'product_description' ? 5 : 2, maxRows: 12 }" :disabled="locked" />
-          <small>{{ row.value.length }} 字符<span v-if="field === 'generic_keyword'"> · {{ byteLength(row.value) }} UTF-8字节</span></small>
+          <small :class="{'inline-limit-error':rowErrors(row.value).length}">{{ charCount(row.value) }}<template v-if="constraints.max_chars !== undefined"> / {{ constraints.max_chars }}</template> 字符<span v-if="constraints.max_utf8_bytes !== undefined"> · {{ byteLength(row.value) }} / {{ constraints.max_utf8_bytes }} UTF-8字节（含空格）</span></small>
         </div>
         <el-button v-if="field === 'bullet_point'" link type="danger" :disabled="locked || rows.length <= 1" @click="rows.splice(index, 1)">移除</el-button>
       </div>
       <div class="inline-actions">
-        <el-button type="primary" size="small" :loading="sending" :disabled="reading || verifying || !ready || !changed || locked || writeBusy || conflict" @click="save()">保存</el-button>
+        <el-button type="primary" size="small" :loading="sending" :disabled="reading || verifying || !ready || !changed || locked || writeBusy || conflict || validationErrors.length>0" @click="save()">保存</el-button>
         <el-button size="small" :disabled="sending" @click="collapse">{{ result || unknown ? '收起' : '取消' }}</el-button>
-        <el-button v-if="field === 'bullet_point'" size="small" link :disabled="locked || !ready" @click="addRow">添加卖点</el-button>
+        <el-button v-if="field === 'bullet_point'" size="small" link :disabled="locked || !ready || !canAddRow" @click="addRow">添加卖点</el-button>
         <el-popconfirm v-if="field !== 'item_name' && baseline.length && !result && !unknown" :title="`确认清除${label}？此操作会提交到Amazon。`" confirm-button-text="清除" cancel-button-text="取消" @confirm="save(true)">
           <template #reference><el-button type="danger" link size="small" :disabled="!ready || locked || writeBusy || conflict">清除本项</el-button></template>
         </el-popconfirm>
@@ -26,6 +27,7 @@
         <small v-if="reading">正在核对实时数据，可先编辑…</small>
         <small v-else-if="ready && !result && !unknown">Ctrl / ⌘ + Enter 保存</small>
       </div>
+      <ul v-if="ready && validationErrors.length" class="inline-issues" role="alert"><li v-for="message in validationErrors" :key="message">{{ message }}</li></ul>
     </div>
     <div v-if="statusText || error || conflict || cacheWarning" class="inline-status" :class="{ 'is-error': error || conflict || result?.state === 'issues', 'is-success': result?.state === 'attributes_confirmed' }" role="status">
       <el-tooltip v-if="statusText" :content="submissionId ? `提交标识：${submissionId}；属性回读不代表商城展示即时更新。` : '结果未确认前不会自动重发修改。'">
@@ -47,6 +49,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { submitAmazonListingText, verifyAmazonListingText } from '@/services/api'
+import { listingCharCount, listingByteCount, listingRowErrors, listingDraftErrors } from '@/utils/listingContentPolicy'
 
 const props = defineProps({
   shopId: { type: [Number, String], required: true }, sku: { type: String, required: true },
@@ -64,7 +67,12 @@ const legacyKey = `listing-text:${props.shopId}:${props.sku}`
 let disposed = false, timer, readRevision = 0, legacy = false
 const copy = value => JSON.parse(JSON.stringify(value))
 const equal = (a, b) => JSON.stringify(a.map(row => [row.value, row.language_tag, row.marketplace_id])) === JSON.stringify(b.map(row => [row.value, row.language_tag, row.marketplace_id]))
-const byteLength = value => new TextEncoder().encode(value).length
+const byteLength = listingByteCount, charCount = listingCharCount
+const constraints = computed(() => snapshot.value?.fields?.[props.field]?.constraints || {})
+const validationErrors = computed(() => listingDraftErrors(props.field, rows.value, snapshot.value))
+const canAddRow = computed(() => rows.value.filter(row=>(row.language_tag || snapshot.value?.default_language)===snapshot.value?.default_language).length < (constraints.value.max_items || 1))
+// 仅显示当前条目的限制；数字全部来自后端，计数与Python Unicode码点口径一致。
+function rowErrors(value) { return listingRowErrors(value, constraints.value) }
 const busy = computed(() => reading.value || sending.value || verifying.value)
 const locked = computed(() => sending.value || !!result.value || unknown.value || (ready.value && !snapshot.value?.fields[props.field].editable))
 const changed = computed(() => baseline.value.length || rows.value.some(row => row.value.trim()) ? !equal(rows.value, baseline.value) : false)
@@ -121,6 +129,7 @@ async function reload() {
 async function save(clear = false) {
   if (disposed || busy.value || locked.value || props.writeBusy || !ready.value || conflict.value || (!clear && !changed.value)) return
   if (!clear && rows.value.some(row => !row.value.trim())) { error.value = '内容不可为空；需要清除请使用“清除本项”'; return }
+  if (!clear && validationErrors.value.length) { error.value = validationErrors.value.join('；'); return }
   error.value = ''; issues.value = []
   // 同一详情内复用最新回读版本；其他字段已保存时不必为当前字段再开弹框/重新GET。
   reading.value = true
@@ -129,6 +138,7 @@ async function save(clear = false) {
   if (!current || disposed || sending.value || locked.value || props.writeBusy) return
   if (!equal(current.fields[props.field].rows, baseline.value)) { conflict.value = true; return }
   snapshot.value = current
+  if (!clear && validationErrors.value.length) { error.value = validationErrors.value.join('；'); return }
   const action = clear ? { mode: 'clear' } : { mode: 'set', rows: copy(rows.value) }
   sending.value = true; emit('busy', true); unknown.value = true; remember()
   try {
@@ -140,7 +150,7 @@ async function save(clear = false) {
     if (!disposed) { sending.value = false; await verify(); schedule(0) }
   } catch (err) {
     const body = err.response?.data
-    if (body?.data?.write_state === 'rejected' || [400, 403, 404, 409].includes(err.response?.status)) { unknown.value = false; forget() }
+    if (['rejected','not_sent'].includes(body?.data?.write_state) || [400, 403, 404, 409].includes(err.response?.status)) { unknown.value = false; forget() }
     else remember()
     if (!disposed) {
       error.value = body?.message || err.message; issues.value = body?.data?.issues || []
@@ -178,5 +188,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); readRevision++ })
 </script>
 
 <style scoped>
+.inline-policy{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px;color:#426b96;font-size:12px;line-height:1.8}.inline-policy strong{font-weight:500}.inline-policy small{color:#8a9bad}.inline-input small.inline-limit-error{color:#c45656;font-weight:600}
 .inline-text-editor{min-width:0;overflow-wrap:anywhere}.inline-text-view{display:flex;align-items:flex-start;gap:12px}.inline-text-content{flex:1;min-width:0}.inline-text-form{padding:10px 12px;border:1px solid #c6e2ff;background:#f8fbff;border-radius:4px}.inline-text-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}.inline-input{flex:1;min-width:0}.inline-input small,.inline-actions small{color:#909399;font-size:12px}.bullet-index{padding-top:6px;color:#909399}.inline-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.inline-actions .el-button+.el-button{margin-left:0}.inline-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px;color:#b88230;font-size:12px}.inline-status.is-success{color:#529b2e}.inline-status.is-error,.inline-issues{color:#c45656}.inline-issues{padding-left:18px;font-size:12px}
 </style>
