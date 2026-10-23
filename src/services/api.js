@@ -49,16 +49,23 @@ export const updateAiManagedAsin = (id, data) => api.patch(`/ai-operations/manag
 export const getAiManagedRuns = (id, params) => api.get(`/ai-operations/managed/${encodeURIComponent(id)}/runs`, { params, timeout: 20000 });
 export const runAiManagedAsin = (id) => api.post(`/ai-operations/managed/${encodeURIComponent(id)}/run`, {}, { timeout: 600000 });
 export const getAiManagedRun = (id) => api.get(`/ai-operations/runs/${encodeURIComponent(id)}`, { timeout: 20000 });
+export const getAiOptimizationDetail = (source,id) => api.get(`/ai-operations/history/${encodeURIComponent(source)}/${encodeURIComponent(id)}`,{timeout:20000});
 // 独立共享会话：所有GET只读；新建仅归档/切换，不调用AI、不重跑当天任务。
 export const getAiConversations = (id, params) => api.get(`/ai-operations/managed/${encodeURIComponent(id)}/conversations`, { params, timeout: 20000 });
 export const createAiConversation = (id, data) => api.post(`/ai-operations/managed/${encodeURIComponent(id)}/conversations`, data, { timeout: 20000 });
 export const getAiConversationMessages = (id, params) => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/messages`, { params, timeout: 20000 });
 export const getAiConversationOriginal = (id, message) => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(message)}`, { timeout: 20000 });
-// 配置预览只读本地资料，不调用付费模型或平台写接口。
-export const getAiInteractionConfig = () => api.get('/ai-operations/interaction-config');
-export const saveAiInteractionConfig = (body) => api.put('/ai-operations/interaction-config', body);
-export const previewAiInteractionConfig = (body) => api.post('/ai-operations/interaction-config/preview', body, {timeout:60000});
-export const getAiConversationDocument = (id, message, binding) => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(message)}/documents/${encodeURIComponent(binding)}`);
+// 工具目录管理只修改新任务可见性；会话记忆读取不会触发付费摘要。
+export const getAiTools = () => api.get('/ai-operations/tools', {timeout:20000});
+// 精简提示词：预览不收费；发布只影响后续准备的任务，不覆盖历史原文。
+export const getAiPrompts = () => api.get('/ai-operations/prompts', {timeout:20000});
+export const publishAiPrompts = body => api.put('/ai-operations/prompts',body,{timeout:20000});
+export const getAiPromptVersions = () => api.get('/ai-operations/prompts/versions',{timeout:20000});
+export const previewAiPrompts = body => api.post('/ai-operations/prompts/preview',body,{timeout:20000});
+export const getAiToolStatistics = (params) => api.get('/ai-operations/tools/statistics', {params,timeout:30000});
+export const getAiToolRounds = (sessionId,messageId) => api.get(`/ai-operations/conversations/${sessionId}/messages/${messageId}/rounds`, {timeout:30000});
+export const updateAiTool = (name,body) => api.put(`/ai-operations/tools/${encodeURIComponent(name)}`, body, {timeout:20000});
+export const getAiConversationMemory = id => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/memory`, {timeout:20000});
 // 人工问题只登记后台任务；取消/轮询不重发AI或执行Amazon修改。
 export const sendAiConversationMessage = (id, data) => api.post(`/ai-operations/conversations/${encodeURIComponent(id)}/messages`, data, {timeout:20000});
 export const getAiChatTask = (id) => api.get(`/ai-operations/tasks/${encodeURIComponent(id)}`, {timeout:20000});

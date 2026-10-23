@@ -315,6 +315,18 @@ const routes = [
       meta: { title: 'AI托管 · ASIN列表', componentName: 'AiOperationsView' }
   },
   {
+    path: '/tools/ai-operations/prompts',
+    name: 'AiPromptManagement',
+    component: () => import('../views/AiPromptManagement.vue'),
+    meta: { title: 'AI托管 · 提示词管理', componentName: 'AiPromptManagement' }
+  },
+  {
+    path: '/tools/ai-operations/tools',
+    name: 'AiToolManagement',
+    component: () => import('../views/AiToolManagement.vue'),
+    meta: { title: 'AI托管 · 工具管理', componentName: 'AiToolManagement' }
+  },
+  {
     path: '/tools/keyword-reverse',
     name: 'KeywordReverse',
     component: () => import('../views/KeywordReverseView.vue'),

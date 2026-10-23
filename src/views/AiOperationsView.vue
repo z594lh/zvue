@@ -1,7 +1,7 @@
 <template>
   <main class="managed-workbench">
-    <header class="managed-heading"><div><span class="eyebrow">AI STORE MANAGEMENT</span><h1>托管 ASIN</h1><p>每日接续上次的运营思路，让调整与观察形成连续记录。</p></div><div class="heading-actions"><el-tag type="warning" effect="plain">DeepSeek真实分析 · Amazon正式执行</el-tag><el-button :disabled="!canAssign" @click="configVisible=true">AI交互配置</el-button><el-button type="primary" :disabled="!canAssign" :title="canAssign?'预约ASIN全部子SKU给AI运营':'需要AI托管权限'" @click="showAdd">＋ 添加托管ASIN</el-button></div></header>
-    <section class="schedule-card"><div class="schedule-clock">18:30 <small>北京时间 · 每日</small></div><div><strong>统一排队 → 恢复共享会话 → AI按需分析 → 每日自动执行 / 人工建议确认后执行</strong><p>定时任务每日入队一次，问答、每日优化和确认执行按同ASIN顺序处理；每次分析最多3轮，DeepSeek会计费。已入队不代表完成，服务器须同时部署AI独立消费者与原18:30定时任务。</p></div></section>
+    <header class="managed-heading"><div><span class="eyebrow">AI STORE MANAGEMENT</span><h1>托管 ASIN</h1><p>自然语言交流，AI按需查询ERP，形成计划与连续观察。</p></div><div class="heading-actions"><el-tag type="warning" effect="plain">DeepSeek真实分析 · Amazon正式执行</el-tag><el-button :disabled="!canAssign" @click="router.push('/tools/ai-operations/prompts')">提示词管理</el-button><el-button :disabled="!canAssign" @click="router.push('/tools/ai-operations/tools')">AI工具管理</el-button><el-button type="primary" :disabled="!canAssign" :title="canAssign?'预约ASIN全部子SKU给AI运营':'需要AI托管权限'" @click="showAdd">＋ 添加托管ASIN</el-button></div></header>
+    <section class="schedule-card"><div class="schedule-clock">18:30 <small>北京时间 · 每日</small></div><div><strong>自然任务 → 工具查询 → 优化计划 → 每日自动执行 / 人工确认执行</strong><p>同ASIN统一排队；问答历史超限时另行压缩摘要。DeepSeek按实际调用计费；工具过程仅本次分析使用，不重复加入下次聊天。</p></div></section>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <section class="managed-card">
       <div class="managed-filters"><el-input v-model="keyword" placeholder="搜索中文名、ASIN或SKU" clearable @keyup.enter="load(true)" /><el-select v-model="shopFilter" clearable placeholder="全部店铺" @change="load(true)"><el-option v-for="s in shops" :key="s.id" :value="s.id" :label="s.shop_name" /></el-select><el-select v-model="enabledFilter" clearable placeholder="全部托管状态" @change="load(true)"><el-option label="托管中" value="1" /><el-option label="已暂停" value="0" /></el-select><el-button :loading="loading" @click="load(true)">查询 / 刷新</el-button></div>
@@ -14,7 +14,7 @@
           <template #header><span class="action-header">操作<el-tooltip content="运行今日会产生AI费用，并可能真实修改亚马逊；查看历史和同步归属不调用AI。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></span></template>
           <template #default="{row}"><div class="operation-actions" @click.stop>
             <el-tooltip content="查看该ASIN跨日的ERP与AI共享对话、真实消息时间和资料；可新建会话。打开不调用AI、不修改店铺。" placement="top"><el-button type="primary" plain :icon="ChatDotRound" size="small" @click="openChat(row)">AI对话</el-button></el-tooltip>
-            <el-tooltip content="查看每日具体改动、执行结果及观察进展。只读，不计费、不修改店铺。" placement="top"><el-button class="history-action" :icon="Clock" size="small" @click="openHistory(row)">优化记录</el-button></el-tooltip>
+            <el-tooltip content="统一查看每日自动优化和人工生成方案的改动、确认与执行回读。旧版记录只显示提示。只读，不计费。" placement="top"><el-button class="history-action" :icon="Clock" size="small" @click="openHistory(row)">优化记录</el-button></el-tooltip>
             <el-tooltip content="把今天的托管加入统一队列，排在同ASIN当前作业之后；后台随后收费分析并真实执行。同日已有记录不重复入队。" placement="top"><span><el-button type="primary" :icon="VideoPlay" size="small" :loading="runningId===row.id" :disabled="!row.enabled || !row.executor_user_id || !row.ownership_consistent || !!runningId" @click="runToday(row)">运行今日</el-button></span></el-tooltip>
             <el-dropdown trigger="click" @command="command=>moreAction(command,row)"><el-button size="small">更多操作 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="sync" :disabled="!row.enabled || !canAssign || row.ownership_consistent || !!changingId || !!runningId"><span title="仅预约全部子SKU的AI负责交接，不调用AI或修改亚马逊">同步AI负责归属</span></el-dropdown-item><el-dropdown-item command="toggle" :disabled="!!changingId || (!row.enabled && !canAssign)"><span :title="row.enabled?'停止后续任务，已提交操作不撤回，负责人不自动交回人工':'恢复后续每日真实托管，可能产生AI费用和真实修改'">{{ row.enabled?'暂停托管':'恢复托管' }}</span></el-dropdown-item></el-dropdown-menu></template></el-dropdown>
           </div></template>
@@ -24,23 +24,24 @@
       <div class="managed-footer"><span>共 {{ total }} 个托管ASIN · 开启/恢复会预约全部子SKU给AI；15:00前变更次日生效，15:00起后天生效。暂停仅停止任务，不自动交回人工。</span><el-pagination v-if="total>20" v-model:current-page="page" :page-size="20" :total="total" layout="prev, pager, next" @current-change="load(false)" /></div>
     </section>
     <el-dialog v-model="chatVisible" title="ASIN · AI运营对话" width="92vw" top="3vh" :fullscreen="!wideScreen" append-to-body destroy-on-close :close-on-click-modal="false" class="ai-shared-chat-dialog"><AiManagedConversation v-if="chatVisible && chatTarget" :product="chatTarget" :initial-session-id="chatSessionId" :initial-plan-id="chatPlanId" /></el-dialog>
-    <el-dialog v-if="selected" v-model="historyVisible" title="每日优化历史" width="min(1280px, calc(100% - 28px))" top="5vh" append-to-body class="ai-managed-history" :close-on-click-modal="false" @closed="closeHistory">
+    <el-dialog v-if="selected" v-model="historyVisible" title="统一优化历史" width="min(1280px, calc(100% - 28px))" top="5vh" append-to-body class="ai-managed-history" :close-on-click-modal="false" @closed="closeHistory">
     <section class="daily-history">
-      <div class="managed-heading"><div><span class="eyebrow">OPTIMIZATION HISTORY</span><h2>{{ selected.product_name || selected.asin }} · 每日优化历史</h2><p>{{ selected.asin }} · 每日一条，包含输入快照、先前观察、AI结论和执行结果。</p></div><el-button :loading="historyLoading" @click="loadHistory">刷新优化历史</el-button></div>
+      <div class="managed-heading"><div><span class="eyebrow">OPTIMIZATION HISTORY</span><h2>{{ selected.product_name || selected.asin }} · 统一优化历史</h2><p>{{ selected.asin }} · 每日自动优化、人工方案及其执行结果；普通讨论不列入，多批确认不重复计为多个方案。</p></div><el-button :loading="historyLoading" @click="loadHistory">刷新优化历史</el-button></div>
       <el-alert v-if="historyError" :title="historyError" type="error" :closable="false" />
       <el-table :data="runs" v-loading="historyLoading" max-height="460">
-        <el-table-column label="任务日（北京时间）" prop="run_date" width="170" />
-        <el-table-column label="结果" width="130"><template #default="{row}"><el-tag :type="row.status==='completed'?'success':row.status==='failed'?'danger':'info'">{{ stateName(row.status) }}</el-tag></template></el-table-column>
-        <el-table-column label="执行 / 发起人员" min-width="160"><template #default="{row}"><template v-if="row.audit_context"><strong>{{ row.audit_context.executor.name }}</strong><p class="table-note">{{ row.trigger_source==='scheduled'?'授权启用人':'人工发起人' }}：{{ row.audit_context.initiated_by.name }}</p></template><span v-else class="table-note">历史记录未保存独立AI身份</span></template></el-table-column>
-        <el-table-column label="本次优化结论" min-width="320"><template #default="{row}"><p class="run-conclusion">{{ row.summary.conclusion || row.message }}</p><small class="table-note">报告截至 {{ row.report_date }} · {{ row.trigger_source==='scheduled'?'18:30定时':'手动触发' }} · DeepSeek会话分析 / 正式执行 · 改动 {{ row.summary.change_count || 0 }} 项</small></template></el-table-column>
-        <el-table-column label="执行 / 回读一致" min-width="140"><template #default="{row}">{{ row.summary.executed_count || 0 }} / {{ row.summary.confirmed_count || 0 }}</template></el-table-column>
-        <el-table-column label="详情" width="100"><template #default="{row}"><el-button link type="primary" @click="openDetail(row)">查看详情</el-button></template></el-table-column>
+        <el-table-column label="任务日（北京时间）" prop="run_date" width="145" />
+        <el-table-column label="来源" width="140"><template #default="{row}"><el-tag effect="plain" :type="row.source==='human'?'warning':'primary'">{{ row.source==='human'?'人工生成方案':'每日自动优化' }}</el-tag></template></el-table-column>
+        <el-table-column label="结果" width="130"><template #default="{row}"><el-tag :type="row.legacy?'info':row.status==='completed'?'success':row.status==='failed'?'danger':'info'">{{ row.legacy?'旧版记录':stateName(row.status) }}</el-tag></template></el-table-column>
+        <el-table-column label="执行 / 发起人员" min-width="160"><template #default="{row}"><template v-if="row.audit_context"><strong>{{ row.audit_context.executor.name }}</strong><p class="table-note">{{ row.trigger_source==='scheduled'?'授权启用人':'人工发起人' }}：{{ row.audit_context.initiated_by.name }}</p></template><span v-else class="table-note">{{ row.actor_name?'提问人：'+row.actor_name:'历史记录未保存独立AI身份' }}</span></template></el-table-column>
+        <el-table-column label="本次优化结论" min-width="320"><template #default="{row}"><p class="run-conclusion">{{ row.legacy?'旧数据，无法查看':row.summary.conclusion || row.message }}</p><small v-if="!row.legacy" class="table-note">报告截至 {{ row.report_date || '准备中' }} · {{ row.source==='human'?'人工方案需确认后执行':row.trigger_source==='scheduled'?'18:30自动执行':'手动触发每日流程' }} · 建议改动 {{ row.summary.change_count || 0 }} 项</small></template></el-table-column>
+        <el-table-column label="执行 / 回读一致" min-width="140"><template #default="{row}"><span v-if="row.legacy">—</span><template v-else>{{ row.summary.executed_count || 0 }} / {{ row.summary.confirmed_count || 0 }}</template></template></el-table-column>
+        <el-table-column label="详情" width="145"><template #default="{row}"><span v-if="row.legacy || row.detail_available===false" class="table-note">旧数据，无法查看</span><el-button v-else link type="primary" @click="openDetail(row)">查看详情</el-button></template></el-table-column>
       </el-table>
-      <el-empty v-if="!historyLoading && !runs.length" description="还没有每日记录；运行一次后即可查看方案、调整快照与执行详情" />
+      <el-empty v-if="!historyLoading && !runs.length" description="暂无优化记录；每日优化和人工生成方案将在这里统一展示" />
       <el-pagination v-if="historyTotal>20" v-model:current-page="historyPage" :page-size="20" :total="historyTotal" layout="prev, pager, next" @current-change="loadHistory" />
     </section>
     </el-dialog>
-    <el-dialog v-model="detailVisible" title="每日优化详情" width="min(1380px, calc(100% - 24px))" top="3vh" append-to-body destroy-on-close class="ai-managed-detail" :close-on-click-modal="false" @closed="closeDetail"><AiOperationDetail v-if="detailVisible && selectedRun" :run-id="selectedRun" @open-chat="openLinkedChat" /></el-dialog>
+    <el-dialog v-model="detailVisible" title="优化详情" width="min(1380px, calc(100% - 24px))" top="3vh" append-to-body destroy-on-close class="ai-managed-detail" :close-on-click-modal="false" @closed="closeDetail"><AiOperationDetail v-if="detailVisible && selectedRun" :run-id="selectedRun.id" :source="selectedRun.source" @open-chat="openLinkedChat" /></el-dialog>
     <el-dialog v-model="addVisible" title="添加托管ASIN" :width="wideScreen?'560px':'calc(100% - 28px)'" class="managed-add" :close-on-click-modal="false">
       <p class="add-description">每天北京时间18:30参与托管，DeepSeek会真实分析并计费；ERP将根据方案真实修改Listing与广告并记录AI操作，可随时暂停后续任务。</p>
       <el-alert title="开启后预约全部有效子SKU给AI运营；北京时间15:00前变更默认次日生效，15:00起默认后天生效。历史绩效不回填；暂停不会自动交回人工。" type="info" :closable="false" show-icon style="margin-bottom:18px" />
@@ -48,7 +49,6 @@
       <el-alert v-if="addError" :title="addError" type="error" :closable="false" />
       <template #footer><el-button :disabled="adding" @click="addVisible=false">取消</el-button><el-button type="primary" :loading="adding" :disabled="!addShop || !addAsin || optionsLoading" @click="add">开启托管（真实AI）</el-button></template>
     </el-dialog>
-    <el-dialog v-model="configVisible" title="AI交互配置与资料溯源" class="ai-interaction-config-dialog" width="min(1200px, calc(100% - 24px))" top="4vh" append-to-body destroy-on-close :close-on-click-modal="false"><AiInteractionConfig v-if="configVisible" :products="rows" /></el-dialog>
   </main>
 </template>
 
@@ -59,13 +59,11 @@ import { Clock, VideoPlay, QuestionFilled, ChatDotRound } from '@element-plus/ic
 import { useRouter } from 'vue-router'
 import AiOperationDetail from '@/components/AiOperationDetail.vue'
 import AiManagedConversation from '@/components/AiManagedConversation.vue'
-import AiInteractionConfig from '@/components/AiInteractionConfig.vue'
 import { getUserPermissions, getAiOperationsOptions, getAiManagedAsins, addAiManagedAsin, updateAiManagedAsin, getAiManagedRuns, runAiManagedAsin } from '@/services/api.js'
 const router=useRouter(),userCodes=getUserPermissions(),canViewAll=userCodes.includes('performance:view_all'),canAssign=userCodes.includes('ai_operations:manage')
 /** 跳到同店铺、同AI人员的绩效筛选，不更改绩效数据或重新分析。 */
 function viewPerformance(row){router.push({path:'/performance',query:{shop_id:String(row.shop_id),user_id:String(row.executor_user_id)}})}
 const wideScreen=ref(window.innerWidth>700)
-const configVisible=ref(false)
 const chatVisible=ref(false),chatTarget=ref(null),chatSessionId=ref(''),chatPlanId=ref('')
 /** 从托管行独立打开跨日对话，不触发AI或每日流程。 */
 function openChat(row){chatTarget.value=row;chatSessionId.value='';chatPlanId.value='';chatVisible.value=true}
@@ -81,7 +79,7 @@ const historyVisible=ref(false),detailVisible=ref(false),selectedRun=ref(null)
 const addVisible=ref(false),addShop=ref(null),addAsin=ref(''),rawProducts=ref([]),optionsLoading=ref(false),adding=ref(false),addError=ref(''),runningId=ref(''),changingId=ref('')
 let revision=0,historyRevision=0,optionRevision=0,active=true,initialized=false
 /** 用中文展示当前会话任务阶段。 */
-function stateName(state){return {queued:'统一队列等待中',preparing:'整理资料',analyzing:'AI分析中',executing:'执行回读中',completed:'优化完成',partial:'部分待核对',failed:'执行异常',paused:'已停止'}[state] || state}
+function stateName(state){return {queued:'统一队列等待中',running:'处理中',awaiting_confirmation:'方案待确认',unknown:'结果待核实',cancelled:'已取消',preparing:'整理资料',analyzing:'AI分析中',executing:'执行回读中',completed:'优化完成',partial:'部分待核对',failed:'执行异常',paused:'已停止'}[state] || state}
 /** 提取可展示的异常，超时明确提示勿重复发起付费请求。 */
 function message(error){return error.response?.data?.message || (error.code==='ECONNABORTED'?'等待超时不代表后台任务停止，请刷新优化历史，不要重复发起付费分析':'读取或处理未完成，请刷新历史核对')}
 // 把店铺多个SKU按ASIN合并为添加托管时的一条选项。
@@ -107,7 +105,7 @@ async function loadHistory(){
   finally{if(current===historyRevision)historyLoading.value=false}
 }
 /** 在第二层弹框打开详情，保留第一层历史的分页和滚动位置。 */
-function openDetail(row){selectedRun.value=row.id;detailVisible.value=true}
+function openDetail(row){if(row.legacy || row.detail_available===false)return;selectedRun.value={id:row.id,source:row.source || 'daily'};detailVisible.value=true}
 /** 关闭历史后使进行中的读取失效，避免迟到列表重新出现。 */
 function closeHistory(){historyRevision++;historyLoading.value=false}
 /** 详情关闭后销毁记录组件，不保留其网络请求与阅读弹框。 */

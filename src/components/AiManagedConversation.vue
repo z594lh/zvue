@@ -15,7 +15,7 @@
         <el-button v-if="moreSessions" link :disabled="loading" @click="loadSessions(true)">更早的会话</el-button>
       </aside>
       <main class="chat-main">
-        <div class="chat-context" v-if="session"><strong>{{ session.title || `运营会话 ${session.generation}` }}</strong><span>记忆 v{{ session.revision }} · {{ session.state==='archived'?'只读归档':'当前共享对话' }}</span><el-tag v-if="session.daily_baseline_pending" type="warning" size="small">下次例行将重新初始化完整基础资料</el-tag></div>
+        <div class="chat-context" v-if="session"><strong>{{ session.title || `运营会话 ${session.generation}` }}</strong><span>问答检查点 v{{ session.revision }} · {{ session.state==='archived'?'只读归档':'当前共享对话' }}</span><el-button link type="primary" @click="readMemory">会话记忆</el-button></div>
         <div ref="scroller" class="chat-scroll">
           <el-button v-if="moreMessages" link :loading="messagesLoading" @click="loadMessages(true)">加载更早消息</el-button>
           <el-empty v-if="!items.length && !messagesLoading" :description="session?'新会话尚无消息；下次每日例行将在这里留下记录':'暂无会话，可新建或等待下一次每日例行'" />
@@ -23,15 +23,16 @@
             <div v-if="!index || day(item.created_at)!==day(timeline[index-1].created_at)" class="chat-day">{{ day(item.created_at) }} · 北京时间</div>
             <article class="shared-message" :class="[item.role,{'technical-message':item.auxiliary}]" :data-message-id="item.id">
               <span v-if="!item.auxiliary" class="shared-avatar">{{ item.role==='assistant'?'DS':item.role==='user'?'人':'ERP' }}</span>
-              <div class="shared-content"><div v-if="!item.auxiliary" class="message-meta"><strong>{{ item.title }}</strong><el-tag v-if="item.task?.chat_mode && item.role==='user'" size="small" :type="item.task.chat_mode==='discussion'?'info':'warning'">{{ item.task.chat_mode==='discussion'?'讨论':'优化方案' }}</el-tag><time>{{ time(item.created_at) }} 北京时间</time><small v-if="item.actor && item.role==='erp'">授权/发起人：{{ item.actor }}</small></div>
+              <div class="shared-content"><div v-if="!item.auxiliary" class="message-meta"><strong>{{ item.title }}</strong><time>{{ time(item.created_at) }} 北京时间</time><el-tag v-if="item.role==='user' && ['discussion','proposal'].includes(item.task?.chat_mode)" size="small" effect="plain">{{ item.task.chat_mode==='proposal'?'生成方案':'讨论' }}</el-tag><small v-if="item.actor && item.role==='erp'">授权/发起人：{{ item.actor }}</small></div>
                 <div class="shared-bubble"><div v-if="item.text" class="message-body" :class="{collapsed:!expanded[item.id]}">{{ item.text }}</div><el-button v-if="item.text.length>500" link type="primary" @click="expanded[item.id]=!expanded[item.id]">{{ expanded[item.id]?'收起':'… 展开完整内容' }}</el-button>
                   <small v-if="item.questionPreview" class="attachment-note">以上为实际提问的自然语言摘要，完整提问与约束可在下方展开。</small>
                   <p v-if="item.error_note" class="reply-warning">{{ item.error_note }}</p>
-                  <div v-if="item.task && item.role==='user' && item.task.status!=='completed'" class="human-task-state"><el-tag size="small" :type="taskType(item.task.status)">{{ taskName(item.task) }}</el-tag><span>{{ item.task.message }}</span><el-button v-if="!terminal(item.task.status)" link type="warning" @click="cancelTask(item.task)">{{ item.task.status==='queued'?'取消排队':'停止后续分析' }}</el-button></div>
-                  <el-button v-if="item.role==='user' && item.event_type==='user_message' && item.task?.status==='failed' && item.task.error_code==='invalid_output' && item.task.chat_mode!=='discussion'" link type="primary" :disabled="!canCompose || !worker.online || sending || !!retryToken" @click="regenerate(item)">重新生成方案（新请求，可能计费）</el-button>
-                  <AiActionConfirmation v-if="item.task?.status==='completed' && item.task.result?.type==='propose_plan' && item.task.result.response_message_id===item.id" :task="item.task" :viewer-id="viewerId" :current="session?.state==='active' && selectedId===currentId" :enabled="!!product.enabled" :worker-online="!!worker.online" @updated="poll" />
-                  <details v-if="item.documentSources.length" class="bound-documents"><summary>资料与规则附件（{{ item.documentCounts.included }} 份组入请求 / {{ item.documentCounts.archived }} 份仅归档）</summary><section v-for="source in item.documentSources" :key="source.id" class="document-source"><small>{{ source.title }} · 第 {{ source.round }} 轮 · {{ time(source.created_at) }}</small><button v-for="doc in source.documents" :key="doc.id" class="message-file" @click="readDocument(source,doc)"><span>{{ doc.kind==='rule'?'规则':doc.kind==='history'?'历史':'资料' }}</span><strong>{{ doc.name }}</strong><small>{{ doc.delivery==='archived'?'仅归档 · 未发送':'本轮组入请求' }} · {{ (doc.byte_count/1024).toFixed(1) }} KB ↗</small></button></section></details>
-                  <details class="message-inspector"><summary>{{ item.auxiliary?'本轮资料与分析过程':'上下文与原始 JSON' }}<small>（{{ item.records.length }} 条原始记录）</small></summary><section v-for="record in item.records" :key="record.id" class="audit-record"><header><strong>{{ record.title }}</strong><time>{{ time(record.created_at) }} 北京时间</time></header><details v-if="record.text" class="record-content"><summary>展开完整提问／记录正文</summary><div class="technical-content">{{ record.text }}</div></details><p v-if="record.interaction" class="attachment-note">配置 {{ record.interaction.version_id?'#'+record.interaction.version_id:'系统初始版' }} · {{ record.delivery_note }}</p><small v-if="record.usage" class="message-usage">输入 {{ record.usage.prompt_tokens ?? '未知' }} / 输出 {{ record.usage.completion_tokens ?? '未知' }} token<template v-if="record.usage.prompt_cache_hit_tokens!=null"> · 缓存命中 {{ record.usage.prompt_cache_hit_tokens }}</template></small><button class="message-file" @click="readOriginal(record)"><span>JSON</span><strong>{{ record.attachment_name }}</strong><small>查看完整请求、上下文与原始记录 ↗</small></button></section></details>
+                  <div v-if="item.task && !item.task.legacy && item.role==='user' && item.task.status!=='completed'" class="human-task-state"><el-tag size="small" :type="taskType(item.task.status)">{{ taskName(item.task) }}</el-tag><span>{{ item.task.message }}</span><el-button v-if="!terminal(item.task.status)" link type="warning" @click="cancelTask(item.task)">{{ item.task.status==='queued'?'取消排队':'停止后续分析' }}</el-button></div>
+                  <el-button v-if="item.role==='user' && item.event_type==='user_message' && item.task?.status==='failed' && item.task.error_code==='invalid_output'" link type="primary" :disabled="!canCompose || !worker.online || sending || !!retryToken" @click="regenerate(item)">重新分析（新请求，可能计费）</el-button>
+                  <details v-if="item.task?.status==='completed' && item.task.result?.type==='propose_plan' && item.task.result.response_message_id===item.id" class="plan-details"><summary>本次优化计划 · 查看 / 确认执行</summary><AiActionConfirmation :task="item.task" :viewer-id="viewerId" :current="session?.state==='active' && selectedId===currentId" :enabled="!!product.enabled" :worker-online="!!worker.online" @updated="poll" /></details>
+                  <AiToolRounds v-if="item.nativeTrace" :session-id="selectedId" :message-id="item.id" :version="`${item.records.at(-1)?.id}:${item.task?.status}`" @original="readOriginal"/>
+
+                  <details v-if="!item.nativeTrace && !item.legacy" class="message-inspector"><summary>{{ item.auxiliary?'本轮资料与分析过程':'上下文与原始 JSON' }}<small>（{{ item.records.length }} 条原始记录）</small></summary><section v-for="record in item.records" :key="record.id" class="audit-record"><header><strong>{{ record.title }}</strong><time>{{ time(record.created_at) }} 北京时间</time></header><details v-if="record.text" class="record-content"><summary>展开完整提问／记录正文</summary><div class="technical-content">{{ record.text }}</div></details><p v-if="record.interaction" class="attachment-note">配置 {{ record.interaction.version_id?'#'+record.interaction.version_id:'系统初始版' }} · {{ record.delivery_note }}</p><small v-if="record.usage" class="message-usage">输入 {{ record.usage.prompt_tokens ?? '未知' }} / 输出 {{ record.usage.completion_tokens ?? '未知' }} token<template v-if="record.usage.prompt_cache_hit_tokens!=null"> · 缓存命中 {{ record.usage.prompt_cache_hit_tokens }}</template></small><button v-if="record.has_original!==false" class="message-file" @click="readOriginal(record)"><span>JSON</span><strong>{{ record.attachment_name }}</strong><small>查看完整请求、上下文与原始记录 ↗</small></button></section></details>
                 </div>
               </div>
             </article>
@@ -40,24 +41,26 @@
         <button v-if="newMessages" class="new-messages" @click="scrollBottom">有新消息 · 点击查看</button>
         <footer class="chat-composer">
           <div class="worker-status"><span :class="{online:worker.online}">{{ worker.online?'● AI后台在线':'○ AI后台未在线' }}</span><small v-if="!worker.online">{{ worker.message || '请管理员部署独立AI会话消费者' }}</small><small v-if="worker.last_heartbeat_at">最近心跳 {{ time(worker.last_heartbeat_at) }}</small><small v-if="pendingTasks.length">{{ pendingTasks.length }} 个作业排队 / 处理中，关闭页面后继续</small></div>
-          <div v-if="pendingTasks.length" class="shared-queue"><div v-for="task in pendingTasks" :key="task.id"><span>{{ task.task_type==='daily'?'每日优化':task.task_type==='execute'?'确认执行':task.chat_mode==='discussion'?'人工讨论':'生成方案' }} #{{ task.id }} · {{ taskName(task) }}</span><el-button link type="warning" @click="cancelTask(task)">{{ task.status==='queued'?'取消排队':'停止后续步骤' }}</el-button></div></div>
-          <div class="chat-mode"><el-radio-group v-model="mode" size="small" :disabled="!canCompose || sending || !!retryToken" @change="persistDraft"><el-radio-button label="discussion">讨论</el-radio-button><el-radio-button label="proposal">生成优化方案</el-radio-button></el-radio-group><el-tooltip :content="mode==='discussion'?'默认模式：一次自然语言回答，带共享记忆和轻量资料；不携带整套执行规范，不生成执行卡片。':'携带运营规则、Listing规范和完整方案协议，最多3轮补查或纠错；允许只观察，修改仍须选择并明确确认。'" placement="top"><span class="mode-help" tabindex="0">?</span></el-tooltip><small>{{ mode==='discussion'?'接着聊，不生成执行方案':'形成行动清单，确认后才执行' }}</small></div>
-          <el-input v-model="draft" type="textarea" :rows="2" :maxlength="4000" :disabled="!canCompose || sending" :placeholder="session?.state==='archived'?'旧对话只读，请切换当前对话':'输入问题，例如：昨天的标题为什么这样修改？Enter发送，Shift+Enter换行'" @input="persistDraft" @keydown="onKeydown" />
-          <div class="composer-actions"><small>{{ session?.state==='archived'?'已归档，只能查看':mode==='discussion'?'讨论为1次AI调用，可能计费；共享历史，平台不会修改。':product.enabled===false?'托管已暂停：可分析，但建议不能执行':'方案最多3轮AI调用，可能计费；须选择并明确确认才执行。' }}</small><el-button type="primary" :loading="sending" :disabled="!canSend" @click="send">{{ mode==='discussion'?'发送':'生成方案' }}</el-button></div>
+          <div v-if="pendingTasks.length" class="shared-queue"><div v-for="task in pendingTasks" :key="task.id"><span>{{ task.task_type==='daily'?'每日优化':task.task_type==='execute'?'确认执行':task.chat_mode==='discussion'?'人工讨论':task.chat_mode==='proposal'?'生成方案':'人工对话' }} #{{ task.id }} · {{ taskName(task) }}</span><el-button link type="warning" @click="cancelTask(task)">{{ task.status==='queued'?'取消排队':'停止后续步骤' }}</el-button></div></div>
+          <div class="chat-mode"><el-radio-group v-model="chatMode" :disabled="!canCompose || sending || !!retryToken" size="small" @change="persistDraft"><el-radio-button value="discussion">讨论</el-radio-button><el-radio-button value="proposal">生成方案</el-radio-button></el-radio-group><el-tooltip content="两种模式都接续相同自然问答、自动摘要并按需查询ERP。讨论直接回答；生成方案还需提交通过校验的计划，允许零改动，确认后才执行。" placement="top"><span class="mode-help" tabindex="0">?</span></el-tooltip><small>{{ chatMode==='proposal'?'生成结构化计划，允许今日不改动；不会自动执行':'自然问答，不强制方案格式，不产生可执行计划' }}</small></div>
+          <el-input v-model="draft" type="textarea" :rows="2" :maxlength="4000" :disabled="!canCompose || sending" :placeholder="session?.state==='archived'?'旧对话只读，请切换当前对话':chatMode==='proposal'?'说明优化目标，AI按需查数据并生成计划（允许不改动）':'输入问题，例如：昨天的标题为什么这样修改？Enter发送，Shift+Enter换行'" @input="persistDraft" @keydown="onKeydown" />
+          <div class="composer-actions"><small>{{ session?.state==='archived'?'已归档，只能查看':'两种模式共用问答记忆和查询工具，可能多轮计费；历史超限另行摘要。人工计划须明确确认。' }}</small><el-button type="primary" :loading="sending" :disabled="!canSend" @click="send">{{ chatMode==='proposal'?'发送并生成方案':'发送' }}</el-button></div>
           <el-button v-if="retryToken" link type="warning" :disabled="sending" @click="retrySend">上次发送结果未知 · 用原标识核对（不重复登记）</el-button>
         </footer>
       </main>
     </div>
     <el-dialog v-model="originalVisible" :title="originalTitle" width="min(1050px, calc(100% - 24px))" top="5vh" append-to-body destroy-on-close :close-on-click-modal="false"><pre v-loading="originalLoading" class="original-content">{{ originalText }}</pre><template #footer><el-button :disabled="originalLoading || !originalText" @click="download">下载原文</el-button><el-button type="primary" @click="originalVisible=false">关闭</el-button></template></el-dialog>
+    <el-dialog v-model="memoryVisible" title="会话记忆 · 仅问答与摘要" width="min(850px, calc(100% - 24px))" top="5vh" append-to-body destroy-on-close><div v-loading="memoryLoading"><p class="memory-note">{{ memoryInfo?.note }}</p><p v-if="memoryInfo">摘要 {{ memoryInfo.summary_id?'#'+memoryInfo.summary_id:'尚未生成' }} · 未压缩问答 {{ memoryInfo.recent_turns }} 组</p><pre class="original-content">{{ memoryInfo?.summary || '尚未达到压缩阈值；近期原问题和AI最终回答直接用于续聊。' }}</pre><details v-if="memoryInfo?.last_attempt"><summary>最近一次摘要调用与费用</summary><pre class="original-content">{{ JSON.stringify(memoryInfo.last_attempt,null,2) }}</pre></details><el-alert v-if="memoryError" :title="memoryError" type="error" :closable="false"/></div><template #footer><el-button v-if="memoryInfo?.last_attempt && memoryInfo.last_attempt.status!=='ready'" :disabled="!canCompose || sending || !!retryToken || !worker.online" @click="retrySummary">重新生成摘要（可能计费）</el-button><el-button @click="readMemory">刷新</el-button><el-button type="primary" @click="memoryVisible=false">关闭</el-button></template></el-dialog>
   </section>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { getAiConversations, getAiConversationMessages, getAiConversationOriginal, createAiConversation, getAiConversationDocument, sendAiConversationMessage, getAiChatTask, cancelAiChatTask } from '@/services/api'
+import { getAiConversations, getAiConversationMessages, getAiConversationOriginal, createAiConversation, sendAiConversationMessage, getAiChatTask, cancelAiChatTask, getAiConversationMemory, getAiPrompts } from '@/services/api'
 import { conversationTime } from '@/utils/aiOperationConversation'
 import AiActionConfirmation from '@/components/AiActionConfirmation.vue'
+import AiToolRounds from '@/components/AiToolRounds.vue'
 import { buildChatTimeline } from '@/utils/aiChatPresentation'
 const props=defineProps({product:{type:Object,required:true},initialSessionId:{type:String,default:''},initialPlanId:{type:String,default:''}})
 const loading=ref(false),creating=ref(false),messagesLoading=ref(false),error=ref(''),sessions=ref([]),selectedId=ref(''),currentId=ref(null),items=ref([]),moreSessions=ref(false),moreMessages=ref(false),expanded=ref({}),scroller=ref(null)
@@ -67,7 +70,8 @@ const session=computed(()=>sessions.value.find(r=>r.id===selectedId.value))
 const timeline=computed(()=>buildChatTimeline(items.value))
 const worker=ref({online:false}),capabilities=ref({human_chat:false}),draft=ref(''),sending=ref(false),pendingTasks=ref([]),newMessages=ref(false),retryToken=ref(null)
 const viewerId=ref('')
-const mode=ref('discussion')
+const chatMode=ref('discussion')
+const memoryVisible=ref(false),memoryLoading=ref(false),memoryInfo=ref(null),memoryError=ref('')
 const canCompose=computed(()=>capabilities.value.human_chat && session.value?.state==='active' && selectedId.value===currentId.value)
 const canSend=computed(()=>canCompose.value && worker.value.online && draft.value.trim() && !sending.value && !retryToken.value)
 let active=true,messageRevision=0,originalRevision=0
@@ -85,7 +89,7 @@ async function loadSessions(older=false){
   persistDraft();viewerId.value=data.data.viewer_id || '';worker.value=data.data.worker || {online:false};capabilities.value=data.data.capabilities || {};restoreDraft()
 }
 /** 选择不同会话时使上一会话未返回的读取失效。 */
-async function select(id){persistDraft();selectedId.value=id;items.value=[];expanded.value={};pendingTasks.value=[];newMessages.value=false;retryToken.value=null;restoreDraft();await loadMessages()}
+async function select(id){persistDraft();memoryVisible.value=false;memoryInfo.value=null;selectedId.value=id;items.value=[];expanded.value={};pendingTasks.value=[];newMessages.value=false;retryToken.value=null;restoreDraft();await loadMessages()}
 /** 分页读取消息，并在向上加载时保留用户原来的阅读位置。 */
 async function loadMessages(older=false){
   if(!selectedId.value)return
@@ -123,7 +127,7 @@ async function refresh(){
 }
 /** 用户明确确认后切换共享代次，保留原记录和观察，不重新运行今天。 */
 async function createNew(){
-  try{await ElMessageBox.confirm('将为该ASIN的所有授权用户和ERP切换新对话。旧问答只读保留，真实操作及待观察事项不删除；下一次每日例行重新提供完整基础资料，不会重复运行今天。','新建共享对话',{confirmButtonText:'确认新建',cancelButtonText:'取消',type:'warning',closeOnClickModal:false})}catch{return}
+  try{await ElMessageBox.confirm('将为该ASIN的所有授权用户和ERP切换新对话。旧问答只读保留，真实操作及待观察事项不删除；新会话不继承旧问答；AI将按需查询当前资料和真实执行历史，不会重复运行今天。','新建共享对话',{confirmButtonText:'确认新建',cancelButtonText:'取消',type:'warning',closeOnClickModal:false})}catch{return}
   creating.value=true;error.value=''
   try{const {data}=await createAiConversation(props.product.id,{expected_current_id:currentId.value,confirm_new:true});if(active){selectedId.value=data.data.id;items.value=[];await refresh()}}
   catch(e){if(active)error.value=failure(e)}
@@ -137,35 +141,41 @@ async function readOriginal(item){
   catch(e){if(active && revision===originalRevision)originalText.value=failure(e)}
   finally{if(active && revision===originalRevision)originalLoading.value=false}
 }
-/** 附件按会话、消息和绑定编号读取，不实时生成当前数据冒充原附件。 */
-async function readDocument(item,doc){
-  const revision=++originalRevision;originalVisible.value=true;originalLoading.value=true;originalTitle.value=doc.name;originalText.value='';downloadName.value=doc.name
-  try{const {data}=await getAiConversationDocument(selectedId.value,item.id,doc.id);if(active && revision===originalRevision){originalText.value=data.data.text;originalTitle.value=doc.name+' · '+(doc.delivery==='archived'?'仅归档未发送':'组入本轮请求')+' · SHA256 '+data.data.hash}}
-  catch(e){if(active && revision===originalRevision)originalText.value=failure(e)}
-  finally{if(active && revision===originalRevision)originalLoading.value=false}
-}
 /** 原文下载只在浏览器生成文件，不触发上传或模型请求。 */
 function download(){const url=URL.createObjectURL(new Blob([originalText.value],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=downloadName.value;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 /** 按登录人、店铺、ASIN和会话隔离草稿；未知用户时只保留内存，不共用本地缓存。 */
 function draftKey(){return viewerId.value && selectedId.value?`ai-chat-draft:${viewerId.value}:${props.product.shop_id}:${props.product.asin}:${selectedId.value}`:null}
 /** 只保存文字草稿及尚待核对的原发送标识，刷新不自动发请求。 */
-function persistDraft(){try{const key=draftKey();if(key)localStorage.setItem(key,JSON.stringify({text:draft.value,mode:mode.value,retry:retryToken.value}))}catch{/* 浏览器不允许本地缓存时不影响服务端消息 */}}
+function persistDraft(){try{const key=draftKey();if(key)localStorage.setItem(key,JSON.stringify({text:draft.value,mode:chatMode.value,retry:retryToken.value}))}catch{/* 浏览器不允许本地缓存时不影响服务端消息 */}}
 /** 恢复当前范围草稿，不把另一个用户或会话的文字带进来。 */
-function restoreDraft(){try{const key=draftKey();const value=key?JSON.parse(localStorage.getItem(key) || 'null'):null;draft.value=value?.text || '';retryToken.value=value?.retry || null;mode.value=(retryToken.value?.mode || value?.mode)==='proposal'?'proposal':'discussion'}catch{draft.value='';retryToken.value=null;mode.value='discussion'}}
+function restoreDraft(){try{const key=draftKey();const value=key?JSON.parse(localStorage.getItem(key) || 'null'):null;draft.value=value?.text || '';chatMode.value=['discussion','proposal'].includes(value?.mode)?value.mode:'discussion';retryToken.value=value?.retry || null}catch{draft.value='';chatMode.value='discussion';retryToken.value=null}}
 /** 区分中文输入法确认与真正Enter，Shift+Enter保持换行。 */
 function onKeydown(event){if(event.key==='Enter' && !event.shiftKey && !event.isComposing && event.keyCode!==229){event.preventDefault();send()}}
 /** 新问题先由用户确认可能计费，不接受聊天文字代替平台修改授权。 */
 async function send(){
   if(!canSend.value)return
-  const selection={mode:mode.value,text:draft.value,sessionId:selectedId.value}
-  try{await ElMessageBox.confirm(selection.mode==='discussion'?'将带共享记忆和轻量本地资料，进行1次自然语言讨论，可能计费。不生成可执行方案，也不会修改Listing或广告。':'将带运营规则、Listing规范和资料，最多3轮生成方案，可能计费。允许只观察，具体改动仍须你选择并明确确认；不会自动修改平台。',selection.mode==='discussion'?'发送讨论':'生成优化方案',{confirmButtonText:'确认发送（可能计费）',cancelButtonText:'取消',type:'info',closeOnClickModal:false})}catch{return}
-  if(!canSend.value || selection.sessionId!==selectedId.value || selection.mode!==mode.value || selection.text!==draft.value)return
+  const selection={mode:chatMode.value,text:draft.value,sessionId:selectedId.value}
+  try{await ElMessageBox.confirm('AI将接续自然问答历史，按需查询ERP，可能多轮计费；历史超限会额外请求DeepSeek摘要。'+(selection.mode==='proposal'?'最终生成结构化计划，允许零改动；人工方案须再次明确确认才执行。':'本次只讨论，不要求提交方案，不修改Amazon。'),selection.mode==='proposal'?'发送并生成方案':'发送讨论问题',{confirmButtonText:'确认发送（可能计费）',cancelButtonText:'取消',type:'info',closeOnClickModal:false})}catch{return}
+  if(!canSend.value || selection.sessionId!==selectedId.value || selection.text!==draft.value || selection.mode!==chatMode.value)return
   const token=crypto.randomUUID().replaceAll('-','');retryToken.value={token,...selection};persistDraft();await submitPending()
 }
 /** 只有已明确格式失败的方案才能主动新建请求；不重放原任务，不用于超时/未知状态。 */
 async function regenerate(item){
   if(draft.value.trim()){try{await ElMessageBox.confirm('将用这条原问题替换当前输入框草稿，原失败记录保持不变。','准备重新生成',{confirmButtonText:'替换草稿',cancelButtonText:'取消'})}catch{return}}
-  mode.value='proposal';draft.value=item.text;persistDraft();await send()
+  draft.value=item.text;chatMode.value=item.task?.chat_mode==='discussion'?'discussion':'proposal';persistDraft();await send()
+}
+/** 仅查看已生成摘要，打开不会压缩历史或调用模型。 */
+async function readMemory(){const sid=selectedId.value;memoryVisible.value=true;memoryLoading.value=true;memoryError.value='';try{const {data}=await getAiConversationMemory(sid);if(active && selectedId.value===sid)memoryInfo.value=data.data}catch(e){if(active && selectedId.value===sid)memoryError.value=failure(e)}finally{if(active && selectedId.value===sid)memoryLoading.value=false}}
+/** 明确授权额外摘要请求；使用新任务记录，不重放原分析或平台修改。 */
+async function retrySummary(){
+  const sid=selectedId.value,attempt=memoryInfo.value?.last_attempt,input=draft.value
+  if(!attempt || !canCompose.value || !worker.value.online || retryToken.value || sending.value)return
+  let text=input.trim()
+  if(!text){try{const {data}=await getAiPrompts();text=data.data.config.prompts.summary_retry_question}catch(e){if(active && selectedId.value===sid)memoryError.value=failure(e);return}}
+  if(!active || selectedId.value!==sid || draft.value!==input)return
+  try{await ElMessageBox.confirm('原摘要请求可能已计费。将登记新的讨论问题并重新请求摘要，不执行Amazon修改。问题：'+text,'重新生成会话摘要',{confirmButtonText:'确认重新请求（可能计费）',cancelButtonText:'取消',type:'warning'})}catch{return}
+  if(!active || selectedId.value!==sid || draft.value!==input || !canCompose.value || retryToken.value || sending.value)return
+  retryToken.value={token:crypto.randomUUID().replaceAll('-',''),mode:'discussion',text,sessionId:sid,retry_summary_id:attempt.id};persistDraft();memoryVisible.value=false;await submitPending()
 }
 /** 使用原token核对超时发送，服务端同一原话只登记一次；不会自动重发收费任务。 */
 async function retrySend(){if(retryToken.value)await submitPending()}
@@ -173,7 +183,7 @@ async function retrySend(){if(retryToken.value)await submitPending()}
 async function submitPending(){
   const request=retryToken.value;if(!request || sending.value)return
   sending.value=true;error.value=''
-  try{const {data}=await sendAiConversationMessage(request.sessionId,{text:request.text,request_token:request.token,confirm_ai:true,...(request.mode?{mode:request.mode}:{})});if(!active || selectedId.value!==request.sessionId)return;retryToken.value=null;draft.value='';persistDraft();pendingTasks.value=[...pendingTasks.value.filter(t=>t.id!==data.data.id),data.data];await poll()}
+  try{const {data}=await sendAiConversationMessage(request.sessionId,{text:request.text,request_token:request.token,confirm_ai:true,...(request.mode?{mode:request.mode}:{}),...(request.retry_summary_id?{retry_summary_id:request.retry_summary_id}:{})});if(!active || selectedId.value!==request.sessionId)return;retryToken.value=null;draft.value='';persistDraft();pendingTasks.value=[...pendingTasks.value.filter(t=>t.id!==data.data.id),data.data];await poll()}
   catch(e){if(active && selectedId.value===request.sessionId){error.value=failure(e);if(e.response && [400,401,404,409,422].includes(e.response.status)){retryToken.value=null;persistDraft()}}}
   finally{if(active)sending.value=false}
 }
@@ -206,14 +216,15 @@ function taskName(task){return {queued:'排队中',preparing:'准备资料',anal
 /** 错误和未知保持醒目，不用绿色掩盖不确定调用。 */
 function taskType(status){return status==='completed'?'success':['failed','unknown'].includes(status)?'danger':'info'}
 /** 销毁弹框时清理异步读取及原文弹框，防止跨ASIN残留。 */
-function stop(){persistDraft();active=false;messageRevision++;originalRevision++;originalVisible.value=false;if(timer)clearInterval(timer)}
+function stop(){persistDraft();active=false;messageRevision++;originalRevision++;originalVisible.value=false;memoryVisible.value=false;if(timer)clearInterval(timer)}
 onMounted(async()=>{await refresh();if(active)timer=setInterval(poll,4000)});onBeforeUnmount(stop)
 </script>
 
 <style scoped>
 .managed-chat{height:78vh;display:flex;flex-direction:column;color:#334d68;min-height:380px}.chat-top{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:0 0 18px;border-bottom:1px solid #e8edf4}.chat-top strong{font-size:16px}.chat-top small{display:block;font-size:11px;color:#8797ab;margin-top:8px}.chat-top>div:last-child{display:flex;flex-shrink:0}.chat-layout{display:flex;min-height:0;flex:1;padding-top:14px;gap:20px}.chat-sessions{width:210px;flex-shrink:0;overflow:auto;border-right:1px solid #e8edf4;padding-right:15px}.section-caption{font-size:11px;color:#8b9db4}.session-item{display:block;text-align:left;width:100%;border:1px solid transparent;background:white;border-radius:9px;padding:12px;margin:8px 0;cursor:pointer;color:#4c6079}.session-item.selected{border-color:#cbdcf7;background:#f0f5ff}.session-item strong{font-size:13px;margin-right:7px}.session-item small{display:block;font-size:10px;color:#8495ae;margin-top:8px}.chat-main{display:flex;flex-direction:column;flex:1;min-width:0}.chat-context{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;padding:0 0 10px}.chat-context>span{color:#8696aa}.chat-scroll{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:8px 8px 25px}.chat-day{text-align:center;color:#98a4b4;font-size:11px;margin:12px 0 22px}.shared-message{display:flex;gap:12px;margin-bottom:24px;max-width:94%;min-width:0}.shared-message.erp{margin-left:auto;flex-direction:row-reverse}.shared-avatar{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:#147d75;color:white;display:flex;align-items:center;justify-content:center;font-size:11px}.erp .shared-avatar{background:#4279d8}.shared-content{min-width:0;flex:1}.message-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;margin-bottom:8px;color:#8b9aad}.message-meta strong{color:#465d7a}.erp .message-meta{justify-content:flex-end}.shared-bubble{border:1px solid #e5ebf4;border-radius:4px 13px 13px;padding:16px 18px;background:white}.erp .shared-bubble{background:#edf4ff;border-color:#dce8fb;border-radius:13px 4px 13px 13px}.message-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;font-size:13px}.message-body.collapsed{display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden}.message-file{display:flex;align-items:center;gap:10px;flex-wrap:wrap;text-align:left;background:#ffffffb0;border:1px solid #dfe7f2;border-radius:8px;padding:12px;margin-top:14px;cursor:pointer;max-width:100%;color:#527292}.message-file>span{font-size:10px;background:#eaf1fd;padding:6px}.message-file strong{font-size:12px}.message-file small{font-size:10px;color:#91a3ba}.message-usage{display:block;font-size:10px;color:#91a3ba;margin-top:6px}.chat-composer{padding-top:12px;border-top:1px solid #e8edf4}.chat-composer>div:last-child{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:7px}.chat-composer small{font-size:11px;color:#8f9bae}.original-content{white-space:pre-wrap;overflow-wrap:anywhere;max-height:65vh;overflow:auto;font-size:12px;line-height:1.8;padding:12px;background:#f5f7fb}@media(max-width:700px){.managed-chat{height:calc(100dvh - 105px);min-height:0}.chat-top{flex-wrap:wrap;padding-bottom:10px}.chat-top strong{font-size:13px}.chat-layout{flex-direction:column;gap:10px}.chat-sessions{width:100%;max-height:110px;border-right:0;display:flex;gap:6px;overflow:auto;padding:0;flex-shrink:0}.section-caption{display:none}.session-item{min-width:170px;width:170px;margin:0}.session-item small{font-size:9px}.chat-context{gap:6px;font-size:10px}.shared-message{max-width:100%;gap:7px}.shared-avatar{width:27px;height:27px;font-size:9px}.shared-bubble{padding:11px}.message-meta{gap:4px}.message-body{font-size:12px}.message-file{padding:8px}.chat-composer small{font-size:10px}}
 .chat-main{min-height:0}.chat-composer{flex-shrink:0}
-.chat-mode{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.mode-help{border:1px solid #c4d4e9;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#6d87a9;cursor:help}.composer-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:7px}.reply-warning{font-size:12px;line-height:1.8;padding:8px 10px;background:#fff6e9;color:#a8732a;border-radius:6px}
+.chat-mode{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:9px}.chat-mode small{color:#8095af}.mode-help{width:16px;height:16px;border:1px solid #9daec3;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#8095af;cursor:help}
+.composer-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:7px}.reply-warning{font-size:12px;line-height:1.8;padding:8px 10px;background:#fff6e9;color:#a8732a;border-radius:6px}.plan-details>summary{font-size:12px;color:#ad7a34;cursor:pointer;margin-top:12px}.memory-note{font-size:12px;color:#8296ae;line-height:1.9}
 .shared-message.user{width:fit-content;min-width:min(260px,94%)}.shared-message.user .shared-content{flex:initial;width:100%}.message-inspector{margin-top:12px}.message-inspector>summary,.record-content>summary{font-size:11px;color:#7b92ae;cursor:pointer;line-height:1.9}.message-inspector>summary small{font-size:10px;color:#9aa8b9}.audit-record{margin-top:10px;padding:10px;background:#ffffffa8;border:1px solid #e1e9f3;border-radius:7px}.audit-record>header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:#617c9c;margin-bottom:8px}.audit-record time{font-size:10px;color:#91a0b5}.technical-content{font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:8px;max-height:320px;overflow:auto}.document-source{margin-top:10px}.document-source>small{font-size:10px;color:#8a9cb6}.technical-message{margin:0 0 16px auto;max-width:90%;width:fit-content}.technical-message .shared-bubble{background:#f7f9fc;border:1px dashed #dfe6ef;padding:7px 12px}.technical-message .message-inspector{margin:0}
 .shared-queue{max-height:92px;overflow:auto;font-size:11px;background:#f5f8fc;padding:4px 8px;margin-bottom:8px;border-radius:6px}.shared-queue>div{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .bound-documents{margin-top:12px}.bound-documents summary{font-size:12px;cursor:pointer;color:#527eb4}.bound-documents .message-file{width:100%;margin-top:6px;padding:8px 10px}.attachment-note{font-size:10px;color:#8a9cb6;line-height:1.8}
