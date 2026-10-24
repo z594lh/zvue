@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { dictionaryLabel,loadBusinessDictionary } from '@/utils/businessDictionary'
 import HomeView from '../views/HomeView.vue'
 import JsonTools from '../views/JsonToolstView.vue'
 import AiImageView from '../views/AiImageView.vue'
@@ -327,6 +328,15 @@ const routes = [
     meta: { title: 'AI托管 · 工具管理', componentName: 'AiToolManagement' }
   },
   {
+    path: '/tools/ai-operations/tools/:toolName/preview',
+    name: 'AiToolPreview',
+    component: () => import('../views/AiToolPreview.vue'),
+    props: true,
+    meta: { title: 'AI工具 · 数据预览', componentName: 'AiToolPreview' },
+    // 工具代码只定位白名单工具，Nav页签名称使用共享字典的中文名称。
+    beforeEnter(to){to.meta.title='AI工具 · '+dictionaryLabel('ai.tool',to.params.toolName,'数据预览')}
+  },
+  {
     path: '/tools/keyword-reverse',
     name: 'KeywordReverse',
     component: () => import('../views/KeywordReverseView.vue'),
@@ -337,6 +347,12 @@ const routes = [
     name: 'UiConfig',
     component: () => import('../views/UiConfigView.vue'),
     meta: { title: '界面配置', componentName: 'UiConfigView' }
+  },
+  {
+    path: '/system/business-dictionary',
+    name: 'BusinessDictionary',
+    component: () => import('../views/BusinessDictionaryView.vue'),
+    meta: { title: '业务字典', componentName: 'BusinessDictionaryView' }
   },
   {
     path: '/profile',
@@ -360,7 +376,9 @@ const router = createRouter({
 // 全局前置守卫
 const publicPaths = ['/', '/json', '/login', '/403', '/company', '/fanyi']
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
+  // 登录后的首个业务页共用同一字典；读取失败保留原码，不控制业务枚举或允许列表。
+  if (isAuthenticated()) await loadBusinessDictionary()
   // 1. 未登录检查
   if (!publicPaths.includes(to.path) && !isAuthenticated()) {
     next({ path: '/login', query: { redirect: to.fullPath } })
@@ -377,7 +395,7 @@ router.beforeEach((to, from, next) => {
   if (to.path === '/system/sellersprite' && !getUserPermissions().includes('system:sellersprite_config')) {
     return next('/403')
   }
-  if (to.path === '/system/ui-config' && !getUserPermissions().includes('system:ui_config')) {
+  if (['/system/ui-config','/system/business-dictionary'].includes(to.path) && !getUserPermissions().includes('system:ui_config')) {
     return next('/403')
   }
   if (to.path === '/daily-reports' && !getUserPermissions().includes('daily_reports:view')) {

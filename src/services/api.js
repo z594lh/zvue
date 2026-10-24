@@ -20,6 +20,12 @@ export const getConfig = () => {
   return api.get('/config');
 };
 
+// 全系统业务字典：登录共享读取；维护沿用system:ui_config，代码/别名不可编辑。
+export const getBusinessDictionary = () => api.get('/business-dictionary',{timeout:8000});
+export const getBusinessDictionaryManagement = () => api.get('/system/business-dictionary',{timeout:15000});
+export const saveBusinessDictionary = body => api.put('/system/business-dictionary',body,{timeout:15000});
+export const getBusinessDictionaryHistory = params => api.get('/system/business-dictionary/history',{params,timeout:15000});
+
 // 界面配置管理：公开读取由独立uiConfig模块负责，管理操作不自动重试。
 export const getUiConfigManagement = () => api.get('/system/ui-config', { timeout: 15000 });
 export const saveUiConfig = (data) => api.put('/system/ui-config', data, { timeout: 15000 });
@@ -57,6 +63,9 @@ export const getAiConversationMessages = (id, params) => api.get(`/ai-operations
 export const getAiConversationOriginal = (id, message) => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(message)}`, { timeout: 20000 });
 // 工具目录管理只修改新任务可见性；会话记忆读取不会触发付费摘要。
 export const getAiTools = () => api.get('/ai-operations/tools', {timeout:20000});
+// 只读查看工具资料来源/实际回包，试查不会收费或执行优化。
+export const getAiToolSources = (name, params) => api.get(`/ai-operations/tools/${encodeURIComponent(name)}/sources`, {params,timeout:30000});
+export const previewAiTool = (name, body) => api.post(`/ai-operations/tools/${encodeURIComponent(name)}/preview`, body, {timeout:60000});
 // 精简提示词：预览不收费；发布只影响后续准备的任务，不覆盖历史原文。
 export const getAiPrompts = () => api.get('/ai-operations/prompts', {timeout:20000});
 export const publishAiPrompts = body => api.put('/ai-operations/prompts',body,{timeout:20000});

@@ -114,6 +114,7 @@
 <script setup>
 import { ref, reactive, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { dictionaryLabel } from '@/utils/businessDictionary'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CpcLayout from './CpcLayout.vue'
 import { getCpcCreationMeta, getCpcCreationProducts, getCpcCreationJobs, getCpcCreationJob, startCpcCreation, runCpcCreation, repairCpcCreation, resolveCpcCreation, getCpcCreatePortfolios } from '@/services/cpc'
@@ -124,7 +125,8 @@ const form = reactive({}), seed = ref(''), autoSeed = ref(''), selected = ref([]
 const targetText = ref(''), matches = ref(['EXACT']), batchBid = ref(0.5), negativeText = ref(''), negativeProductText = ref(''), portfolios = ref([])
 const productRows = ref([]), productSearch = ref(''), productPage = ref(1), productTotal = ref(0), productsLoading = ref(false)
 const reviewOpen = ref(false), editOpen = ref(false), resolveOpen = ref(false), editing = ref(null), editPayload = ref({}), resolveId = ref(''), resolveConfirmed = ref(false)
-const strategies = { LEGACY_FOR_SALES: '动态竞价－仅降低', AUTO_FOR_SALES: '动态竞价－提高和降低', MANUAL: '固定竞价' }
+// 可选项仍由创建API固定允许列表决定，字典只提供名称，不能增加可提交类型。
+const strategies = computed(() => Object.fromEntries(['LEGACY_FOR_SALES','AUTO_FOR_SALES','MANUAL'].map(code => [code,dictionaryLabel('ads.strategy',code)])))
 const placements = [{ key: 'top', label: '搜索顶部（首页）' }, { key: 'rest', label: '其余搜索结果' }, { key: 'product', label: '商品页面' }]
 const digits = computed(() => meta.value?.currency === 'JPY' ? 0 : 2)
 const draftDirty = computed(() => customAuto.value || JSON.stringify(autoTargets.value) !== autoSeed.value || selected.value.length > 0 || keywords.value.length > 0 || productTargets.value.length > 0 || !!targetText.value || !!negativeText.value || !!negativeProductText.value || JSON.stringify(form) !== seed.value)
@@ -135,14 +137,14 @@ const storageKey = () => `cpc_creation:${shopId.value}:${props.campaignId || 'ne
 function uuid() { return window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = window.crypto.getRandomValues(new Uint8Array(1))[0] % 16; return (c === 'x' ? r : (r & 3) | 8).toString(16) }) }
 function data(response) { if (response.data?.status !== 'success') throw new Error(response.data?.message || '请求未完成'); return response.data.data }
 function message(exc) { return exc.response?.data?.message || exc.message || '请求未完成，请先读取原进度，勿重复创建' }
-function strategyLabel(value) { return strategies[value] || value || '—' }
+function strategyLabel(value) { return dictionaryLabel('ads.strategy',value,value || '—') }
 function statusText(value) { return ({ ready: '待继续', pending: '待处理', running: '处理中', waiting: '等待回读', failed: '明确失败', unknown: '结果待确认', requesting: '发送中待核实', accepted: '平台已接受', complete: '已完成', skipped: '已跳过' })[value] || value }
 function itemLabel(row) { const p = row.payload; return p.name || p.sku || p.keywordText || p.type || p.expression?.[0]?.value || p.state || '对象' }
 function reset() {
   const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19)
   Object.assign(form, { campaignName: `SP广告-${stamp}`, groupName: `广告组-${stamp}`, targetingType: meta.value?.campaign?.targeting_type || 'AUTO', mode: 'KEYWORDS', budget: 10, defaultBid: 0.5, strategy: 'LEGACY_FOR_SALES', startDate: meta.value?.today || '', endDate: '', portfolioId: '', placements: { top: 0, rest: 0, product: 0 }, negativeScope: 'group', negativeMatch: 'NEGATIVE_EXACT', launch: false })
   seed.value = JSON.stringify(form); selected.value = []; keywords.value = []; productTargets.value = []; targetText.value = ''; negativeText.value = ''; negativeProductText.value = ''; customAuto.value = false
-  autoTargets.value = ['QUERY_HIGH_REL_MATCHES', 'QUERY_BROAD_REL_MATCHES', 'ASIN_SUBSTITUTE_RELATED', 'ASIN_ACCESSORY_RELATED'].map((type, index) => ({ type, label: ['紧密匹配', '宽泛匹配', '同类商品', '关联商品'][index], state: 'ENABLED', bid: 0.5 }))
+  autoTargets.value = ['QUERY_HIGH_REL_MATCHES', 'QUERY_BROAD_REL_MATCHES', 'ASIN_SUBSTITUTE_RELATED', 'ASIN_ACCESSORY_RELATED'].map(type => ({ type, label: dictionaryLabel('ads.auto_target',type), state: 'ENABLED', bid: 0.5 }))
   autoSeed.value = JSON.stringify(autoTargets.value)
 }
 reset()

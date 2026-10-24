@@ -186,6 +186,7 @@ const fallbackNavGroups = [
     children: [
       { label: '计划任务', path: '/system/cron-tasks' },
       { label: '界面配置', path: '/system/ui-config' },
+      { label: '业务字典', path: '/system/business-dictionary' },
       { label: '权限管理', path: '/system/permissions' }
     ]
   }
@@ -290,6 +291,12 @@ export default {
         if (!system) { system = { label: '系统', children: [] }; groups.push(system) }
         system.children.push({ label: '界面配置', path: '/system/ui-config' })
       }
+      if (getUserPermissions().includes('system:ui_config') &&
+          !groups.some(g => g.children.some(item => item.path === '/system/business-dictionary'))) {
+        let system = groups.find(g => g.label === '系统')
+        if (!system) { system = { label: '系统', children: [] }; groups.push(system) }
+        system.children.push({ label: '业务字典', path: '/system/business-dictionary' })
+      }
       // AI托管是工具独立菜单；即使菜单缓存残留也必须满足专用权限。
       groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/tools/ai-operations') })
       if (getUserPermissions().includes('ai_operations:manage')) {
@@ -311,7 +318,7 @@ export default {
         (item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) &&
         (item.path !== '/tools/keyword-reverse' || permissions.includes('amazon_listings:page')) &&
         (item.path !== '/tools/ai-operations' || permissions.includes('ai_operations:manage')) &&
-        (item.path !== '/system/ui-config' || permissions.includes('system:ui_config'))) }))
+        (!['/system/ui-config','/system/business-dictionary'].includes(item.path) || permissions.includes('system:ui_config'))) }))
     })
 
     const isGroupActive = (group) => {

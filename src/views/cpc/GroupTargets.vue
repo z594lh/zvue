@@ -308,6 +308,7 @@
 
 <script setup>
 import { useCpcEntityRefresh } from '@/composables/useCpcEntityRefresh'
+import { dictionaryMap,dictionaryLabel } from '@/utils/businessDictionary'
 /* eslint-disable no-undef */
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -344,26 +345,13 @@ const selectAll = ref(false)
 const batchLoading = ref(false)
 const filter = reactive({ search: '', state: '' })
 
-const expressionMap = {
-  'QUERY_HIGH_REL_MATCHES': '紧密匹配',
-  'QUERY_BROAD_REL_MATCHES': '宽泛匹配',
-  'ASIN_SUBSTITUTE_RELATED': '同类商品',
-  'ASIN_ACCESSORY_RELATED': '关联商品'
-}
-const autoExpressions = Object.keys(expressionMap)
-
-const matchTypeMap = {
-  'BROAD': '广泛',
-  'PHRASE': '词组',
-  'EXACT': '精准'
-}
+const expressionMap = dictionaryMap('ads.auto_target',true)
+// 这是API允许类型，不是中文展示配置；人工补充词条不能扩大可提交枚举。
+const autoExpressions = ['QUERY_HIGH_REL_MATCHES','QUERY_BROAD_REL_MATCHES','ASIN_SUBSTITUTE_RELATED','ASIN_ACCESSORY_RELATED']
+const matchTypeMap = dictionaryMap('ads.match')
 const matchTypeLabel = (val) => matchTypeMap[(val || '').toUpperCase()] || val || '--'
 const stateLabel = (val) => {
-  const s = (val || '').toUpperCase()
-  if (s === 'ENABLED') return '进行中'
-  if (s === 'PAUSED') return '已暂停'
-  if (s === 'ARCHIVED') return '已归档'
-  return '--'
+  return dictionaryLabel('ads.state',val || '',val || '--')
 }
 
 const selectedRows = computed(() => tableData.value.filter(row => row._selected))

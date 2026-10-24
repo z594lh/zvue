@@ -2,7 +2,7 @@
   <details class="tool-rounds" @toggle="toggle">
     <summary>分析过程 · 按轮查看<span v-if="info">{{ info.model_rounds }} 轮AI请求 · {{ info.tool_calls }} 次工具调用</span></summary>
     <section class="round-list" v-loading="loading">
-      <div class="round-toolbar"><small>{{ info?.note || '展开后只读已保存的查询过程，不重新调用AI。' }}</small><div><el-button link @click="original(messageId,'本次提问或记录原文')">提问原文</el-button><el-button link type="primary" :loading="loading" @click="load">刷新过程</el-button></div></div>
+      <div class="round-toolbar"><small>{{ info?.note || '展开后只读已保存的查询过程，不重新调用AI。' }}</small><div><el-button link @click="original(messageId,'当前关联消息原文')">关联消息原文</el-button><el-button link type="primary" :loading="loading" @click="load">刷新过程</el-button></div></div>
       <el-alert v-if="error" :title="error" type="error" :closable="false"/>
       <el-alert v-if="info?.truncated" title="记录较多，仅展示部分；请查看原始记录核对完整过程。" type="warning" :closable="false"/>
       <p v-if="info && !info.list.length" class="empty">尚无模型请求记录；可能还在排队或资料准备阶段。</p>
