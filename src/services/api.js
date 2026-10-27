@@ -1218,6 +1218,10 @@ export const syncListingToProduct = (sku, shop_id) => {
   return api.post(`/amazon/listings/${sku}/sync-to-product`, { shop_id });
 };
 
+// Listing竞品快照与版本化保存；可选采集由后端同事务调用原批量添加规则。
+export const getListingCompetitors = (sku, shop_id) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/competitors`, { params: { shop_id } });
+export const saveListingCompetitors = (sku, data) => api.put(`/amazon/listings/${encodeURIComponent(sku)}/competitors`, data);
+
 /**
  * 同步单个 Listing（从 SP-API 拉取最新数据）
  * @param {string} sku 卖家 SKU

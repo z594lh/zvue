@@ -15,7 +15,7 @@
           placement="top"
           content="从亚马逊 SP-API 手动同步最新 Listing 数据到本地数据库。"
         >
-          <el-button type="warning" @click="syncListings" :loading="syncLoading">
+          <el-button type="warning" @click="syncListings" :loading="syncLoading" :disabled="!!syncListingLoading || !!syncToProductLoading">
             <el-icon><RefreshRight /></el-icon>
             同步 Listing
           </el-button>
@@ -202,7 +202,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="asin" label="ASIN" width="120" show-overflow-tooltip>
+        <el-table-column prop="asin" label="ASIN" width="145">
           <template #default="scope">
             <a
               v-if="scope.row.asin && scope.row.marketplace_id"
@@ -213,6 +213,12 @@
               {{ scope.row.asin }}
             </a>
             <span v-else style="font-family:monospace;font-size:12px;color:#888;">{{ scope.row.asin }}</span>
+            <el-popover v-if="scope.row.competitor_asins?.length" trigger="hover" placement="right" width="240">
+              <template #reference>
+                <div class="listing-competitor-summary"><span>竞品</span><a :href="`https://www.amazon.com/dp/${scope.row.competitor_asins[0]}`" target="_blank" rel="noopener noreferrer">{{ scope.row.competitor_asins[0] }}</a><span v-if="scope.row.competitor_asins.length>1">…</span></div>
+              </template>
+              <div class="listing-competitor-links"><strong>竞品 ASIN · {{ scope.row.competitor_asins.length }} 个</strong><a v-for="item in scope.row.competitor_asins" :key="item" :href="`https://www.amazon.com/dp/${item}`" target="_blank" rel="noopener noreferrer">{{ item }} ↗</a></div>
+            </el-popover>
           </template>
         </el-table-column>
 
@@ -332,26 +338,27 @@
                 <el-icon><Edit /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-tooltip content="同步最新数据" placement="top">
-              <el-button
-                type="warning"
-                link
-                :loading="syncListingLoading === scope.row.sku"
-                @click="syncSingleListing(scope.row.sku)"
-              >
-                <el-icon><RefreshRight /></el-icon>
-              </el-button>
-            </el-tooltip>
-            <el-tooltip content="同步到产品" placement="top">
-              <el-button
-                type="warning"
-                link
-                :loading="syncToProductLoading === scope.row.sku"
-                @click="syncToProduct(scope.row.sku)"
-              >
-                <el-icon><Connection /></el-icon>
-              </el-button>
-            </el-tooltip>
+            <el-popover placement="left" width="min(340px, calc(100vw - 24px))" trigger="hover" :show-after="150" :hide-after="180" :popper-options="{ modifiers: [{ name: 'preventOverflow', options: { altAxis: true, tether: false, padding: 12 } }] }">
+              <template #reference>
+                <el-button type="warning" link aria-label="同步最新数据" :loading="syncListingLoading === scope.row.sku || syncToProductLoading === scope.row.sku" :disabled="!!syncListingLoading || !!syncToProductLoading || syncLoading" @click="syncSingleListing(scope.row.sku)">
+                  <el-icon><RefreshRight /></el-icon>
+                </el-button>
+              </template>
+              <div class="listing-sync-menu">
+                <section class="sync-direct">
+                  <strong>直接点击图标</strong>
+                  <p>同步亚马逊后台最新信息到本地 Listing。</p>
+                </section>
+                <section class="sync-product">
+                  <strong>点击下方按钮</strong>
+                  <p>将本地 Listing 信息维护到产品表。</p>
+                  <el-button type="primary" size="large" :loading="syncToProductLoading === scope.row.sku" :disabled="!!syncListingLoading || !!syncToProductLoading || syncLoading" @click="syncToProduct(scope.row.sku)">维护到产品表</el-button>
+                  <p class="sync-secondary">使用已保存的 Listing，保留已有 AI 申报资料。</p>
+                  <p class="sync-secondary">新产品可能调用 AI；父体会同步全部子体。</p>
+                </section>
+              </div>
+            </el-popover>
+            <el-tooltip content="绑定竞品 ASIN" placement="top"><el-button type="primary" link aria-label="绑定竞品ASIN" :disabled="!scope.row.asin" @click="openCompetitors(scope.row)"><el-icon><Connection /></el-icon></el-button></el-tooltip>
             <el-tooltip content="前往工具 · 关键词反查（美国站）" placement="top"><el-button type="success" link aria-label="卖家精灵关键词" :disabled="!scope.row.asin" @click="openSellersprite(scope.row)"><el-icon><DataAnalysis /></el-icon></el-button></el-tooltip>
             <el-tooltip content="修改记录" placement="top"><el-button type="info" link aria-label="修改记录" @click="openListingHistory(scope.row)"><el-icon><Clock /></el-icon></el-button></el-tooltip>
           </template>
@@ -374,6 +381,7 @@
     </div>
 
     <ListingHistoryDialog v-if="historyTarget" :key="`${historyTarget.shopId}:${historyTarget.sku}`" :shop-id="historyTarget.shopId" :sku="historyTarget.sku" @close="historyTarget = null" />
+    <ListingCompetitorDialog v-if="competitorTarget" :key="`${competitorTarget.shopId}:${competitorTarget.sku}`" :shop-id="competitorTarget.shopId" :sku="competitorTarget.sku" :asin="competitorTarget.asin" @close="competitorTarget=null" @saved="competitorsSaved" />
 
     <!-- Listing 详情对话框 -->
     <el-dialog
@@ -717,7 +725,7 @@ import { computed, ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useListQuerySync } from '@/composables/useListQuerySync.js'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, Connection, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown, Clock, DataAnalysis } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight, Goods, Picture, WarningFilled, Edit, DocumentCopy, CopyDocument, TrendCharts, ArrowUp, ArrowDown, Clock, DataAnalysis, Connection } from '@element-plus/icons-vue'
 import {
   getAmazonListings,
   getAmazonListing,
@@ -734,6 +742,7 @@ import ListingPriceEditor from '@/components/ListingPriceEditor.vue'
 import ListingTextEditor from '@/components/ListingTextEditor.vue'
 import ListingImageEditor from '@/components/ListingImageEditor.vue'
 import ListingHistoryDialog from '@/components/ListingHistoryDialog.vue'
+import ListingCompetitorDialog from '@/components/ListingCompetitorDialog.vue'
 import { useShopCache } from '@/composables/useShopCache'
 
 export default {
@@ -743,6 +752,8 @@ export default {
     ListingTextEditor,
     ListingImageEditor,
     ListingHistoryDialog,
+    ListingCompetitorDialog,
+    Connection,
     DataAnalysis,
     Clock,
     Search,
@@ -752,7 +763,6 @@ export default {
     Picture,
     WarningFilled,
     Edit,
-    Connection,
     DocumentCopy,
     CopyDocument,
     TrendCharts,
@@ -765,6 +775,15 @@ export default {
     const syncLoading = ref(false)
     const listings = ref([])
     const historyTarget = ref(null)
+    const competitorTarget = ref(null)
+    // 冻结点击时的店铺/SKU；编辑弹框通过后端版本校验避免覆盖他人变更。
+    const openCompetitors = (row) => {
+      if (selectedShopId.value && row.asin) competitorTarget.value = { shopId:selectedShopId.value, sku:row.sku, asin:row.asin }
+    }
+    // 保存后仅重读仍然选中的来源店铺列表，不把旧店铺结果混入新选择。
+    const competitorsSaved = (data) => {
+      if (String(data.shop_id) === String(selectedShopId.value)) fetchListings()
+    }
     const openSellersprite = (row) => {
       if (row.marketplace_id && row.marketplace_id !== 'ATVPDKIKX0DER') { ElMessage.warning('关键词反查当前仅支持美国站'); return }
       if (row.asin) router.push({ path: '/tools/keyword-reverse', query: { asin: row.asin.trim().toUpperCase(), shop_id: selectedShopId.value || undefined } })
@@ -926,6 +945,7 @@ export default {
 
     // 切换店铺
     const handleShopChange = async (val) => {
+      competitorTarget.value = null
       detailRevision++
       detailDialogVisible.value = false
       invalidateTextSnapshot()
@@ -942,8 +962,9 @@ export default {
       fetchListings()
     }
 
-    // 同步 Listing
+    // 全店拉取Listing时同样避免与当前行的刷新或产品同步重叠。
     const syncListings = async () => {
+      if (syncLoading.value || syncListingLoading.value || syncToProductLoading.value) return
       if (!selectedShopId.value) {
         ElMessage.warning('请选择店铺')
         return
@@ -1021,18 +1042,23 @@ export default {
       }
     }
 
-    // 同步 Listing 到产品
+    // 将已保存Listing复制到本地产品；已有申报资料保留，并防止两个同步动作重叠。
     const syncToProduct = async (sku) => {
+      if (syncToProductLoading.value || syncListingLoading.value || syncLoading.value) return
       if (!selectedShopId.value) {
         ElMessage.warning('请选择店铺')
         return
       }
 
       syncToProductLoading.value = sku
+      const shopId = selectedShopId.value
       try {
-        const response = await syncListingToProduct(sku, selectedShopId.value)
+        const response = await syncListingToProduct(sku, shopId)
         if (response.data.status === 'success') {
-          ElMessage.success(response.data.message || `产品 ${sku} 已同步`)
+          const results = response.data.data?.results || []
+          const failed = results.filter(item => item.status !== 'success').length
+          if (failed) ElMessage.warning(`已同步 ${results.length - failed} 个子体，${failed} 个失败，请核对后重试`)
+          else ElMessage.success(response.data.message || `产品 ${sku} 已同步，本地申报资料保留`)
         } else {
           ElMessage.error(response.data.message || '同步到产品失败')
         }
@@ -1044,18 +1070,20 @@ export default {
       }
     }
 
-    // 同步单个 Listing
+    // 从亚马逊刷新当前SKU的本地Listing；切换店铺后不把旧请求结果刷新到新店铺。
     const syncSingleListing = async (sku) => {
+      if (syncListingLoading.value || syncToProductLoading.value || syncLoading.value) return
       if (!selectedShopId.value) {
         ElMessage.warning('请选择店铺')
         return
       }
 
       syncListingLoading.value = sku
+      const shopId = selectedShopId.value
       try {
-        await syncAmazonListing(sku, selectedShopId.value)
+        await syncAmazonListing(sku, shopId)
         ElMessage.success(`Listing ${sku} 同步成功`)
-        await fetchListings()
+        if (shopId === selectedShopId.value) await fetchListings()
       } catch (error) {
         console.error('同步 Listing 失败:', error)
         ElMessage.error('同步失败: ' + (error.response?.data?.message || error.message))
@@ -1658,6 +1686,9 @@ export default {
       syncLoading,
       listings,
       historyTarget,
+      competitorTarget,
+      openCompetitors,
+      competitorsSaved,
       openSellersprite,
       openListingHistory,
       searchForm,
@@ -1732,6 +1763,17 @@ export default {
 </script>
 
 <style scoped>
+.listing-competitor-summary{display:flex;align-items:center;gap:4px;max-width:100%;margin-top:5px;color:#99a6b8;font-size:10px;white-space:nowrap;overflow:hidden}.listing-competitor-summary a{min-width:0;overflow:hidden;text-overflow:ellipsis;font:10px Consolas,monospace;color:#7e94b2;text-decoration:none}.listing-competitor-summary a:hover{color:#409eff}.listing-competitor-links{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto}.listing-competitor-links strong{font-size:12px;color:#60738b}.listing-competitor-links a{font:12px Consolas,monospace;color:#4d7db8;text-decoration:none}
+.listing-sync-menu { color: #526078; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.listing-sync-menu section { padding: 12px; border-radius: 8px; }
+.listing-sync-menu section + section { margin-top: 10px; }
+.listing-sync-menu .sync-direct { background: #fff8eb; }
+.listing-sync-menu .sync-direct strong { color: #986318; }
+.listing-sync-menu .sync-product { background: #f0f6ff; }
+.listing-sync-menu strong { display: block; color: #263e60; font-size: 14px; }
+.listing-sync-menu p { margin: 6px 0 0; }
+.listing-sync-menu .sync-secondary { color: #728199; font-size: 12px; }
+.listing-sync-menu .el-button { width: 100%; margin: 10px 0 4px; font-weight: 600; }
 .amazon-listing-page {
   max-width: 1600px;
   margin: 0 auto;
