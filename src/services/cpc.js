@@ -44,6 +44,9 @@ export const getCpcChangeHistory = (params = {}) => {
   return api.get('/history', { params })
 }
 
+// 只登记原范围的历史补采，由cron统一消费；不立即请求Amazon，更不修改广告。
+export const queueCpcChangeHistory = data => api.post('/history/sync', data)
+
 export const getCpcCampaigns = (params = {}) => {
   return api.get('/campaigns', { params })
 }

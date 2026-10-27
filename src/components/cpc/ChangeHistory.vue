@@ -26,12 +26,15 @@
       <el-tooltip content="只读取已保存记录，历史由计划任务同步" placement="top">
         <el-button :icon="Refresh" :loading="loading" :disabled="!shopId" @click="search">重读本地</el-button>
       </el-tooltip>
+      <el-tooltip content="登记本活动/组失败及待核对项，并补查近3天；由计划任务执行，不再次修改广告" placement="top"><el-button :loading="queueing" :disabled="!shopId || loading" @click="queueHistory">加入补采队列</el-button></el-tooltip>
     </div>
     <div class="history-note">
       {{ scope === 'group' ? '本广告组：组设置、投放方案、否定投放及广告。' : view === 'all' ? '扩展范围：本活动及所有广告组的历史，不等于后台活动历史条数。' : '本活动：活动设置及活动级否定投放，不混入广告组内历史。' }}只读本地，筛选与翻页不会请求Amazon。
     </div>
     <div class="history-note">历史日期独立于顶部报表日期，按所选时区筛选和展示；对照美国后台可选美国太平洋时间（自动处理夏令时）。请确保日期、时区及范围相同；金额按账户原币。</div>
-    <div class="history-note">历史由计划任务同步；最近完整采集：{{ lastSuccess ? historyTime(lastSuccess, timeZone) : '尚未完成，请等待计划任务采集' }} · {{ stateLabel }}</div>
+    <div class="history-note">历史由计划任务同步；最近完成采集水位：{{ lastSuccess ? historyTime(lastSuccess, timeZone) : '尚未完成，请等待计划任务采集' }} · {{ stateLabel }}</div>
+    <div v-if="collection?.ready" class="history-collection"><strong>本账户采集队列</strong><span>排队 {{ queueStats.queued }} · 延迟重试 {{ queueStats.retry }} · 待核对 {{ queueStats.unmatched }} · 查询失败 {{ queueStats.failed }} · 历史缺口 {{ queueStats.gap + queueStats.partial }}</span><p>{{ collection.note }}</p><p v-if="collection.recent_error">最近查询异常（任务 #{{ collection.recent_error.job_id }}）：{{ collection.recent_error.message }}<span v-if="collection.recent_error.request_id"> · Amazon请求编号：{{ collection.recent_error.request_id }}</span></p><p v-if="collection.cooldown_until_ms">账户下次最早请求：{{ historyTime(collection.cooldown_until_ms, timeZone) }}；等待期间不会访问历史接口。</p><p v-if="collection.initial_inherited_ms">首次历史回填沿用既有成功记录，不再每天重抓90天。</p><small>以上为合并后的查询任务数，不是广告修改次数；缺口记录不代表修改失败。</small></div>
+    <el-alert v-else-if="collection && !collection.ready" :title="collection.note" type="warning" :closable="false"/>
     <div class="history-note">“平台记录”不一定来自亚马逊后台，也可能来自其他工具或尚未关联的ERP操作；规则关联不是平台确认操作人。亚马逊暂未返回对应事件时仍为待同步，不会重新执行广告操作。</div>
     <el-alert v-if="syncError" :title="syncError" type="warning" :closable="false" show-icon />
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" show-icon />
@@ -65,10 +68,11 @@
           <div v-if="row.audit_context?.proposed_by" class="history-detail">提问：{{ row.audit_context.proposed_by.name }} · 会话 #{{ row.audit_context.conversation_id }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="同步状态" width="130">
+      <el-table-column label="广告修改API" width="130"><template #default="{row}"><el-tag v-if="row.source==='ERP'" size="small" :type="row.write_status==='accepted'?'success':row.write_status==='failed'?'danger':'warning'">{{ ({accepted:'已接受',failed:'写入失败',unknown:'待核实',requesting:'待回执'})[row.write_status] || '未记录' }}</el-tag><span v-else class="history-detail">平台事件</span><div v-if="row.write_status==='accepted'" class="history-detail">不等于已关联历史</div></template></el-table-column>
+      <el-table-column label="历史采集 / 关联" width="145">
         <template #default="{ row }">
           <el-tooltip :content="statusTip(row)" placement="top">
-            <el-tag size="small" :type="row.sync_status === 'synced' ? 'success' : row.sync_status === 'failed' ? 'danger' : 'warning'">{{ ({ pending: '待同步', synced: '已同步', failed: '同步失败' })[row.sync_status] || row.sync_status }}</el-tag>
+            <el-tag size="small" :type="row.sync_status === 'synced' ? 'success' : row.write_status==='failed'?'info':row.sync_status === 'failed' ? 'danger' : 'warning'">{{ row.write_status==='failed'?'未关联':row.sync_status==='synced'?(row.source==='ERP'?'已关联':'已采集'):row.sync_status==='failed'?'采集异常':'待关联' }}</el-tag>
           </el-tooltip>
           <div v-if="row.write_status && row.write_status !== 'accepted'" class="history-detail">{{ ({ requesting:'写入结果待核实', unknown:'写入结果待核实', failed:'广告写入失败' })[row.write_status] }}</div>
         </template>
@@ -84,7 +88,8 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Refresh, QuestionFilled } from '@element-plus/icons-vue'
-import { getCpcChangeHistory } from '@/services/cpc'
+import { getCpcChangeHistory,queueCpcChangeHistory } from '@/services/cpc'
+import { ElMessageBox,ElMessage } from 'element-plus'
 import { useCpcEntityRefresh } from '@/composables/useCpcEntityRefresh'
 import { historyChange, historyDetail, historyValue, historyTime, historyDates, historyFilters, historyCategories, historyTimezones } from '@/utils/cpcHistory'
 
@@ -101,7 +106,9 @@ const source = ref(''), syncStatus = ref(''), view = ref('console'), category = 
 const rows = ref([]), loading = ref(false), loadError = ref('')
 const page = ref(1), pageSize = ref(50), total = ref(0)
 const lastSuccess = ref(null), syncState = ref('never'), syncError = ref('')
-const stateLabel = computed(() => ({ never:'尚未采集', pending:'待补采', running:'采集中', success:'采集完成', partial:'部分完成，待续采', failed:'采集失败，原历史保留' })[syncState.value] || syncState.value)
+const collection=ref(null),queueing=ref(false)
+const queueStats=computed(()=>{const result={queued:0,retry:0,unmatched:0,failed:0,gap:0,partial:0};for(const row of collection.value?.lanes || [])if(Object.hasOwn(result,row.status))result[row.status]+=Number(row.n)||0;return result})
+const stateLabel = computed(() => ({ never:'尚未采集', pending:'待补采', running:'采集中', success:'采集完成', partial:'部分已采集，仍有任务或历史缺口', failed:'采集失败，原历史保留' })[syncState.value] || syncState.value)
 const filterOptions = computed(() => historyFilters(props.scope))
 const categoryOptions = computed(() => historyCategories(props.scope, view.value))
 const shortcuts = [7, 30, 90].map(days => ({ text: `近${days}天`, value: () => historyDates(days, timeZone.value).map(day => new Date(`${day}T12:00:00`)) }))
@@ -132,7 +139,7 @@ async function fetchData() {
     if (version !== requestVersion) return false
     const data = response.data.data
     if (response.data.status !== 'success' || !Array.isArray(data?.list)) throw new Error('历史记录响应异常')
-    rows.value = data.list; total.value = data.total
+    rows.value = data.list; total.value = data.total;collection.value=data.collection || null
     lastSuccess.value = data.last_success_ms; syncState.value = data.sync_state; syncError.value = data.sync_error || ''
     return true
   } catch (error) {
@@ -152,6 +159,15 @@ function sourceTip(row) {
 function statusTip(row) {
   return row.error_message || (row.sync_status === 'synced' ? '已保存平台历史证据；不表示平台确认了ERP操作人。' : '等待平台事件及后续合批采集。不是再次执行广告操作；未匹配可能因为延迟、无变化、信息不一致或关联歧义。')
 }
+/** 用户确认后只登记该活动/组的补查；不把重新排队当成已完成历史匹配。 */
+async function queueHistory(){
+  const context={shop_id:props.shopId,campaign_id:String(props.campaignId),scope:props.scope,...(props.scope==='group'?{ad_group_id:String(props.adGroupId)}:{})}
+  try{await ElMessageBox.confirm('仅加入历史补采队列：重查本范围失败/待核对项及近3天。由计划任务只读执行，不会再次修改广告。','加入历史补采',{confirmButtonText:'确认入队',cancelButtonText:'取消'})}catch{return}
+  queueing.value=true
+  try{const {data}=await queueCpcChangeHistory(context);ElMessage.success(data.data?.message || '已加入补采队列');if(String(context.shop_id)===String(props.shopId) && context.campaign_id===String(props.campaignId) && String(context.ad_group_id || '')===String(props.adGroupId || ''))await fetchData()}
+  catch(error){ElMessage.error(error.response?.data?.message || '补采登记失败，请核对后重试')}
+  finally{queueing.value=false}
+}
 function search() { page.value = 1; return fetchData() }
 function changeTimezone() {
   const [, today] = historyDates(90, timeZone.value)
@@ -160,13 +176,14 @@ function changeTimezone() {
 }
 function changeView() { category.value = ''; return search() }
 watch(() => [props.shopId, props.campaignId, props.adGroupId, props.scope], () => {
-  changeType.value = ''; category.value = ''; view.value = 'console'; page.value = 1; lastSuccess.value = null; syncState.value = 'never'; syncError.value = ''; fetchData()
+  changeType.value = ''; category.value = ''; view.value = 'console'; page.value = 1; lastSuccess.value = null; syncState.value = 'never'; syncError.value = ''; collection.value=null;fetchData()
 }, { immediate: true })
 // 公共栏同步成功后仅重读当前表，保留历史日期、筛选和分页。
 useCpcEntityRefresh(fetchData)
 </script>
 
 <style scoped>
+.history-collection{margin:12px 0;padding:14px 16px;border:1px solid #dce8f7;border-radius:8px;background:#f5f9ff;color:#547294;font-size:12px;line-height:1.9}.history-collection strong{margin-right:16px;color:#335d8b}.history-collection p{margin:4px 0}.history-collection small{color:#8598b0}
 .change-history { background: #fff; min-width: 0; }
 .history-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .filter-label { color: #606266; font-size: 13px; }
