@@ -44,6 +44,22 @@
         <p v-if="rows.some(r=>r.total_objects!=null)" class="empty-note">上表为各报告汇总；对象总数与归档数量见每条“完整记录”，并非所有投放 / 搜索词明细。</p>
       </template>
 
+      <template v-else-if="module.tool==='read_competitors'">
+        <p class="warning-note">仅显示本次工具返回的绑定竞品；销量是父体所有跟卖的预测量，不是本店销量。报告采集日与经营报表截止日分别查看，缺失不补0。</p>
+        <p v-if="!rows.length && !failed" class="empty-note">本次冻结资料中没有绑定竞品记录。</p>
+        <article v-for="(row,index) in pageRows" :key="index" class="listing-card">
+          <div class="record-heading"><h3>绑定竞品 {{ row.query_asin }}</h3><span>绑定SKU：{{ (row.bound_skus || []).join(' / ') }}</span></div>
+          <p v-if="row.latest_attempt">最近采集 {{ row.latest_attempt.record_date }} · {{ spriteStates[row.latest_attempt.status] || row.latest_attempt.status }} {{ row.latest_attempt.error_message || '' }}</p>
+          <p v-if="!row.product" class="warning-note">{{ row.reason || '未提供成功报告' }}</p>
+          <template v-else>
+            <p>实际导出商品 {{ row.product.asin }} · 采集 {{ row.product.record_date }} · 近30天 · {{ row.product.currency }}</p>
+            <p v-if="row.product.asin!==row.query_asin" class="warning-note">实际导出的是另一变体，指标不能冒充查询ASIN的子体销量。</p>
+            <AiToolTable :rows="[row.product.report_fields]" :columns="['ASIN','Product Title','Brand','Sales','Monthly Revenue($)','Price($)','Category BSR','Ratings','Rating']"/>
+            <details><summary>查看全部来源字段与证据编号</summary><p>证据：{{ row.evidence_id }} · 任务 {{ row.product.task_id }} · 文件 {{ row.product.file_id }}</p><AiToolTable :rows="[row.product.report_fields]" :columns="Object.keys(row.product.report_fields || {})"/></details>
+          </template>
+        </article>
+      </template>
+
       <template v-else-if="['read_keywords','read_keyword_history'].includes(module.tool)">
         <p class="warning-note">关键词流量为卖家精灵返回的快照口径，不是ERP单日销量；词组保留原文。日期与排名缺失时不推测。</p>
         <AiToolValue v-if="data.snapshot || module.meta?.snapshot" :value="{snapshot:data.snapshot || module.meta.snapshot}"/>
@@ -82,6 +98,7 @@
 <script setup>
 import { computed,ref,watch } from 'vue'
 import { dictionaryLabel } from '@/utils/businessDictionary'
+import { spriteStates } from '@/utils/sellersprite'
 import { actualWindows,fieldLabel,formatValue,matrixRows,moduleState,periodAt,pretty,readableNote,reportKind,rowCurrency } from '@/utils/aiToolData'
 import AiToolValue from './AiToolValue.vue'
 import AiToolTable from './AiToolTable.vue'

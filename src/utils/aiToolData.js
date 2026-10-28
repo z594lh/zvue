@@ -8,7 +8,7 @@ export function pretty(value){return JSON.stringify(value,null,2)}
 export function fieldLabel(key){return fieldEntry(key)?.label || `未配置中文名（${key}）`}
 
 /** 参数与数据共用词义时直接引用同一词条，避免在展示功能中重复定义。 */
-export function fieldEntry(key){return dictionaryEntry('data.field',key) || dictionaryEntry('listing.field',key) || dictionaryEntry('data.window',key) || dictionaryEntry('ai.parameter',key)}
+export function fieldEntry(key){return dictionaryEntry('data.field',key) || dictionaryEntry('listing.field',key) || dictionaryEntry('data.window',key) || dictionaryEntry('ai.parameter',key) || dictionaryEntry('sellersprite.competitor_field',key)}
 
 /** 参数/工具名也使用同一字典，不能用函数名充当业务模块标题。 */
 export function toolLabel(name){return dictionaryLabel('ai.tool',name,'未配置中文名的工具')}
