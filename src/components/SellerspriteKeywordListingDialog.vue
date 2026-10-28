@@ -17,9 +17,10 @@
   </el-dialog>
 </template>
 <script setup>
+// Listing关键词快照展示，只读已导入数据，不查询竞品商品报告。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
-import { getSellerspriteListing } from '@/services/api'
+import { getSellerspriteKeywordListing } from '@/services/api'
 import { spriteStates, spriteTime, spriteValue } from '@/utils/sellersprite'
 const props=defineProps({shopId:{type:[Number,String],required:true},sku:{type:String,required:true}})
 const emit=defineEmits(['close'])
@@ -33,7 +34,7 @@ let disposed=false,revision=0
 async function load() {
   const current=++revision;loading.value=true;error.value=''
   try {
-    const response=await getSellerspriteListing(props.sku,{shop_id:props.shopId,task_id:snapshotId.value || undefined,page:page.value,page_size:pageSize.value,search:query.value,sort:sort.value,direction:direction.value})
+    const response=await getSellerspriteKeywordListing(props.sku,{shop_id:props.shopId,task_id:snapshotId.value || undefined,page:page.value,page_size:pageSize.value,search:query.value,sort:sort.value,direction:direction.value})
     if(disposed || revision!==current)return
     data.value=response.data.data;snapshotId.value=data.value.snapshot?.id || ''
   }catch(err){if(!disposed && revision===current){data.value={};error.value=err.response?.data?.message || '读取失败，请重新读取本地数据'}}

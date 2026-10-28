@@ -2,8 +2,11 @@
   <main class="sprite-config">
     <header class="sprite-config-header">
       <div class="sprite-config-title"><div class="sprite-config-mark"><el-icon><DataAnalysis /></el-icon></div><div><h1>卖家精灵采集配置</h1><p>管理待抓ASIN，自动关联本地商品与店铺资料</p></div></div>
-      <el-button type="primary" :icon="Plus" :disabled="loading || saving" @click="openAdd">批量添加ASIN</el-button>
+      <el-button v-if="collectionKind==='keywords'" type="primary" :icon="Plus" :disabled="loading || saving" @click="openAdd">批量添加ASIN</el-button>
     </header>
+    <el-tabs v-model="collectionKind" :before-leave="() => !saving && !competitorBusy"><el-tab-pane label="关键词反查" name="keywords" /><el-tab-pane label="查竞品报告" name="competitors" /></el-tabs>
+    <SellerspriteCompetitorPanel v-if="collectionKind==='competitors'" @busy="competitorBusy=$event" />
+    <template v-else>
     <div class="sprite-config-hint"><el-tag size="small" effect="plain">美国站 US</el-tag><span>仅采集启用的ASIN · 保存后下一轮生效 · 停用保留历史和已领取任务的补传</span></div>
     <section class="sprite-config-panel">
       <div class="sprite-config-tools">
@@ -49,21 +52,25 @@
       </el-table>
       <el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next" :disabled="loading || saving" @current-change="load" />
     </section>
-    <SellerspriteTaskDialog v-model="tasksVisible" :asin="tasksAsin" can-recover @changed="load" />
+    <SellerspriteKeywordTaskDialog v-model="tasksVisible" :asin="tasksAsin" can-recover @changed="load" />
     <el-dialog v-model="visible" :title="editing ? '编辑ASIN配置' : '批量添加ASIN'" width="min(580px, 94vw)" append-to-body :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving">
       <el-form label-position="top" :disabled="saving"><el-form-item v-if="!editing" label="ASIN（每行一个，最多200个；重复项保持原设置）"><el-input v-model="form.asins" type="textarea" :rows="6" maxlength="3000" placeholder="B0XXXXXXXX&#10;B0YYYYYYYY" aria-label="待抓取ASIN列表" /></el-form-item><el-form-item v-else label="ASIN / 站点"><strong>{{ form.asin }} · US</strong></el-form-item><el-form-item label="启用采集"><el-switch v-model="form.enabled" /></el-form-item><el-form-item label="优先级（越大越先采集）"><el-input-number v-model="form.priority" :min="0" :max="9999" :precision="0" /></el-form-item><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit /></el-form-item></el-form>
       <template #footer><el-button :disabled="saving" @click="visible=false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存配置</el-button></template>
     </el-dialog>
+    </template>
   </main>
 </template>
 <script>export default {name:'SellerspriteConfigView'}</script>
 <script setup>
+// 两类采集的配置容器：关键词与竞品独立页签，分别调用各自API。
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Search, Refresh, DataAnalysis, Picture, CopyDocument } from '@element-plus/icons-vue'
-import { addSellerspriteAsins, getSellerspriteAsins, updateSellerspriteAsin } from '@/services/api'
+import { addSellerspriteKeywordAsins, getSellerspriteKeywordAsins, updateSellerspriteKeywordAsin } from '@/services/api'
 import { spriteStates, spriteTime } from '@/utils/sellersprite'
-import SellerspriteTaskDialog from '@/components/SellerspriteTaskDialog.vue'
+import SellerspriteKeywordTaskDialog from '@/components/SellerspriteKeywordTaskDialog.vue'
+import SellerspriteCompetitorPanel from '@/components/SellerspriteCompetitorPanel.vue'
+const collectionKind=ref('keywords'),competitorBusy=ref(false)
 const tasksVisible=ref(false),tasksAsin=ref('')
 // 在独立弹框查看该ASIN的任务、失败原因和补救队列，不触发网页采集。
 function openTasks(row){tasksAsin.value=row.asin;tasksVisible.value=true}
@@ -74,13 +81,13 @@ const ownershipLabel=row=>row.ownership==='owned'?'本店商品':row.ownership==
 const taskTone=status=>status==='completed'?'success':['failed','parse_failed','action_required'].includes(status)?'danger':['running','downloaded'].includes(status)?'warning':'info'
 function safeImage(value){try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)?url.href:''}catch{return ''}}
 async function copyAsin(asin){try{await navigator.clipboard.writeText(asin);ElMessage.success('ASIN已复制')}catch{ElMessage.warning('复制失败，请手动复制ASIN')}}
-async function load(){const current=++revision;loading.value=true;error.value='';try{const res=await getSellerspriteAsins({page:page.value,page_size:20,search:search.value,enabled:enabled.value,ownership:ownership.value});if(disposed || current!==revision)return;rows.value=res.data.data.list;total.value=res.data.data.total}catch(err){if(!disposed && current===revision){error.value=err.response?.data?.message || '读取配置失败，请重试';rows.value=[];total.value=0}}finally{if(!disposed && current===revision)loading.value=false}}
+async function load(){const current=++revision;loading.value=true;error.value='';try{const res=await getSellerspriteKeywordAsins({page:page.value,page_size:20,search:search.value,enabled:enabled.value,ownership:ownership.value});if(disposed || current!==revision)return;rows.value=res.data.data.list;total.value=res.data.data.total}catch(err){if(!disposed && current===revision){error.value=err.response?.data?.message || '读取配置失败，请重试';rows.value=[];total.value=0}}finally{if(!disposed && current===revision)loading.value=false}}
 function filter(){page.value=1;load()}
 function openAdd(){editing.value=null;form.value={asins:'',enabled:true,priority:0,remark:''};visible.value=true}
 function openEdit(row){editing.value=row.id;form.value={...row,enabled:!!row.enabled};visible.value=true}
 function body(value){return {enabled:value.enabled?1:0,priority:value.priority,remark:value.remark,version:value.version,marketplace:'US'}}
-async function save(){if(saving.value)return;saving.value=true;try{if(editing.value){await updateSellerspriteAsin(editing.value,body(form.value));ElMessage.success('配置已保存')}else{const res=await addSellerspriteAsins({...body(form.value),asins:form.value.asins});ElMessage.success(`新增${res.data.data.created}条，已有${res.data.data.existing}条保持原设置`)}visible.value=false;await load()}catch(err){ElMessage.error(message(err))}finally{saving.value=false}}
-async function toggle(row,value){if(saving.value)return;saving.value=true;busyId.value=row.id;try{await updateSellerspriteAsin(row.id,{...body(row),enabled:value?1:0});ElMessage.success(value?'已启用下一轮采集':'已停用新采集，历史数据保留');await load()}catch(err){error.value=message(err);ElMessage.error(error.value)}finally{saving.value=false;busyId.value=null}}
+async function save(){if(saving.value)return;saving.value=true;try{if(editing.value){await updateSellerspriteKeywordAsin(editing.value,body(form.value));ElMessage.success('配置已保存')}else{const res=await addSellerspriteKeywordAsins({...body(form.value),asins:form.value.asins});ElMessage.success(`新增${res.data.data.created}条，已有${res.data.data.existing}条保持原设置`)}visible.value=false;await load()}catch(err){ElMessage.error(message(err))}finally{saving.value=false}}
+async function toggle(row,value){if(saving.value)return;saving.value=true;busyId.value=row.id;try{await updateSellerspriteKeywordAsin(row.id,{...body(row),enabled:value?1:0});ElMessage.success(value?'已启用下一轮采集':'已停用新采集，历史数据保留');await load()}catch(err){error.value=message(err);ElMessage.error(error.value)}finally{saving.value=false;busyId.value=null}}
 onMounted(load);onBeforeUnmount(()=>{disposed=true;revision++})
 </script>
 <style scoped>

@@ -66,7 +66,7 @@
       <el-drawer v-model="columnsOpen" title="自定义关键词列" size="min(440px, 96vw)" append-to-body><div class="kr-column-settings"><p>关键词和选择列始终固定。勾选显示指标，拖动行或用箭头调整顺序；合并列中的上下指标可分别点击表头排序。</p><div class="kr-column-presets"><el-button size="small" @click="columnPreset('common')">常用列</el-button><el-button size="small" @click="columnPreset('all')">全部显示</el-button><el-button size="small" @click="columnPreset('none')">清空可选列</el-button></div><div v-for="(column,index) in orderedColumns" :key="column.key" class="kr-column-setting-row" draggable="true" @dragstart="startColumnDrag($event,column.key)" @dragover.prevent @drop.prevent="dropColumn(column.key)" @dragend="dragColumn=null"><span class="kr-column-grip" title="拖动调整顺序">⠿</span><el-checkbox :model-value="visibleColumns.includes(column.key)" @change="value=>toggleColumn(column.key,value)">{{ column.label }}</el-checkbox><div><el-button link :icon="ArrowUp" :disabled="index===0" :aria-label="`上移${column.label}`" @click="moveColumn(column.key,-1)" /><el-button link :icon="ArrowDown" :disabled="index===orderedColumns.length-1" :aria-label="`下移${column.label}`" @click="moveColumn(column.key,1)" /></div></div><div class="kr-column-save-note">{{ prefsUnavailable?'浏览器存储不可用，列设置仅本次有效。':'列设置自动保存在当前浏览器，刷新和切换ASIN后仍保留。' }}</div></div></el-drawer>
     </template>
     <section v-else class="kr-welcome kr-panel"><el-icon><Search /></el-icon><h2>输入ASIN，查看已导入的关键词数据</h2><p>支持本店商品和竞品ASIN，也可以从上方店铺列表中选择商品。</p></section>
-    <SellerspriteTaskDialog v-model="tasksVisible" :asin="activeAsin" :can-recover="canRecover" @changed="load" />
+    <SellerspriteKeywordTaskDialog v-model="tasksVisible" :asin="activeAsin" :can-recover="canRecover" @changed="load" />
   </main>
 </template>
 <script>export default {name:'KeywordReverseView'}</script>
@@ -79,7 +79,7 @@ import { getKeywordReverse, getKeywordReverseOptions, getUserPermissions } from 
 import { spriteStates, spriteTime, spriteValue } from '@/utils/sellersprite'
 import { reverseMetrics, reverseLabel, hasValue, percentWidth, reverseCsv, reverseColumns, defaultColumnPrefs, normalizeColumnPrefs, rankPageText } from '@/utils/keywordReverse'
 import KeywordMetricHelp from '@/components/KeywordMetricHelp.vue'
-import SellerspriteTaskDialog from '@/components/SellerspriteTaskDialog.vue'
+import SellerspriteKeywordTaskDialog from '@/components/SellerspriteKeywordTaskDialog.vue'
 import { translationStatus, translationTip } from '@/utils/translationStatus'
 
 const route=useRoute(),router=useRouter(),table=ref(null)

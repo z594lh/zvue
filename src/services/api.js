@@ -32,18 +32,25 @@ export const saveUiConfig = (data) => api.put('/system/ui-config', data, { timeo
 export const resetUiConfig = (data) => api.post('/system/ui-config/reset', data, { timeout: 15000 });
 export const getUiConfigHistory = (params) => api.get('/system/ui-config/history', { params, timeout: 15000 });
 
-// 浏览器仅用ERP会话权限，不携带采集API密钥，不触发外部采集。
-export const getSellerspriteListing = (sku, params) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/sellersprite`, { params, timeout: 20000 });
+// 关键词反查API：浏览器只用ERP会话权限，不携带采集密钥，不触发外部采集。
+export const getSellerspriteKeywordListing = (sku, params) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/sellersprite`, { params, timeout: 20000 });
 export const getKeywordReverse = (asin, params) => api.get(`/tools/keyword-reverse/${encodeURIComponent(asin)}`, { params, timeout: 20000 });
 export const getKeywordReverseOptions = (params) => api.get('/tools/keyword-reverse/options', { params, timeout: 20000 });
-export const getSellerspriteAsins = (params) => api.get('/system/sellersprite/asins', { params, timeout: 20000 });
-export const addSellerspriteAsins = (data) => api.post('/system/sellersprite/asins', data, { timeout: 20000 });
-export const updateSellerspriteAsin = (id, data) => api.put(`/system/sellersprite/asins/${id}`, data, { timeout: 20000 });
+export const getSellerspriteKeywordAsins = (params) => api.get('/system/sellersprite/asins', { params, timeout: 20000 });
+export const addSellerspriteKeywordAsins = (data) => api.post('/system/sellersprite/asins', data, { timeout: 20000 });
+export const updateSellerspriteKeywordAsin = (id, data) => api.put(`/system/sellersprite/asins/${id}`, data, { timeout: 20000 });
+// 查竞品普通报告使用独立清单及任务，沿用ERP会话鉴权，不暴露机器密钥。
+export const getSellerspriteCompetitorAsins = params => api.get('/system/sellersprite/competitors/asins', { params });
+export const addSellerspriteCompetitorAsins = data => api.post('/system/sellersprite/competitors/asins', data);
+export const updateSellerspriteCompetitorAsin = (id, data) => api.put(`/system/sellersprite/competitors/asins/${id}`, data);
+export const getSellerspriteCompetitorTasks = (asin, params) => api.get(`/system/sellersprite/competitors/tasks/${encodeURIComponent(asin)}`, { params });
+export const getSellerspriteCompetitorSnapshot = id => api.get(`/system/sellersprite/competitors/snapshots/${id}`);
+export const downloadSellerspriteCompetitorFile = id => api.get(`/system/sellersprite/competitors/files/${id}`, { responseType: 'blob' });
 // 任务历史只读；人工补救仅入队，不在浏览器启动网页采集。
-export const getSellerspriteTasks = (asin, params, manage = false) => api.get(manage ? `/system/sellersprite/tasks/${encodeURIComponent(asin)}` : `/tools/keyword-reverse/${encodeURIComponent(asin)}/tasks`, { params, timeout: 20000 });
-export const recoverSellerspriteTask = (id, data) => api.post(`/system/sellersprite/tasks/${id}/recover`, data, { timeout: 20000 });
-export const resumeSellerspriteAccount = () => api.post('/system/sellersprite/recovery/resume', { confirm: true }, { timeout: 20000 });
-export const cancelSellerspriteRecovery = id => api.post(`/system/sellersprite/recovery/${id}/cancel`, {}, { timeout: 20000 });
+export const getSellerspriteKeywordTasks = (asin, params, manage = false) => api.get(manage ? `/system/sellersprite/tasks/${encodeURIComponent(asin)}` : `/tools/keyword-reverse/${encodeURIComponent(asin)}/tasks`, { params, timeout: 20000 });
+export const recoverSellerspriteKeywordTask = (id, data) => api.post(`/system/sellersprite/tasks/${id}/recover`, data, { timeout: 20000 });
+export const resumeSellerspriteKeywordAccount = () => api.post('/system/sellersprite/recovery/resume', { confirm: true }, { timeout: 20000 });
+export const cancelSellerspriteKeywordRecovery = id => api.post(`/system/sellersprite/recovery/${id}/cancel`, {}, { timeout: 20000 });
 
 // AI托管会话：选项、启停、每日运行及只读历史；不暴露旧单次生成/虚拟收益接口。
 export const getAiOperationsOptions = (params) => api.get('/ai-operations/options', { params, timeout: 20000 });

@@ -34,9 +34,10 @@
 </template>
 
 <script setup>
+// 关键词反查任务历史与失败补救；竞品进度由独立竞品面板显示。
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSellerspriteTasks, recoverSellerspriteTask, resumeSellerspriteAccount, cancelSellerspriteRecovery } from '@/services/api'
+import { getSellerspriteKeywordTasks, recoverSellerspriteKeywordTask, resumeSellerspriteKeywordAccount, cancelSellerspriteKeywordRecovery } from '@/services/api'
 import { spriteStates, spriteTime } from '@/utils/sellersprite'
 const props=defineProps({modelValue:Boolean,asin:{type:String,default:''},canRecover:Boolean})
 const emit=defineEmits(['update:modelValue','changed'])
@@ -51,13 +52,13 @@ function queueTone(status){return status==='completed'?'success':['blocked','exh
 // 同ASIN同目标日期或来源任务已有等待/执行队列时禁用重复入队，不累计手动额度。
 function isQueued(row){return (data.value.queues || []).some(queue=>['queued','running'].includes(queue.status) && (String(queue.source_task_id)===String(row.id) || queue.record_date===row.record_date))}
 // 使用请求序号防止切换ASIN/关闭弹框后旧响应覆盖当前记录。
-async function load(){const current=++revision;loading.value=true;error.value='';try{const res=await getSellerspriteTasks(props.asin,{page:page.value},props.canRecover);if(disposed || current!==revision)return;data.value=res.data.data}catch(err){if(!disposed && current===revision)error.value=err.response?.data?.message || '任务记录读取失败'}finally{if(!disposed && current===revision)loading.value=false}}
+async function load(){const current=++revision;loading.value=true;error.value='';try{const res=await getSellerspriteKeywordTasks(props.asin,{page:page.value},props.canRecover);if(disposed || current!==revision)return;data.value=res.data.data}catch(err){if(!disposed && current===revision)error.value=err.response?.data?.message || '任务记录读取失败'}finally{if(!disposed && current===revision)loading.value=false}}
 // 人工明确确认后仅排一次；总次数不限且不占自动预算，重复请求由服务端幂等去重。
-async function recover(row){if(busy.value || isQueued(row))return;const asin=props.asin;try{await ElMessageBox.confirm(`将 ${asin} 的任务 #${row.id} 加入一次手动补救。手动总次数不限，不占自动3次；已在等待或执行中不会重复添加。空表重采归今天；有有效原文件时优先补传原日期。登录/验证码/格式问题请先处理，执行可能消耗卖家精灵额度。`,'确认补救',{type:'warning',confirmButtonText:'确认加入队列',cancelButtonText:'取消'});if(asin!==props.asin || !props.modelValue)return;busy.value=true;const res=await recoverSellerspriteTask(row.id,{confirm:true});ElMessage.success(res.data.data.duplicate?'任务已在队列中，未重复添加':`已排队，目标快照 ${res.data.data.record_date}；等待小时任务`);await load();emit('changed')}catch(err){if(err!=='cancel' && err!=='close')ElMessage.error(err.response?.data?.message || '入队结果待确认，请刷新记录，勿反复点击')}finally{busy.value=false}}
+async function recover(row){if(busy.value || isQueued(row))return;const asin=props.asin;try{await ElMessageBox.confirm(`将 ${asin} 的任务 #${row.id} 加入一次手动补救。手动总次数不限，不占自动3次；已在等待或执行中不会重复添加。空表重采归今天；有有效原文件时优先补传原日期。登录/验证码/格式问题请先处理，执行可能消耗卖家精灵额度。`,'确认补救',{type:'warning',confirmButtonText:'确认加入队列',cancelButtonText:'取消'});if(asin!==props.asin || !props.modelValue)return;busy.value=true;const res=await recoverSellerspriteKeywordTask(row.id,{confirm:true});ElMessage.success(res.data.data.duplicate?'任务已在队列中，未重复添加':`已排队，目标快照 ${res.data.data.record_date}；等待小时任务`);await load();emit('changed')}catch(err){if(err!=='cancel' && err!=='close')ElMessage.error(err.response?.data?.message || '入队结果待确认，请刷新记录，勿反复点击')}finally{busy.value=false}}
 // 仅在用户确认虚拟机账号问题已经处理后解除全局网页采集阻塞。
-async function resume(){if(busy.value)return;try{await ElMessageBox.confirm('请确认已在虚拟机浏览器处理登录、验证码或账号权限。恢复后，下一轮小时任务将继续网页采集。','恢复采集账号',{type:'warning'});busy.value=true;await resumeSellerspriteAccount();ElMessage.success('已恢复，等待下一次小时任务');await load()}catch(err){if(err!=='cancel' && err!=='close')ElMessage.error(err.response?.data?.message || '恢复结果待确认，请刷新')}finally{busy.value=false}}
+async function resume(){if(busy.value)return;try{await ElMessageBox.confirm('请确认已在虚拟机浏览器处理登录、验证码或账号权限。恢复后，下一轮小时任务将继续网页采集。','恢复采集账号',{type:'warning'});busy.value=true;await resumeSellerspriteKeywordAccount();ElMessage.success('已恢复，等待下一次小时任务');await load()}catch(err){if(err!=='cancel' && err!=='close')ElMessage.error(err.response?.data?.message || '恢复结果待确认，请刷新')}finally{busy.value=false}}
 // 只取消等待/阻塞队列，服务端拒绝取消执行中的任务，避免中断上传事务。
-async function cancelQueue(queue){if(busy.value)return;try{await ElMessageBox.confirm('取消本队列后，今天不会自动重新打开；仍可手动重新入队。','取消补救',{type:'warning'});busy.value=true;await cancelSellerspriteRecovery(queue.id);await load()}catch(err){if(err!=='cancel' && err!=='close')ElMessage.error(err.response?.data?.message || '取消结果待确认，请刷新')}finally{busy.value=false}}
+async function cancelQueue(queue){if(busy.value)return;try{await ElMessageBox.confirm('取消本队列后，今天不会自动重新打开；仍可手动重新入队。','取消补救',{type:'warning'});busy.value=true;await cancelSellerspriteKeywordRecovery(queue.id);await load()}catch(err){if(err!=='cancel' && err!=='close')ElMessage.error(err.response?.data?.message || '取消结果待确认，请刷新')}finally{busy.value=false}}
 // 打开或切换ASIN重置分页；关闭时使在途查询失效。
 watch(()=>[props.modelValue,props.asin],()=>{revision++;if(props.modelValue && props.asin){page.value=1;data.value={};load()}},{immediate:true})
 onBeforeUnmount(()=>{disposed=true;revision++})
