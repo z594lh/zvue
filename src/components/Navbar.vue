@@ -50,6 +50,9 @@
       </template>
     </div>
 
+    <span v-if="menusLoading" class="nav-load-status" role="status">菜单加载中…</span>
+    <button v-else-if="menusError" type="button" class="nav-load-retry" @click="fetchMenus">菜单加载失败，点击重试</button>
+
     <!-- 移动端菜单 -->
     <div v-show="mobileMenuOpen" class="mobile-menu">
       <template v-for="group in visibleNavGroups" :key="group.label">
@@ -120,78 +123,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { uiConfig } from '@/services/uiConfig.js'
-import { isAuthenticated, getUserProfile, getMenus, logout, setAuthToken, setUserPermissions, clearUserPermissions, getUserPermissions, setUserMenus, clearUserMenus } from '@/services/api.js'
-
-// 本地兜底菜单（当 /api/menus 接口不可用时使用）
-const fallbackNavGroups = [
-  {
-    label: '财务',
-    children: [
-      { label: '支出记账', path: '/expense' },
-      { label: '账目类别管理', path: '/transaction-categories' },
-      { label: '计算售价', path: '/pricing' },
-      { label: '人员绩效', path: '/performance' }
-    ]
-  },
-  {
-    label: '亚马逊',
-    children: [
-      { label: '店铺管理', path: '/shops' },
-      { label: '订单列表', path: '/amazon-orders' },
-      { label: 'Listing列表', path: '/amazon-listings' },
-      { label: 'Listing 负责人分配', path: '/amazon-listing-assignments' },
-      { label: '货件列表', path: '/amazon-shipments' },
-      { label: '库存列表', path: '/amazon-inventory' }
-    ]
-  },
-  {
-    label: '报表',
-    children: [
-      { label: '店铺报表', path: '/reports' },
-      { label: '广告报表', path: '/reports/advertising' },
-      { label: 'FBA仓储费', path: '/reports/fba-storage-fees' }
-    ]
-  },
-  {
-    label: '供应链',
-    children: [
-      { label: '备货看板', path: '/product-board' },
-      { label: '供应商管理', path: '/suppliers' },
-      { label: '进货单管理', path: '/purchase-orders' },
-      { label: '产品维护', path: '/products' },
-      { label: '类目维护', path: '/categories' }
-    ]
-  },
-  {
-    label: '货代',
-    children: [
-      { label: '货代管理', path: '/logistics-providers' },
-      { label: '货代运单管理', path: '/logistics-waybills' }
-    ]
-  },
-  {
-    label: '工具',
-    children: [
-      { label: 'FBA标签', path: '/fba-label' },
-      { label: '箱唛助手', path: '/label-organize' },
-      { label: '发票助手', path: '/invoice-export' },
-      { label: '运营日报', path: '/daily-reports' },
-      { label: '关键词反查', path: '/tools/keyword-reverse' },
-      { label: '竞品数据', path: '/tools/competitor-data' },
-      { label: 'AI托管', path: '/tools/ai-operations' },
-      { label: 'PDF工具', path: '/pdf-tools' }
-    ]
-  },
-  {
-    label: '系统',
-    children: [
-      { label: '计划任务', path: '/system/cron-tasks' },
-      { label: '界面配置', path: '/system/ui-config' },
-      { label: '业务字典', path: '/system/business-dictionary' },
-      { label: '权限管理', path: '/system/permissions' }
-    ]
-  }
-]
+import { isAuthenticated, getUserProfile, getMenus, logout, setAuthToken, setUserPermissions, clearUserPermissions, setUserMenus, clearUserMenus } from '@/services/api.js'
 
 export default {
   name: 'NavBar',
@@ -205,7 +137,10 @@ export default {
     const menuRef = ref(null)
     const openGroup = ref(null)
     const mobileMenuOpen = ref(false)
-    const dynamicMenus = ref(null) // 从 /api/menus 获取的原始菜单
+    const dynamicMenus = ref([]) // 只接收 /api/menus 的原始配置
+    const menusLoading = ref(false)
+    const menusError = ref(false)
+    let menuRevision = 0
 
     const toggleMobileMenu = () => {
       mobileMenuOpen.value = !mobileMenuOpen.value
@@ -251,84 +186,11 @@ export default {
         }
       })
 
-      // 兼容已安装的旧菜单：只移动接口已授权返回的入口，不增加权限。
-      const performanceItems = groups.flatMap(g => g.children.filter(item => item.path === '/performance'))
-      if (performanceItems.length) {
-        groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/performance') })
-        let finance = groups.find(g => g.label === '财务')
-        if (!finance) {
-          finance = { label: '财务', children: [] }
-          groups.push(finance)
-        }
-        finance.children.push(performanceItems[0])
-      }
-      // 旧安装尚无新菜单记录时，按已有分配权限补齐独立入口。
-      if (getUserPermissions().includes('amazon_listings:assign') &&
-          !groups.some(g => g.children.some(item => item.path === '/amazon-listing-assignments'))) {
-        let amazon = groups.find(g => g.label === '亚马逊')
-        if (!amazon) {
-          amazon = { label: '亚马逊', children: [] }
-          groups.push(amazon)
-        }
-        amazon.children.push({ label: 'Listing 负责人分配', path: '/amazon-listing-assignments' })
-      }
-      // 已授权但菜单缓存未刷新时补日报入口；不为无日报查看权用户新增入口。
-      if (getUserPermissions().includes('daily_reports:view') &&
-          !groups.some(g => g.children.some(item => item.path === '/daily-reports'))) {
-        let tools = groups.find(g => g.label === '工具')
-        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
-        tools.children.push({ label: '运营日报', path: '/daily-reports' })
-      }
-      // 沿用原Listing关键词查看权，兼容已登录用户的旧菜单缓存。
-      if (getUserPermissions().includes('amazon_listings:page') &&
-          !groups.some(g => g.children.some(item => item.path === '/tools/keyword-reverse'))) {
-        let tools = groups.find(g => g.label === '工具')
-        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
-        tools.children.push({ label: '关键词反查', path: '/tools/keyword-reverse' })
-      }
-      // 竞品浏览沿用Listing查看权，旧菜单缓存也排在关键词反查之后。
-      groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/tools/competitor-data') })
-      if (getUserPermissions().includes('amazon_listings:page')) {
-        let tools = groups.find(g => g.label === '工具')
-        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
-        const index = tools.children.findIndex(item => item.path === '/tools/keyword-reverse')
-        tools.children.splice(index < 0 ? tools.children.length : index + 1, 0, { label: '竞品数据', path: '/tools/competitor-data' })
-      }
-      if (getUserPermissions().includes('system:ui_config') &&
-          !groups.some(g => g.children.some(item => item.path === '/system/ui-config'))) {
-        let system = groups.find(g => g.label === '系统')
-        if (!system) { system = { label: '系统', children: [] }; groups.push(system) }
-        system.children.push({ label: '界面配置', path: '/system/ui-config' })
-      }
-      if (getUserPermissions().includes('system:ui_config') &&
-          !groups.some(g => g.children.some(item => item.path === '/system/business-dictionary'))) {
-        let system = groups.find(g => g.label === '系统')
-        if (!system) { system = { label: '系统', children: [] }; groups.push(system) }
-        system.children.push({ label: '业务字典', path: '/system/business-dictionary' })
-      }
-      // AI托管是工具独立菜单；即使菜单缓存残留也必须满足专用权限。
-      groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/tools/ai-operations') })
-      if (getUserPermissions().includes('ai_operations:manage')) {
-        let tools = groups.find(g => g.label === '工具')
-        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
-        tools.children.push({ label: 'AI托管', path: '/tools/ai-operations' })
-      }
       return groups.filter((g) => g.children.length > 0)
     }
 
-    // 动态菜单（优先使用 /api/menus，失败则回退到本地兜底）
-    const visibleNavGroups = computed(() => {
-      if (dynamicMenus.value) {
-        return buildMenuTree(dynamicMenus.value)
-      }
-      const permissions = getUserPermissions()
-      // 保持旧兜底项行为，新日报入口仍须具备独立查看权限。
-      return fallbackNavGroups.map(group => ({ ...group, children: group.children.filter(item =>
-        (item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) &&
-        (!['/tools/keyword-reverse','/tools/competitor-data'].includes(item.path) || permissions.includes('amazon_listings:page')) &&
-        (item.path !== '/tools/ai-operations' || permissions.includes('ai_operations:manage')) &&
-        (!['/system/ui-config','/system/business-dictionary'].includes(item.path) || permissions.includes('system:ui_config'))) }))
-    })
+    // 只展示接口配置；空配置或读取失败都不生成菜单。
+    const visibleNavGroups = computed(() => buildMenuTree(dynamicMenus.value))
 
     const isGroupActive = (group) => {
       return group.children.some((item) => item.path === route.path)
@@ -360,15 +222,26 @@ export default {
     }
 
     const fetchMenus = async () => {
+      const revision = ++menuRevision
+      menusLoading.value = true
+      menusError.value = false
+      dynamicMenus.value = []
+      clearUserMenus()
+      openGroup.value = null
       try {
         const res = await getMenus()
-        if (res.data.status === 'success') {
-          dynamicMenus.value = res.data.data || []
-          setUserMenus(dynamicMenus.value)
-        }
+        if (revision !== menuRevision || !isAuthenticated()) return
+        if (res.data.status !== 'success' || !Array.isArray(res.data.data)) throw new Error('菜单响应无效')
+        dynamicMenus.value = res.data.data
+        setUserMenus(dynamicMenus.value)
       } catch (error) {
+        if (revision !== menuRevision || !isAuthenticated()) return
         console.error('获取菜单失败:', error)
-        dynamicMenus.value = null
+        dynamicMenus.value = []
+        clearUserMenus()
+        menusError.value = true
+      } finally {
+        if (revision === menuRevision) menusLoading.value = false
       }
     }
 
@@ -397,7 +270,10 @@ export default {
         setAuthToken(null)
         clearUserPermissions()
         clearUserMenus()
-        dynamicMenus.value = null
+        ++menuRevision
+        dynamicMenus.value = []
+        menusLoading.value = false
+        menusError.value = false
         isLoggedIn.value = false
         userNickname.value = ''
         userAvatar.value = ''
@@ -435,6 +311,9 @@ export default {
     return {
       uiConfig,
       visibleNavGroups,
+      menusLoading,
+      menusError,
+      fetchMenus,
       route,
       isLoggedIn,
       userNickname,
@@ -456,6 +335,7 @@ export default {
 </script>
 
 <style scoped>
+.nav-load-status,.nav-load-retry{font-size:12px;color:#8a97a8;margin:0 12px}.nav-load-retry{border:0;background:transparent;color:#d57b36;cursor:pointer}
 .navbar {
   display: flex;
   align-items: center;

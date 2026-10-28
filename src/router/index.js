@@ -395,7 +395,10 @@ router.beforeEach(async (to, from, next) => {
   if ((to.path === '/tools/ai-operations' || to.path.startsWith('/tools/ai-operations/')) && !getUserPermissions().includes('ai_operations:manage')) {
     return next('/403')
   }
-  if (['/tools/keyword-reverse','/tools/competitor-data'].includes(to.path) && !getUserPermissions().includes('amazon_listings:page')) {
+  if (to.path === '/tools/competitor-data' && !getUserPermissions().includes('competitor_data:view')) {
+    return next('/403')
+  }
+  if (to.path === '/tools/keyword-reverse' && !getUserPermissions().includes('keyword_data:view')) {
     return next('/403')
   }
   if (to.path === '/system/sellersprite' && !getUserPermissions().includes('system:sellersprite_config')) {
