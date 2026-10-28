@@ -177,6 +177,7 @@ const fallbackNavGroups = [
       { label: '发票助手', path: '/invoice-export' },
       { label: '运营日报', path: '/daily-reports' },
       { label: '关键词反查', path: '/tools/keyword-reverse' },
+      { label: '竞品数据', path: '/tools/competitor-data' },
       { label: 'AI托管', path: '/tools/ai-operations' },
       { label: 'PDF工具', path: '/pdf-tools' }
     ]
@@ -285,6 +286,14 @@ export default {
         if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
         tools.children.push({ label: '关键词反查', path: '/tools/keyword-reverse' })
       }
+      // 竞品浏览沿用Listing查看权，旧菜单缓存也排在关键词反查之后。
+      groups.forEach(g => { g.children = g.children.filter(item => item.path !== '/tools/competitor-data') })
+      if (getUserPermissions().includes('amazon_listings:page')) {
+        let tools = groups.find(g => g.label === '工具')
+        if (!tools) { tools = { label: '工具', children: [] }; groups.push(tools) }
+        const index = tools.children.findIndex(item => item.path === '/tools/keyword-reverse')
+        tools.children.splice(index < 0 ? tools.children.length : index + 1, 0, { label: '竞品数据', path: '/tools/competitor-data' })
+      }
       if (getUserPermissions().includes('system:ui_config') &&
           !groups.some(g => g.children.some(item => item.path === '/system/ui-config'))) {
         let system = groups.find(g => g.label === '系统')
@@ -316,7 +325,7 @@ export default {
       // 保持旧兜底项行为，新日报入口仍须具备独立查看权限。
       return fallbackNavGroups.map(group => ({ ...group, children: group.children.filter(item =>
         (item.path !== '/daily-reports' || permissions.includes('daily_reports:view')) &&
-        (item.path !== '/tools/keyword-reverse' || permissions.includes('amazon_listings:page')) &&
+        (!['/tools/keyword-reverse','/tools/competitor-data'].includes(item.path) || permissions.includes('amazon_listings:page')) &&
         (item.path !== '/tools/ai-operations' || permissions.includes('ai_operations:manage')) &&
         (!['/system/ui-config','/system/business-dictionary'].includes(item.path) || permissions.includes('system:ui_config'))) }))
     })

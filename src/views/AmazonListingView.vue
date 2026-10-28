@@ -358,7 +358,10 @@
                 </section>
               </div>
             </el-popover>
-            <el-tooltip content="绑定竞品 ASIN" placement="top"><el-button type="primary" link aria-label="绑定竞品ASIN" :disabled="!scope.row.asin" @click="openCompetitors(scope.row)"><el-icon><Connection /></el-icon></el-button></el-tooltip>
+            <FeatureGuide v-if="scope.row === competitorGuideRow" feature-key="listing-competitors-v1" title="现在可以绑定竞品了" description="点击关联图标，绑定竞品 ASIN，也可开启竞品数据采集。" placement="bottom-end" :enabled="!competitorGuideClosed && !loading && !competitorTarget && !detailDialogVisible && !historyTarget && !syncVariantDialogVisible" @dismiss="competitorGuideClosed = true">
+              <template #default="{ visible }"><el-tooltip content="绑定竞品 ASIN" placement="top" :disabled="visible"><el-button type="primary" link aria-label="绑定竞品ASIN" @click="openCompetitors(scope.row)"><el-icon><Connection /></el-icon></el-button></el-tooltip></template>
+            </FeatureGuide>
+            <el-tooltip v-else content="绑定竞品 ASIN" placement="top"><el-button type="primary" link aria-label="绑定竞品ASIN" :disabled="!scope.row.asin" @click="openCompetitors(scope.row)"><el-icon><Connection /></el-icon></el-button></el-tooltip>
             <el-tooltip content="前往工具 · 关键词反查（美国站）" placement="top"><el-button type="success" link aria-label="卖家精灵关键词" :disabled="!scope.row.asin" @click="openSellersprite(scope.row)"><el-icon><DataAnalysis /></el-icon></el-button></el-tooltip>
             <el-tooltip content="修改记录" placement="top"><el-button type="info" link aria-label="修改记录" @click="openListingHistory(scope.row)"><el-icon><Clock /></el-icon></el-button></el-tooltip>
           </template>
@@ -743,6 +746,7 @@ import ListingTextEditor from '@/components/ListingTextEditor.vue'
 import ListingImageEditor from '@/components/ListingImageEditor.vue'
 import ListingHistoryDialog from '@/components/ListingHistoryDialog.vue'
 import ListingCompetitorDialog from '@/components/ListingCompetitorDialog.vue'
+import FeatureGuide from '@/components/FeatureGuide.vue'
 import { useShopCache } from '@/composables/useShopCache'
 
 export default {
@@ -753,6 +757,7 @@ export default {
     ListingImageEditor,
     ListingHistoryDialog,
     ListingCompetitorDialog,
+    FeatureGuide,
     Connection,
     DataAnalysis,
     Clock,
@@ -776,6 +781,9 @@ export default {
     const listings = ref([])
     const historyTarget = ref(null)
     const competitorTarget = ref(null)
+    const competitorGuideClosed = ref(false)
+    // 当前页仅首个可绑定行显示主动引导，其余行仍使用普通悬浮说明。
+    const competitorGuideRow = computed(() => listings.value.find(row => row.asin))
     // 冻结点击时的店铺/SKU；编辑弹框通过后端版本校验避免覆盖他人变更。
     const openCompetitors = (row) => {
       if (selectedShopId.value && row.asin) competitorTarget.value = { shopId:selectedShopId.value, sku:row.sku, asin:row.asin }
@@ -1687,6 +1695,8 @@ export default {
       listings,
       historyTarget,
       competitorTarget,
+      competitorGuideClosed,
+      competitorGuideRow,
       openCompetitors,
       competitorsSaved,
       openSellersprite,

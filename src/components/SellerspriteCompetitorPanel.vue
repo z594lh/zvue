@@ -36,9 +36,9 @@
         <el-table-column prop="record_date" label="采集日期" width="115" />
         <el-table-column label="状态" width="110"><template #default="{row}">{{ states[row.status] || row.status }}</template></el-table-column>
         <el-table-column prop="selected_asin" label="实际选中ASIN" width="145" />
-        <el-table-column label="报告与路径" min-width="260"><template #default="{row}"><div>{{ row.file_name || '尚未下载' }}</div><small>报告编号：{{ row.report_id || '—' }}</small><br><small>VM：{{ row.local_path || '—' }}</small><br><small>服务器：{{ row.storage_path || '—' }}</small><div class="error">{{ row.error_message }}</div></template></el-table-column>
+        <el-table-column label="报告与VM路径" min-width="260"><template #default="{row}"><div>{{ row.file_name || '尚未下载' }}</div><small>报告编号：{{ row.report_id || '—' }}</small><br><small>VM：{{ row.local_path || '—' }}</small><div class="error">{{ row.error_message }}</div></template></el-table-column>
         <el-table-column label="商品快照" min-width="160"><template #default="{row}"><div>销量 {{ row.monthly_sales ?? '—' }} / 价格 {{ row.price ?? '—' }}</div><div>评分 {{ row.rating ?? '—' }} / BSR {{ row.bsr ?? '—' }}</div></template></el-table-column>
-        <el-table-column label="操作" width="145"><template #default="{row}"><el-button v-if="row.latest_file_id" link type="primary" @click="download(row)" :disabled="downloading">原始报告</el-button><el-button v-if="row.status==='completed'" link type="primary" @click="details(row)" :disabled="detailLoading">全部字段</el-button></template></el-table-column>
+        <el-table-column label="操作" width="145"><template #default="{row}"><el-button v-if="row.status==='completed'" link type="primary" @click="details(row)" :disabled="detailLoading">全部字段</el-button></template></el-table-column>
       </el-table>
       <el-pagination v-model:current-page="taskPage" :total="taskTotal" :page-size="20" layout="total, prev, pager, next" @current-change="loadTasks" />
     </el-dialog>
@@ -52,10 +52,10 @@
 // 查竞品独立页面：仅操作ERP配置和读取快照，不在浏览器触发网站采集。
 import { ref,onMounted,onBeforeUnmount,watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getSellerspriteCompetitorAsins,addSellerspriteCompetitorAsins,updateSellerspriteCompetitorAsin,getSellerspriteCompetitorTasks,getSellerspriteCompetitorSnapshot,downloadSellerspriteCompetitorFile } from '@/services/api'
+import { getSellerspriteCompetitorAsins,addSellerspriteCompetitorAsins,updateSellerspriteCompetitorAsin,getSellerspriteCompetitorTasks,getSellerspriteCompetitorSnapshot } from '@/services/api'
 const emit=defineEmits(['busy'])
 const rows=ref([]),total=ref(0),page=ref(1),search=ref(''),enabled=ref(''),loading=ref(false),saving=ref(false),error=ref('')
-const form=ref({}),editingVisible=ref(false),tasksVisible=ref(false),tasksAsin=ref(''),tasks=ref([]),taskPage=ref(1),taskTotal=ref(0),taskLoading=ref(false),taskError=ref(''),downloading=ref(false),detailLoading=ref(false),detailVisible=ref(false),detailRows=ref([])
+const form=ref({}),editingVisible=ref(false),tasksVisible=ref(false),tasksAsin=ref(''),tasks=ref([]),taskPage=ref(1),taskTotal=ref(0),taskLoading=ref(false),taskError=ref(''),detailLoading=ref(false),detailVisible=ref(false),detailRows=ref([])
 const states={pending:'待采集',running:'查询 / 生成报告中',downloaded:'已下载待上传',completed:'已清洗入库',failed:'采集失败',action_required:'需人工处理',parse_failed:'清洗失败'}
 let disposed=false,revision=0,taskRevision=0
 watch(saving,value=>emit('busy',value))
@@ -69,7 +69,6 @@ async function save(){if(saving.value)return;saving.value=true;try{if(form.value
 async function toggle(row,value){if(saving.value)return;saving.value=true;try{await updateSellerspriteCompetitorAsin(row.id,{...body(row),enabled:value?1:0});await load()}catch(e){ElMessage.error(message(e))}finally{saving.value=false}}
 function showTasks(asin){tasksAsin.value=asin;taskPage.value=1;tasksVisible.value=true;loadTasks()}
 async function loadTasks(){const n=++taskRevision;taskLoading.value=true;taskError.value='';try{const r=await getSellerspriteCompetitorTasks(tasksAsin.value,{page:taskPage.value});if(disposed||n!==taskRevision)return;tasks.value=r.data.data.list;taskTotal.value=r.data.data.total}catch(e){if(!disposed&&n===taskRevision){taskError.value=message(e);tasks.value=[]}}finally{if(!disposed&&n===taskRevision)taskLoading.value=false}}
-async function download(row){if(downloading.value)return;downloading.value=true;try{const r=await downloadSellerspriteCompetitorFile(row.latest_file_id);const url=URL.createObjectURL(r.data);const a=document.createElement('a');a.href=url;a.download=row.file_name || 'competitor.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch{ElMessage.error('报告下载失败，请刷新重试')}finally{downloading.value=false}}
 async function details(row){detailLoading.value=true;try{const r=await getSellerspriteCompetitorSnapshot(row.id);detailRows.value=Object.entries(JSON.parse(r.data.data.raw_row_json)).map(([name,value])=>({name,value:value??'未提供'}));detailVisible.value=true}catch(e){ElMessage.error(message(e))}finally{detailLoading.value=false}}
 onMounted(load);onBeforeUnmount(()=>{disposed=true;revision++;taskRevision++;emit('busy',false)})
 </script>

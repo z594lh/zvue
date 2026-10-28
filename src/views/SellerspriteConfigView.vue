@@ -4,7 +4,7 @@
       <div class="sprite-config-title"><div class="sprite-config-mark"><el-icon><DataAnalysis /></el-icon></div><div><h1>卖家精灵采集配置</h1><p>管理待抓ASIN，自动关联本地商品与店铺资料</p></div></div>
       <el-button v-if="collectionKind==='keywords'" type="primary" :icon="Plus" :disabled="loading || saving" @click="openAdd">批量添加ASIN</el-button>
     </header>
-    <el-tabs v-model="collectionKind" :before-leave="() => !saving && !competitorBusy"><el-tab-pane label="关键词反查" name="keywords" /><el-tab-pane label="查竞品报告" name="competitors" /></el-tabs>
+    <el-tabs v-model="collectionKind" :before-leave="() => !saving && !competitorBusy"><el-tab-pane label="关键词反查" name="keywords" /><el-tab-pane name="competitors"><template #label><FeatureGuide feature-key="sellersprite-competitor-reports-v1" title="新增查竞品报告" description="在这里添加竞品 ASIN，采集销量、价格、排名等商品数据，与关键词反查分开管理。" :enabled="collectionKind === 'keywords' && !visible && !tasksVisible"><span>查竞品报告</span></FeatureGuide></template></el-tab-pane></el-tabs>
     <SellerspriteCompetitorPanel v-if="collectionKind==='competitors'" @busy="competitorBusy=$event" />
     <template v-else>
     <div class="sprite-config-hint"><el-tag size="small" effect="plain">美国站 US</el-tag><span>仅采集启用的ASIN · 保存后下一轮生效 · 停用保留历史和已领取任务的补传</span></div>
@@ -64,13 +64,17 @@
 <script setup>
 // 两类采集的配置容器：关键词与竞品独立页签，分别调用各自API。
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Search, Refresh, DataAnalysis, Picture, CopyDocument } from '@element-plus/icons-vue'
 import { addSellerspriteKeywordAsins, getSellerspriteKeywordAsins, updateSellerspriteKeywordAsin } from '@/services/api'
 import { spriteStates, spriteTime } from '@/utils/sellersprite'
 import SellerspriteKeywordTaskDialog from '@/components/SellerspriteKeywordTaskDialog.vue'
 import SellerspriteCompetitorPanel from '@/components/SellerspriteCompetitorPanel.vue'
-const collectionKind=ref('keywords'),competitorBusy=ref(false)
+import FeatureGuide from '@/components/FeatureGuide.vue'
+// 支持从绑定弹框直达竞品配置；未知参数仍落到原关键词页签。
+const route=useRoute()
+const collectionKind=ref(route.query.tab==='competitors'?'competitors':'keywords'),competitorBusy=ref(false)
 const tasksVisible=ref(false),tasksAsin=ref('')
 // 在独立弹框查看该ASIN的任务、失败原因和补救队列，不触发网页采集。
 function openTasks(row){tasksAsin.value=row.asin;tasksVisible.value=true}

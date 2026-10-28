@@ -343,6 +343,12 @@ const routes = [
     meta: { title: '关键词反查', componentName: 'KeywordReverseView' }
   },
   {
+    path: '/tools/competitor-data',
+    name: 'CompetitorData',
+    component: () => import('../views/CompetitorDataView.vue'),
+    meta: { title: '竞品数据', componentName: 'CompetitorDataView' }
+  },
+  {
     path: '/system/ui-config',
     name: 'UiConfig',
     component: () => import('../views/UiConfigView.vue'),
@@ -389,7 +395,7 @@ router.beforeEach(async (to, from, next) => {
   if ((to.path === '/tools/ai-operations' || to.path.startsWith('/tools/ai-operations/')) && !getUserPermissions().includes('ai_operations:manage')) {
     return next('/403')
   }
-  if (to.path === '/tools/keyword-reverse' && !getUserPermissions().includes('amazon_listings:page')) {
+  if (['/tools/keyword-reverse','/tools/competitor-data'].includes(to.path) && !getUserPermissions().includes('amazon_listings:page')) {
     return next('/403')
   }
   if (to.path === '/system/sellersprite' && !getUserPermissions().includes('system:sellersprite_config')) {

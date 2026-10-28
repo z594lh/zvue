@@ -36,6 +36,10 @@ export const getUiConfigHistory = (params) => api.get('/system/ui-config/history
 export const getSellerspriteKeywordListing = (sku, params) => api.get(`/amazon/listings/${encodeURIComponent(sku)}/sellersprite`, { params, timeout: 20000 });
 export const getKeywordReverse = (asin, params) => api.get(`/tools/keyword-reverse/${encodeURIComponent(asin)}`, { params, timeout: 20000 });
 export const getKeywordReverseOptions = (params) => api.get('/tools/keyword-reverse/options', { params, timeout: 20000 });
+// 竞品浏览只查询已采集的本地商品快照，与采集配置管理权限分开。
+export const getCompetitorData = params => api.get('/tools/competitor-data', { params, timeout: 20000 });
+export const getCompetitorDataOptions = params => api.get('/tools/competitor-data/options', { params, timeout: 15000 });
+export const getCompetitorDataHistory = (asin, params) => api.get(`/tools/competitor-data/${encodeURIComponent(asin)}/history`, { params, timeout: 15000 });
 export const getSellerspriteKeywordAsins = (params) => api.get('/system/sellersprite/asins', { params, timeout: 20000 });
 export const addSellerspriteKeywordAsins = (data) => api.post('/system/sellersprite/asins', data, { timeout: 20000 });
 export const updateSellerspriteKeywordAsin = (id, data) => api.put(`/system/sellersprite/asins/${id}`, data, { timeout: 20000 });
@@ -45,7 +49,6 @@ export const addSellerspriteCompetitorAsins = data => api.post('/system/sellersp
 export const updateSellerspriteCompetitorAsin = (id, data) => api.put(`/system/sellersprite/competitors/asins/${id}`, data);
 export const getSellerspriteCompetitorTasks = (asin, params) => api.get(`/system/sellersprite/competitors/tasks/${encodeURIComponent(asin)}`, { params });
 export const getSellerspriteCompetitorSnapshot = id => api.get(`/system/sellersprite/competitors/snapshots/${id}`);
-export const downloadSellerspriteCompetitorFile = id => api.get(`/system/sellersprite/competitors/files/${id}`, { responseType: 'blob' });
 // 任务历史只读；人工补救仅入队，不在浏览器启动网页采集。
 export const getSellerspriteKeywordTasks = (asin, params, manage = false) => api.get(manage ? `/system/sellersprite/tasks/${encodeURIComponent(asin)}` : `/tools/keyword-reverse/${encodeURIComponent(asin)}/tasks`, { params, timeout: 20000 });
 export const recoverSellerspriteKeywordTask = (id, data) => api.post(`/system/sellersprite/tasks/${id}/recover`, data, { timeout: 20000 });
