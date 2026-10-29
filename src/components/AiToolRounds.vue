@@ -4,10 +4,12 @@
     <section class="round-list" v-loading="loading">
       <div class="round-toolbar"><small>{{ info?.note || '展开后只读已保存的查询过程，不重新调用AI。' }}</small><div><el-button link @click="original(messageId,'当前关联消息原文')">关联消息原文</el-button><el-button link type="primary" :loading="loading" @click="load">刷新过程</el-button></div></div>
       <el-alert v-if="error" :title="error" type="error" :closable="false"/>
+      <p v-if="info?.budget_usage" class="empty">累计输入 {{ bytes(info.budget_usage.total_input_bytes) }} / 额度 {{ bytes(info.budget_usage.input_limit_bytes) }} · 最大单轮 {{ bytes(info.budget_usage.max_request_bytes) }} · 工具累计返回 {{ bytes(info.budget_usage.tool_result_bytes) }}。输入包含各轮重复携带；不是Token。</p><p v-else-if="info" class="empty">旧记录未保存精确上下文额度指标。</p>
       <el-alert v-if="info?.truncated" title="记录较多，仅展示部分；请查看原始记录核对完整过程。" type="warning" :closable="false"/>
       <p v-if="info && !info.list.length" class="empty">尚无模型请求记录；可能还在排队或资料准备阶段。</p>
       <article v-for="round in info?.list || []" :key="round.round" class="round-card">
         <header><strong>{{ round.has_request?`第 ${round.round} 轮`:'系统结束记录' }}</strong><time>{{ time(round.created_at) }} 北京时间</time></header>
+        <p v-if="round.budget?.next_request_bytes!=null" class="empty">本轮输入 {{ bytes(round.budget.next_request_bytes) }} · 累计 {{ bytes(round.budget.projected_total_bytes) }} · {{ {normal:'正常额度',warning:'第一阶段提醒',urgent:'第二阶段提醒'}[round.budget.stage] }}</p>
         <div class="round-speech"><small>AI公开回复</small><p :class="{clamped:!expanded[round.round]}">{{ round.text || (round.tools.length?'本轮未附加文字，直接请求了以下工具。':'本轮没有公开回复正文。') }}</p><el-button v-if="round.text.length>500" link type="primary" @click="expanded[round.round]=!expanded[round.round]">{{ expanded[round.round]?'收起':'展开回复' }}</el-button><el-button v-if="round.text_truncated" link type="primary" @click="original(round.response_id,'完整AI回复')">回复超过展示上限 · 查看完整原文</el-button></div>
         <el-alert v-if="round.error_code" :title="round.message || '本轮未完成，请查看原文'" type="warning" :closable="false"/>
         <div v-if="round.tools.length" class="round-tools"><small>实际调用的工具</small>
@@ -42,7 +44,7 @@ function number(value){return value==null?'未知':Number(value).toLocaleString(
 /** 工具字节只是返回体积，历史估算与实际测量分开，不冒充token。 */
 function bytes(value,estimated){return value==null?'数据量未记录':`${estimated?'约 ':''}${(value/1024).toFixed(1)} KB`}
 /** 只把真实工具状态翻译为中文，不认定计划校验等于执行成功。 */
-function status(value){return {provided:'已返回',validated:'方案校验通过',error:'查询/校验失败',too_large:'结果超限',unavailable:'没有可用资料',disabled:'工具已关闭',pending:'尚无返回',partial:'部分返回'}[value] || value}
+function status(value){return {provided:'已返回',validated:'方案校验通过',error:'查询/校验失败',too_large:'结果超限',budget_exceeded:'预算不足，正文未交付',empty:'没有匹配记录',unavailable:'资料不可用',disabled:'工具已关闭',pending:'尚无返回',partial:'部分返回'}[value] || value}
 /** 失败/缺失醒目区分，成功查询不意味着实际平台修改。 */
 function tone(value){return ['provided','validated'].includes(value)?'success':['error','too_large'].includes(value)?'danger':'info'}
 /** 销毁后使迟到请求失效，避免切换会话显示旧商品过程。 */

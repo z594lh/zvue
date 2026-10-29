@@ -105,7 +105,7 @@ import AiToolTable from './AiToolTable.vue'
 const props=defineProps({module:{type:Object,required:true},currency:{type:String,default:''},time:{type:Object,default:()=>({})},mode:{type:String,default:''}})
 const window=ref(''),selectedSku=ref(0),adKind=ref(''),metricGroup=ref('effect'),page=ref(1)
 const data=computed(()=>props.module.data),rows=computed(()=>Array.isArray(data.value?.rows)?data.value.rows:[])
-const state=computed(()=>moduleState(data.value)),failed=computed(()=>!data.value || !!data.value.error || ['error','failed','too_large','unavailable','disabled'].includes(data.value.status))
+const state=computed(()=>moduleState(data.value)),failed=computed(()=>!data.value || !!data.value.error || ['error','failed','too_large','budget_exceeded','empty','unavailable','disabled'].includes(data.value.status))
 const windows=computed(()=>actualWindows(rows.value)),businessRow=computed(()=>rows.value[selectedSku.value]),businessPeriod=computed(()=>periodAt(businessRow.value || {},window.value))
 const businessPeriods=computed(()=>matrixRows(businessRow.value?.periods).map(r=>({...r,coverage:businessRow.value.periods.coverage?.[r.window]})))
 const adKinds=computed(()=>[...new Set(rows.value.map(reportKind).filter(Boolean))]),adsRows=computed(()=>rows.value.filter(r=>!adKind.value || reportKind(r)===adKind.value))

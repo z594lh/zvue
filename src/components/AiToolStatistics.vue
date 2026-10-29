@@ -23,7 +23,7 @@ function num(value){return value==null?'未知':Number(value).toLocaleString()}
 /** 字节与token分别展示，避免误读成模型计费量。 */
 function size(value){return value>=1048576?`${(value/1048576).toFixed(2)} MB`:`${(value/1024).toFixed(1)} KB`}
 /** 汇总真实状态计数，方案校验通过不等于平台执行成功。 */
-function statuses(values){const labels={provided:'已返回',validated:'校验通过',error:'失败',too_large:'超限',unavailable:'无资料',pending:'无返回',partial:'部分返回',disabled:'已关闭'};return Object.entries(values).map(([key,count])=>`${labels[key] || key} ${count}`).join(' · ')}
+function statuses(values){const labels={provided:'已返回',validated:'校验通过',error:'失败',too_large:'超限',budget_exceeded:'预算不足未交付',empty:'无匹配记录',unavailable:'无资料',pending:'无返回',partial:'部分返回',disabled:'已关闭'};return Object.entries(values).map(([key,count])=>`${labels[key] || key} ${count}`).join(' · ')}
 /** 离页后不显示迟到统计结果。 */
 function stop(){active=false;revision++}
 onMounted(load);onBeforeUnmount(stop)

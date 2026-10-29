@@ -52,7 +52,7 @@ export function periodAt(row,window){return matrixRows(row.periods).find(p=>p.wi
 export function businessModules(tool,result){
   const titles={get_asin_overview:'商品与库存',read_business:'经营与利润',read_advertising:'广告表现',read_listing:'Listing文案',read_pricing:'售价与成本',simulate_price:'售价测算',read_keywords:'关键词流量',read_keyword_history:'关键词历史',read_observations:'往期改动与观察',read_current_settings:'当前可调整设置',read_operations:'操作日志',read_plan_history:'方案历史',read_chat_history:'历史问答'}
   if(!result || typeof result!=='object')return []
-  if(result.error || ['error','failed','too_large','unavailable','disabled'].includes(result.status))return [{key:'unavailable',title:titles[tool] || toolLabel(tool),tool,data:result,path:'result'}]
+  if(result.error || ['error','failed','too_large','budget_exceeded','empty','unavailable','disabled'].includes(result.status))return [{key:'unavailable',title:titles[tool] || toolLabel(tool),tool,data:result,path:'result'}]
   if(tool==='get_operation_overview'){
     const modules=[{key:'product',title:'商品与库存',tool:'get_asin_overview',data:{identity:result.identity,time:result.time,inventory:result.inventory,gaps:result.gaps},path:'identity / time / inventory'},
       {key:'ads',title:'广告表现',tool:'read_advertising',data:Array.isArray(result.advertising)?{rows:result.advertising,note:result.advertising_note}:result.advertising || {status:'unavailable',message:result.advertising_note || '本次未提供广告汇总'},path:'advertising'}]
@@ -67,7 +67,7 @@ export function businessModules(tool,result){
 /** 状态只陈述当前回包，不把空列表当作业务不存在或数据完整。 */
 export function moduleState(data){
   if(!data)return '本次未提供'
-  if(data.error || ['error','failed','too_large','unavailable','disabled'].includes(data.status))return dictionaryLabel('data.status',data.status,'查询失败 / 不可用')
+  if(data.error || ['error','failed','too_large','budget_exceeded','empty','unavailable','disabled'].includes(data.status))return dictionaryLabel('data.status',data.status,'查询失败 / 不可用')
   if(Array.isArray(data.rows) && !data.rows.length)return '已返回空列表'
   return '有返回'
 }
