@@ -1,19 +1,15 @@
 <template>
   <span ref="anchor" class="feature-guide-anchor" @click="dismiss">
-    <el-popover :visible="visible" :placement="placement" :width="280" popper-class="feature-guide-popover" :popper-options="popperOptions">
+    <FeatureGuidePopover :visible="visible" :placement="placement" :title="title" :description="description" :suppressed="suppressed" @suppress="suppress" @dismiss="dismiss">
       <template #reference><span class="feature-guide-trigger"><slot :visible="visible" /></span></template>
-      <div class="feature-guide-copy"><strong>{{ title }}</strong><p>{{ description }}</p></div>
-      <div class="feature-guide-actions">
-        <el-checkbox :model-value="suppressed" @change="suppress">不再提醒</el-checkbox>
-        <el-button text type="primary" size="small" @click="dismiss">知道了</el-button>
-      </div>
-    </el-popover>
+    </FeatureGuidePopover>
   </span>
 </template>
 
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import FeatureGuidePopover from './FeatureGuidePopover.vue'
 
 const props = defineProps({
   featureKey: { type: String, required: true },
@@ -26,7 +22,6 @@ const emit = defineEmits(['dismiss'])
 const anchor = ref(null), inView = ref(false), closed = ref(false), suppressed = ref(true), active = ref(true)
 const storageKey = `erp-feature-guide:${props.featureKey}`
 const visible = computed(() => props.enabled && active.value && inView.value && !closed.value && !suppressed.value)
-const popperOptions = { modifiers: [{ name: 'preventOverflow', options: { altAxis: true, tether: false, padding: 12 } }] }
 let observer
 
 /** 点击入口或“知道了”仅关闭本次引导，由页面记住以免翻页后重复提示。 */
@@ -60,6 +55,4 @@ onBeforeUnmount(() => { observer?.disconnect(); window.removeEventListener('stor
 
 <style scoped>
 .feature-guide-anchor,.feature-guide-trigger{display:inline-flex;align-items:center;vertical-align:middle}
-.feature-guide-copy strong{color:#303b4a;font-size:14px}.feature-guide-copy p{margin:8px 0 12px;font-size:12px;color:#7c8a9e;line-height:1.6}
-.feature-guide-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.feature-guide-actions :deep(.el-checkbox__label){font-size:12px}
 </style>

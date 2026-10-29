@@ -52,15 +52,10 @@
               <el-collapse-item name="selection">
                 <template #title>
                   <span class="sku-selection-title">勾选汇报 SKU</span><span class="sku-selection-count">已选 {{ editForm.selected_skus.length }}/10</span>
-                  <el-popover :visible="skuGuideVisible" placement="bottom-start" :width="300" popper-class="daily-sku-onboarding">
+                  <FeatureGuidePopover :visible="skuGuideVisible" :width="300" :suppressed="skuGuideDontRemind" title="先选好本次要汇报的 SKU" description="点击“展开选择”，查看系统推荐的重点 SKU，可按实际情况增删。勾选后，系统会自动生成对应的运营情况。" @suppress="value => skuGuideDontRemind = value" @dismiss="dismissSkuSelectionGuide">
                     <template #reference><span :class="['sku-selection-action', {'is-guided': skuGuideVisible}]">{{ skuSections.includes('selection') ? '收起' : '展开选择' }}<el-icon :class="{'is-open': skuSections.includes('selection')}"><ArrowRight /></el-icon></span></template>
-                    <div class="sku-onboarding-content" role="note">
-                      <strong>先选好本次要汇报的 SKU</strong>
-                      <p>点击“展开选择”，查看系统推荐的重点 SKU，可按实际情况增删。勾选后，系统会自动生成对应的运营情况。</p>
-                      <el-checkbox v-model="skuGuideDontRemind" class="sku-onboarding-optout">不再提醒</el-checkbox>
-                      <div class="sku-onboarding-actions"><el-button size="small" text @click.stop="dismissSkuSelectionGuide">知道了</el-button><el-button size="small" type="primary" @click.stop="openSkuSelection">展开选择</el-button></div>
-                    </div>
-                  </el-popover>
+                    <template #actions><el-button size="small" type="primary" @click.stop="openSkuSelection">展开选择</el-button></template>
+                  </FeatureGuidePopover>
                 </template>
             <div class="sku-picker-bar"><div class="inline-controls"><el-select v-model="category" @change="skuPage = 1" style="width:165px"><el-option label="全部负责 SKU" value="" /><el-option label="优先关注" value="attention" /><el-option label="经营下滑" value="decline" /><el-option label="表现改善" value="improved" /><el-option label="数据缺口" value="missing" /></el-select><el-input v-model="skuSearch" clearable placeholder="搜索 SKU / 产品中文名" :prefix-icon="Search" @input="skuPage = 1" /></div><el-button :icon="MagicStick" @click="useRecommended">采用系统推荐</el-button></div>
             <div class="selected-skus"><span>本次重点 {{ editForm.selected_skus.length }}/10</span><el-tag v-for="sku in editForm.selected_skus" :key="sku" closable @close="editForm.selected_skus = editForm.selected_skus.filter(x => x !== sku)">{{ nameFor(sku) }} · {{ sku }}</el-tag><span v-if="!editForm.selected_skus.length" class="muted">建议选 3～5 个，也可只汇报整体概况，不强求凑数。</span></div>
@@ -113,6 +108,7 @@ import { useOperationGuide } from '@/utils/operationGuide'
 import DailyReportOperations from '@/components/DailyReportOperations.vue'
 import { pageSelection, selectPage } from '@/utils/dailyBulkSelection'
 import TextChangeDiff from '@/components/TextChangeDiff.vue'
+import FeatureGuidePopover from '@/components/FeatureGuidePopover.vue'
 
 const config = ref({ shops: [], users: [], can_all: false, can_write: false, can_delete: false })
 // 首次进入默认展示填写说明，仍允许运营人员手动收起。
@@ -362,11 +358,6 @@ onMounted(async () => {
 .sku-selection-collapse :deep(.el-collapse-item__arrow){display:none}
 .sku-selection-collapse :deep(.el-collapse-item__content){padding-bottom:0}
 /* 首次引导悬浮在入口旁，不遮罩、不自动改变选择，也不占正文布局。 */
-:global(.daily-sku-onboarding.el-popper){background:#fffbeb;border-color:#f3d48a;box-shadow:0 5px 18px #7c570026}
-:global(.daily-sku-onboarding .el-popper__arrow::before){background:#fffbeb;border-color:#f3d48a}
-.sku-onboarding-content{font-size:13px;line-height:1.7;color:#785b25}.sku-onboarding-content strong{font-size:14px;color:#604716}
-.sku-onboarding-content p{margin:8px 0 12px}.sku-onboarding-actions{display:flex;justify-content:flex-end;gap:8px}
-.sku-onboarding-optout{height:24px;margin-bottom:8px}
 /* 标题与问号共用说明入口；不再占据正文空间，键盘聚焦仍有清晰边框。 */
 .sku-guide-trigger{display:inline-flex;align-items:center;gap:7px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:help;vertical-align:middle}
 .sku-guide-trigger .el-icon{font-size:13px;color:#8a9ab1}

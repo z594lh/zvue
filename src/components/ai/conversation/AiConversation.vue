@@ -52,7 +52,7 @@
         <footer class="chat-composer">
           <div class="worker-status"><span :class="{online:worker.online}">{{ worker.online?'● AI后台在线':'○ AI后台未在线' }}</span><small v-if="!worker.online">{{ worker.message || '请管理员部署独立AI会话消费者' }}</small><small v-if="worker.last_heartbeat_at">最近心跳 {{ time(worker.last_heartbeat_at) }}</small><small v-if="pendingTasks.length">{{ pendingTasks.length }} 个作业排队 / 处理中，关闭页面后继续</small></div>
           <div v-if="pendingTasks.length" class="shared-queue"><div v-for="task in pendingTasks" :key="task.id"><span>{{ task.task_type==='daily'?'每日优化':task.task_type==='execute'?'确认执行':task.chat_mode==='discussion'?'人工讨论':task.chat_mode==='proposal'?'生成方案':'人工对话' }} #{{ task.id }} · {{ taskName(task) }}</span><el-button link type="warning" @click="cancelTask(task)">{{ task.status==='queued'?'取消排队':'停止后续步骤' }}</el-button></div></div>
-          <div class="chat-mode"><el-radio-group v-model="chatMode" :disabled="!canCompose || sending || !!retryToken" size="small" @change="persistDraft"><el-radio-button value="discussion">讨论</el-radio-button><el-radio-button value="proposal">生成方案</el-radio-button></el-radio-group><el-tooltip content="两种模式都接续相同自然问答、自动摘要并按需查询ERP。讨论直接回答；生成方案还需提交通过校验的计划，允许零改动，确认后才执行。" placement="top"><span class="mode-help" tabindex="0">?</span></el-tooltip><small>{{ chatMode==='proposal'?'生成结构化计划，允许今日不改动；不会自动执行':'自然问答，不强制方案格式，不产生可执行计划' }}</small></div>
+          <div class="chat-mode"><FeatureGuide v-if="viewerId" :key="viewerId" :feature-key="`ai-chat-modes-v1:user:${viewerId}`" title="先讨论，需要计划时再生成方案" :description="'讨论：查资料、分析问题，直接给出回答。\n生成方案：分析后生成可确认执行的计划，也可以建议暂不改动。\n两种模式都能自主查资料、接续历史；生成方案不会自动执行。'" placement="top-start" :enabled="!loading && canCompose && !originalVisible && !memoryVisible"><el-radio-group v-model="chatMode" :disabled="!canCompose || sending || !!retryToken" size="small" @change="persistDraft"><el-radio-button value="discussion">讨论</el-radio-button><el-radio-button value="proposal">生成方案</el-radio-button></el-radio-group></FeatureGuide><el-radio-group v-else v-model="chatMode" disabled size="small"><el-radio-button value="discussion">讨论</el-radio-button><el-radio-button value="proposal">生成方案</el-radio-button></el-radio-group><el-tooltip content="两种模式都接续相同自然问答、自动摘要并按需查询ERP。讨论直接回答；生成方案还需提交通过校验的计划，允许零改动，确认后才执行。" placement="top"><span class="mode-help" tabindex="0">?</span></el-tooltip><small>{{ chatMode==='proposal'?'生成结构化计划，允许今日不改动；不会自动执行':'自然问答，不强制方案格式，不产生可执行计划' }}</small></div>
           <el-input v-model="draft" type="textarea" :rows="2" :maxlength="4000" :disabled="!canCompose || sending" :placeholder="session?.state==='archived'?'旧对话只读，请切换当前对话':chatMode==='proposal'?'说明优化目标，AI按需查数据并生成计划（允许不改动）':'输入问题，例如：昨天的标题为什么这样修改？Enter发送，Shift+Enter换行'" @input="persistDraft" @keydown="onKeydown" />
           <div class="composer-actions"><small>{{ session?.state==='archived'?'已归档，只能查看':'两种模式共用问答记忆和查询工具，可能多轮计费；历史超限另行摘要。人工计划须明确确认。' }}</small><el-button type="primary" :loading="sending" :disabled="!canSend" @click="send">{{ chatMode==='proposal'?'发送并生成方案':'发送' }}</el-button></div>
           <el-button v-if="retryToken" link type="warning" :disabled="sending" @click="retrySend">上次发送结果未知 · 用原标识核对（不重复登记）</el-button>
@@ -72,6 +72,7 @@ import { conversationTime } from '@/utils/aiOperationConversation'
 import { getProductConversations as getAiConversations, createProductConversation as createAiConversation } from '@/services/ai/workspace'
 import AiActionConfirmation from '@/components/AiActionConfirmation.vue'
 import AiToolRounds from '@/components/AiToolRounds.vue'
+import FeatureGuide from '@/components/FeatureGuide.vue'
 import { buildChatTimeline } from '@/utils/aiChatPresentation'
 const props=defineProps({product:{type:Object,required:true},initialSessionId:{type:String,default:''},initialPlanId:{type:String,default:''},initialQuestion:{type:String,default:''}})
 const loading=ref(false),creating=ref(false),messagesLoading=ref(false),error=ref(''),sessions=ref([]),selectedId=ref(''),currentId=ref(null),items=ref([]),moreSessions=ref(false),moreMessages=ref(false),expanded=ref({}),scroller=ref(null)
@@ -165,9 +166,9 @@ function download(){const url=URL.createObjectURL(new Blob([originalText.value],
 /** 按登录人、店铺、ASIN和会话隔离草稿；未知用户时只保留内存，不共用本地缓存。 */
 function draftKey(){return viewerId.value && selectedId.value?`ai-chat-draft:${viewerId.value}:${props.product.shop_id}:${props.product.asin}:${selectedId.value}`:null}
 /** 只保存文字草稿及尚待核对的原发送标识，刷新不自动发请求。 */
-function persistDraft(){try{const key=draftKey();if(key)localStorage.setItem(key,JSON.stringify({text:draft.value,mode:chatMode.value,retry:retryToken.value}))}catch{/* 浏览器不允许本地缓存时不影响服务端消息 */}}
+function persistDraft(){try{const key=draftKey();if(key)localStorage.setItem(key,JSON.stringify({text:draft.value,retry:retryToken.value}))}catch{/* 浏览器不允许本地缓存时不影响服务端消息 */}}
 /** 恢复当前范围草稿，不把另一个用户或会话的文字带进来。 */
-function restoreDraft(){try{const key=draftKey();const value=key?JSON.parse(localStorage.getItem(key) || 'null'):null;draft.value=value?.text || '';chatMode.value=['discussion','proposal'].includes(value?.mode)?value.mode:'discussion';retryToken.value=value?.retry || null}catch{draft.value='';chatMode.value='discussion';retryToken.value=null}}
+function restoreDraft(){chatMode.value='discussion';try{const key=draftKey();const value=key?JSON.parse(localStorage.getItem(key) || 'null'):null;draft.value=value?.text || '';retryToken.value=value?.retry || null}catch{draft.value='';retryToken.value=null}}
 /** 区分中文输入法确认与真正Enter，Shift+Enter保持换行。 */
 function onKeydown(event){if(event.key==='Enter' && !event.shiftKey && !event.isComposing && event.keyCode!==229){event.preventDefault();send()}}
 /** 新问题先由用户确认可能计费，不接受聊天文字代替平台修改授权。 */

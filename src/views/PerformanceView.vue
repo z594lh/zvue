@@ -28,15 +28,10 @@
       <el-table-column label="负责人" width="320" fixed="left"><template #default="{row}"><div class="performance-owner-analysis">
         <div class="workbench-owner"><span class="workbench-avatar">{{ row.account_type==='ai'?'AI':(row.owner_name || '?').slice(0,1) }}</span><span class="performance-owner-name" :title="row.owner_name">{{ row.owner_name || (row.owner_user_id ? `用户 ${row.owner_user_id}` : '未分配负责人') }}</span><el-tag v-if="row.account_type==='ai'" size="small" effect="plain">AI运营</el-tag></div>
         <div class="performance-analysis-actions">
-          <el-popover :visible="analysisGuideShown(row)" placement="bottom-start" :width="320" popper-class="performance-config-onboarding">
+          <FeatureGuidePopover :visible="analysisGuideShown(row)" :width="320" :suppressed="analysisGuideDontRemind" title="先设置你要关注的 SKU 和指标" description="点击齿轮 配置你需要关注的SKU和指标。后续每次点击分析数据就只会展示你关注的SKU和指标，当然，随时可以修改配置" @suppress="value => analysisGuideDontRemind = value" @dismiss="dismissAnalysisGuide">
             <template #reference><span><el-tooltip :disabled="analysisGuideShown(row)" :content="canAnalyze(row) ? '分析配置：选择关注 SKU 和指标' : '需要本人或全员 SKU 经营分析权限，授权后刷新页面'" placement="top"><span><el-button size="small" plain circle :icon="Setting" :class="{'analysis-config-guided': analysisGuideShown(row)}" :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="分析配置" @click="openAnalysisConfig(row)" /></span></el-tooltip></span></template>
-            <div class="analysis-onboarding-content" role="note">
-              <strong>先设置你要关注的 SKU 和指标</strong>
-              <p>点击齿轮 配置你需要关注的SKU和指标。后续每次点击分析数据就只会展示你关注的SKU和指标，当然，随时可以修改配置</p>
-              <el-checkbox v-model="analysisGuideDontRemind" class="analysis-onboarding-optout">不再提醒</el-checkbox>
-              <div class="analysis-onboarding-actions"><el-button size="small" text @click="dismissAnalysisGuide">知道了</el-button><el-button size="small" type="primary" @click="openAnalysisConfig(row)">去配置</el-button></div>
-            </div>
-          </el-popover>
+            <template #actions><el-button size="small" type="primary" @click="openAnalysisConfig(row)">去配置</el-button></template>
+          </FeatureGuidePopover>
           <el-button-group><el-button size="small" plain :icon="DataAnalysis" :disabled="loading || !loadedParams || !canAnalyze(row)" @click="openAnalysis(row, 1)">分析数据</el-button>
             <el-dropdown trigger="hover" :disabled="loading || !loadedParams || !canAnalyze(row)" @command="days => openAnalysis(row, days)"><el-button size="small" plain :disabled="loading || !loadedParams || !canAnalyze(row)" aria-label="选择分析周期"><el-icon><ArrowDown /></el-icon></el-button>
               <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="days in [3,7,14,30]" :key="days" :command="days">最近 {{ days }} 天 · 对比前 {{ days }} 天</el-dropdown-item></el-dropdown-menu></template>
@@ -78,6 +73,7 @@ import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue
 import { useRoute } from 'vue-router'
 import { ArrowDown, Calendar, DataAnalysis, Search, Setting, Document, QuestionFilled } from '@element-plus/icons-vue'
 import PerformanceSkuDetails from '@/components/PerformanceSkuDetails.vue'
+import FeatureGuidePopover from '@/components/FeatureGuidePopover.vue'
 import PerformanceOwnerDaily from '@/components/PerformanceOwnerDaily.vue'
 import PerformanceTrendChart from '@/components/PerformanceTrendChart.vue'
 import PerformanceSkuAnalysis from '@/components/PerformanceSkuAnalysis.vue'
@@ -206,9 +202,4 @@ onMounted(async () => {
 .performance-analysis-actions .el-button-group { display:inline-flex; align-items:center; }
 .performance-analysis-actions :deep(.el-dropdown .el-button) { border-left:0; border-top-left-radius:0; border-bottom-left-radius:0; }
 .analysis-config-guided{background:#eaf2ff;color:#2563eb;border-color:#93b4ec;box-shadow:0 0 0 2px #bfdbfe}
-:global(.performance-config-onboarding.el-popper){background:#fffbeb;border-color:#f3d48a;box-shadow:0 5px 18px #7c570026}
-:global(.performance-config-onboarding .el-popper__arrow::before){background:#fffbeb;border-color:#f3d48a}
-.analysis-onboarding-content{font-size:13px;line-height:1.7;color:#785b25}.analysis-onboarding-content strong{font-size:14px;color:#604716}
-.analysis-onboarding-content p{margin:8px 0 12px}.analysis-onboarding-optout{height:24px;margin-bottom:8px}
-.analysis-onboarding-actions{display:flex;justify-content:flex-end;gap:8px}
 </style>
