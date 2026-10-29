@@ -378,6 +378,8 @@ const fetchData = async () => {
       if (res.data.status === 'success') {
         let list = res.data.data.list || []
         list = list.filter(item => autoExpressions.includes(item.resolved_expression))
+          // 固定紧密、宽泛、同类、关联顺序，不按曝光、花费等指标排列。
+          .sort((a, b) => autoExpressions.indexOf(a.resolved_expression) - autoExpressions.indexOf(b.resolved_expression))
           .map(item => ({ ...item, resolved_expression_label: item.resolved_expression_label || expressionMap[item.resolved_expression] || item.resolved_expression }))
         tableData.value = list.map(item => ({ ...item, _editing: false, _editBid: item.bid, _selected: false, _loading: false, _saving: false, state: (item.state || '').toUpperCase() }))
         total.value = tableData.value.length

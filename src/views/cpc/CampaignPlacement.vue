@@ -106,6 +106,12 @@ const placementCodeMap = {
 }
 
 const placementLabel = (val) => placementMap[val] || val || '--'
+// 固定业务顺序，兼容报表名称和API代码，不随表现指标或接口返回顺序变化。
+const placementOrder = ['PLACEMENT_TOP', 'PLACEMENT_REST_OF_SEARCH', 'PLACEMENT_PRODUCT_PAGE', 'PLACEMENT_OFF_AMAZON']
+const placementRank = (value) => {
+  const index = placementOrder.indexOf(placementCodeMap[value] || value)
+  return index < 0 ? placementOrder.length : index
+}
 
 let fetchGeneration = 0
 const fetchData = async () => {
@@ -125,7 +131,8 @@ const fetchData = async () => {
     if (version !== fetchGeneration || placeRes.data.status !== 'success') return false
     if (placeRes.data.status === 'success') {
       const data = placeRes.data.data
-      tableData.value = Array.isArray(data) ? data : (data?.list || [])
+      tableData.value = [...(Array.isArray(data) ? data : (data?.list || []))]
+        .sort((a, b) => placementRank(a.placement) - placementRank(b.placement))
     }
     if (version !== fetchGeneration || campRes.data.status !== 'success') return false
     if (campRes.data.status === 'success') {
