@@ -309,30 +309,35 @@ const routes = [
     component: () => import('../views/SellerspriteConfigView.vue'),
     meta: { title: '卖家精灵ASIN配置', componentName: 'SellerspriteConfigView' }
   },
+  {path:'/ai/chat',name:'AiChat',component:()=>import('../views/ai/AiChatView.vue'),meta:{title:'AI对话',componentName:'AiChatView',aiPermission:'ai_chat:use'}},
   {
-    path: '/tools/ai-operations',
+    path: '/ai/operations',
+    alias: '/tools/ai-operations',
     name: 'AiOperations',
-    component: () => import('../views/AiOperationsView.vue'),
-      meta: { title: 'AI托管 · ASIN列表', componentName: 'AiOperationsView' }
+    component: () => import('../views/ai/AiOperationsView.vue'),
+      meta: { title: 'AI托管 · ASIN列表', componentName: 'AiOperationsView', aiPermission:'ai_operations:manage' }
   },
   {
-    path: '/tools/ai-operations/prompts',
+    path: '/ai/prompts',
+    alias: '/tools/ai-operations/prompts',
     name: 'AiPromptManagement',
-    component: () => import('../views/AiPromptManagement.vue'),
-    meta: { title: 'AI托管 · 提示词管理', componentName: 'AiPromptManagement' }
+    component: () => import('../views/ai/AiPromptManagement.vue'),
+    meta: { title: 'AI · 提示词管理', componentName: 'AiPromptManagement', aiPermission:'ai_prompts:manage' }
   },
   {
-    path: '/tools/ai-operations/tools',
+    path: '/ai/tools',
+    alias: '/tools/ai-operations/tools',
     name: 'AiToolManagement',
-    component: () => import('../views/AiToolManagement.vue'),
-    meta: { title: 'AI托管 · 工具管理', componentName: 'AiToolManagement' }
+    component: () => import('../views/ai/AiToolManagement.vue'),
+    meta: { title: 'AI · 工具管理', componentName: 'AiToolManagement', aiPermission:'ai_tools:manage' }
   },
   {
-    path: '/tools/ai-operations/tools/:toolName/preview',
+    path: '/ai/tools/:toolName/preview',
+    alias: '/tools/ai-operations/tools/:toolName/preview',
     name: 'AiToolPreview',
-    component: () => import('../views/AiToolPreview.vue'),
+    component: () => import('../views/ai/AiToolPreview.vue'),
     props: true,
-    meta: { title: 'AI工具 · 数据预览', componentName: 'AiToolPreview' },
+    meta: { title: 'AI工具 · 数据预览', componentName: 'AiToolPreview', aiPermission:'ai_tools:manage' },
     // 工具代码只定位白名单工具，Nav页签名称使用共享字典的中文名称。
     beforeEnter(to){to.meta.title='AI工具 · '+dictionaryLabel('ai.tool',to.params.toolName,'数据预览')}
   },
@@ -392,7 +397,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // 2. 权限检查（从 /api/menus 缓存中动态查找 permission_code）
-  if ((to.path === '/tools/ai-operations' || to.path.startsWith('/tools/ai-operations/')) && !getUserPermissions().includes('ai_operations:manage')) {
+  if (to.meta.aiPermission && !getUserPermissions().includes(to.meta.aiPermission)) {
     return next('/403')
   }
   if (to.path === '/tools/competitor-data' && !getUserPermissions().includes('competitor_data:view')) {

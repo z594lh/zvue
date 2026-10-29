@@ -1,7 +1,7 @@
 <template>
   <section class="managed-chat" v-loading="loading">
     <header class="chat-top">
-      <div><strong>{{ product.product_name || '托管商品' }} · {{ product.asin }}</strong><small>{{ product.shop_name || '' }} · 所有获授AI托管权限的运营人员共享此对话</small></div>
+      <div><strong>{{ product.product_name || '商品' }} · {{ product.asin }}</strong><small>{{ product.shop_name || '' }} · 具有该商品AI数据权限的运营人员共享此对话</small></div>
       <div><el-button :disabled="loading || creating" @click="refresh">刷新</el-button><el-button type="primary" :loading="creating" :disabled="loading || sending || pendingTasks.length>0" @click="createNew">＋ 新对话</el-button></div>
     </header>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
@@ -29,7 +29,7 @@
                   <p v-if="item.error_note" class="reply-warning">{{ item.error_note }}</p>
                   <div v-if="item.task && !item.task.legacy && item.role==='user' && item.task.status!=='completed'" class="human-task-state"><el-tag size="small" :type="taskType(item.task.status)">{{ taskName(item.task) }}</el-tag><span>{{ item.task.message }}</span><el-button v-if="!terminal(item.task.status)" link type="warning" @click="cancelTask(item.task)">{{ item.task.status==='queued'?'取消排队':'停止后续分析' }}</el-button></div>
                   <el-button v-if="item.role==='user' && item.event_type==='user_message' && item.task?.status==='failed' && item.task.error_code==='invalid_output'" link type="primary" :disabled="!canCompose || !worker.online || sending || !!retryToken" @click="regenerate(item)">重新分析（新请求，可能计费）</el-button>
-                  <details v-if="item.task?.status==='completed' && item.task.result?.type==='propose_plan' && item.task.result.response_message_id===item.id" class="plan-details"><summary>本次优化计划 · 查看 / 确认执行</summary><AiActionConfirmation :task="item.task" :viewer-id="viewerId" :current="session?.state==='active' && selectedId===currentId" :enabled="!!product.enabled" :worker-online="!!worker.online" @updated="poll" /></details>
+                  <details v-if="item.task?.status==='completed' && item.task.result?.type==='propose_plan' && item.task.result.response_message_id===item.id" class="plan-details"><summary>本次优化计划 · 查看 / 确认执行</summary><AiActionConfirmation :task="item.task" :viewer-id="viewerId" :current="session?.state==='active' && selectedId===currentId && !!capabilities.confirm_execution" :enabled="!!product.enabled" :worker-online="!!worker.online" @updated="poll" /></details>
                   <AiToolRounds v-if="item.nativeTrace" :session-id="selectedId" :message-id="item.id" :version="`${item.records.at(-1)?.id}:${item.task?.status}`" @original="readOriginal"/>
 
                   <details v-if="!item.legacy && item.records.length" class="message-inspector"><summary>上下文与原始 JSON<small>（{{ item.records.length }} 条原始记录）</small></summary><section v-for="record in item.records" :key="record.id" class="audit-record"><header><strong>{{ record.title }}</strong><time>{{ time(record.created_at) }} 北京时间</time></header><details v-if="record.text" class="record-content"><summary>展开完整提问／记录正文</summary><div class="technical-content">{{ record.text }}</div></details><p v-if="record.interaction" class="attachment-note">配置 {{ record.interaction.version_id?'#'+record.interaction.version_id:'系统初始版' }} · {{ record.delivery_note }}</p><small v-if="record.usage" class="message-usage">输入 {{ record.usage.prompt_tokens ?? '未知' }} / 输出 {{ record.usage.completion_tokens ?? '未知' }} token<template v-if="record.usage.prompt_cache_hit_tokens!=null"> · 缓存命中 {{ record.usage.prompt_cache_hit_tokens }}</template></small><button v-if="record.has_original!==false" class="message-file" @click="readOriginal(record)"><span>JSON</span><strong>{{ record.attachment_name }}</strong><small>查看完整请求、上下文与原始记录 ↗</small></button></section></details>
@@ -57,12 +57,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { getAiConversations, getAiConversationMessages, getAiConversationOriginal, createAiConversation, sendAiConversationMessage, getAiChatTask, cancelAiChatTask, getAiConversationMemory, getAiPrompts } from '@/services/api'
+import { getAiConversationMessages, getAiConversationOriginal, sendAiConversationMessage, getAiChatTask, cancelAiChatTask, getAiConversationMemory } from '@/services/api'
 import { conversationTime } from '@/utils/aiOperationConversation'
+import { getProductConversations as getAiConversations, createProductConversation as createAiConversation } from '@/services/ai/workspace'
 import AiActionConfirmation from '@/components/AiActionConfirmation.vue'
 import AiToolRounds from '@/components/AiToolRounds.vue'
 import { buildChatTimeline } from '@/utils/aiChatPresentation'
-const props=defineProps({product:{type:Object,required:true},initialSessionId:{type:String,default:''},initialPlanId:{type:String,default:''}})
+const props=defineProps({product:{type:Object,required:true},initialSessionId:{type:String,default:''},initialPlanId:{type:String,default:''},initialQuestion:{type:String,default:''}})
 const loading=ref(false),creating=ref(false),messagesLoading=ref(false),error=ref(''),sessions=ref([]),selectedId=ref(''),currentId=ref(null),items=ref([]),moreSessions=ref(false),moreMessages=ref(false),expanded=ref({}),scroller=ref(null)
 const originalVisible=ref(false),originalLoading=ref(false),originalTitle=ref(''),originalText=ref('')
 const downloadName=ref('原始消息.json')
@@ -74,7 +75,7 @@ const chatMode=ref('discussion')
 const memoryVisible=ref(false),memoryLoading=ref(false),memoryInfo=ref(null),memoryError=ref('')
 const canCompose=computed(()=>capabilities.value.human_chat && session.value?.state==='active' && selectedId.value===currentId.value)
 const canSend=computed(()=>canCompose.value && worker.value.online && draft.value.trim() && !sending.value && !retryToken.value)
-let active=true,messageRevision=0,originalRevision=0
+let active=true,messageRevision=0,originalRevision=0,entryPrepared=false
 let timer=null,polling=false
 const time=conversationTime
 /** 统一按北京时间分组，不用服务器日期或浏览器本地时区。 */
@@ -89,7 +90,7 @@ async function loadSessions(older=false){
   persistDraft();viewerId.value=data.data.viewer_id || '';worker.value=data.data.worker || {online:false};capabilities.value=data.data.capabilities || {};restoreDraft()
 }
 /** 选择不同会话时使上一会话未返回的读取失效。 */
-async function select(id){persistDraft();memoryVisible.value=false;memoryInfo.value=null;selectedId.value=id;items.value=[];expanded.value={};pendingTasks.value=[];newMessages.value=false;retryToken.value=null;restoreDraft();await loadMessages()}
+async function select(id){persistDraft();memoryVisible.value=false;memoryInfo.value=null;selectedId.value=id;items.value=[];expanded.value={};pendingTasks.value=[];newMessages.value=false;retryToken.value=null;restoreDraft();if(!entryPrepared && props.initialQuestion){if(!draft.value)draft.value=props.initialQuestion;entryPrepared=true}await loadMessages()}
 /** 分页读取消息，并在向上加载时保留用户原来的阅读位置。 */
 async function loadMessages(older=false){
   if(!selectedId.value)return
@@ -171,7 +172,8 @@ async function retrySummary(){
   const sid=selectedId.value,attempt=memoryInfo.value?.last_attempt,input=draft.value
   if(!attempt || !canCompose.value || !worker.value.online || retryToken.value || sending.value)return
   let text=input.trim()
-  if(!text){try{const {data}=await getAiPrompts();text=data.data.config.prompts.summary_retry_question}catch(e){if(active && selectedId.value===sid)memoryError.value=failure(e);return}}
+  if(!text)text=memoryInfo.value?.retry_question || ''
+  if(!text)return
   if(!active || selectedId.value!==sid || draft.value!==input)return
   try{await ElMessageBox.confirm('原摘要请求可能已计费。将登记新的讨论问题并重新请求摘要，不执行Amazon修改。问题：'+text,'重新生成会话摘要',{confirmButtonText:'确认重新请求（可能计费）',cancelButtonText:'取消',type:'warning'})}catch{return}
   if(!active || selectedId.value!==sid || draft.value!==input || !canCompose.value || retryToken.value || sending.value)return

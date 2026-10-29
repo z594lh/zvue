@@ -2,7 +2,7 @@
   <section class="tool-browser">
     <details class="query-configuration" :open="!output"><summary>商品、数据来源与查询条件{{ output?'（点击更换）':'' }}</summary>
     <p class="readonly-note">只读核对工具返回 · 不调用DeepSeek、不生成方案、不修改Amazon，不写入会话记忆。</p>
-    <div class="browser-field"><label>选择托管商品 <small>店铺、账户、站点随商品绑定</small></label><el-select v-model="managedId" filterable remote :remote-method="searchManaged" :loading="managedLoading" placeholder="输入ASIN、SKU或中文名搜索" @change="loadSources"><el-option v-for="item in managed" :key="item.id" :value="item.id" :label="`${item.product_name || item.asin} · ${item.asin} · ${item.shop_name}`"/></el-select><small>每次显示前20个匹配项；未找到时请输入完整ASIN搜索。</small></div>
+    <div class="browser-field"><el-select v-model="managedFilter" @change="filterProducts"><el-option value="all" label="全部商品"/><el-option value="yes" label="已托管"/><el-option value="no" label="未托管"/></el-select><label>选择商品 <small>店铺、账户、站点随商品绑定</small></label><el-select v-model="managedId" filterable remote :remote-method="searchManaged" :loading="managedLoading" placeholder="输入ASIN、SKU或中文名搜索" @change="loadSources"><el-option v-for="item in managed" :key="item.id" :value="item.id" :label="`${item.product_name || item.asin} · ${item.asin} · ${item.shop_name}`"/></el-select><small>每次显示前20个匹配项；未找到时请输入完整ASIN搜索。</small></div>
     <el-radio-group v-model="mode" class="source-modes" @change="clearResult"><el-radio-button value="actual">AI实际收到的数据</el-radio-button><el-radio-button value="snapshot">用原任务资料试查</el-radio-button><el-radio-button value="current">用当前ERP资料试查</el-radio-button></el-radio-group>
     <div v-loading="sourceLoading" class="source-panel">
       <template v-if="mode==='snapshot'"><label>选择原任务资料 <small>固定同一次数据，翻页不会漂移</small></label><el-select v-model="archiveKey" placeholder="请选择冻结资料" :disabled="!managedId" @change="clearResult"><el-option v-for="row in sources.archives" :key="`${row.kind}:${row.id}`" :value="`${row.kind}:${row.id}`" :label="`${row.kind==='plan'?'方案':'问答任务'} #${row.id} · 截止 ${row.report_date} · ${time(row.created_at)}`"/></el-select><p v-if="managedId && !sourceLoading && !sources.archives.length" class="browser-hint">尚无可用冻结资料。可以切换“当前本地资料试查”，无需先付费调用AI。</p></template>
@@ -23,7 +23,8 @@
 </template>
 <script setup>
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue'
-import { getAiManagedAsins,getAiToolSources,previewAiTool } from '@/services/api'
+import { getAiToolSources,previewAiTool } from '@/services/api'
+import { getAiProducts } from '@/services/ai/workspace'
 import { pretty } from '@/utils/aiToolData'
 import { conversationTime } from '@/utils/aiOperationConversation'
 import { dictionaryLabel } from '@/utils/businessDictionary'
@@ -32,7 +33,7 @@ import AiToolResult from './AiToolResult.vue'
 const props=defineProps({tool:{type:Object,required:true}})
 const emit=defineEmits(['context-change'])
 const managed=ref([]),managedId=ref(''),managedLoading=ref(false),sourceLoading=ref(false),sources=ref({archives:[],calls:[]}),archiveKey=ref(''),callKey=ref(''),mode=ref('actual'),reading=ref(false),error=ref(''),output=ref(null)
-const selectedManaged=ref(null)
+const selectedManaged=ref(null),managedFilter=ref('all')
 const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1)
 const reportDate=ref(`${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`)
 const query=ref({ref:'',window:'all',offset:0,limit:1000}),price=ref({sku:'',selling_price:'11.99',ad_rate:'0.15',refund_rate:'0.03'})
@@ -55,7 +56,8 @@ function removeQuery(index){if(bundleRows.value.length>1){bundleRows.value.splic
 /** 换来源或参数后立即清除旧结果，迟到响应不能显示到新商品。 */
 function clearResult(){readVersion++;output.value=null;error.value='';reading.value=false}
 /** 按关键词查询前20个托管项，不默认静默漏掉后续商品。 */
-async function searchManaged(keyword=''){const v=++managedVersion;managedLoading.value=true;try{const {data}=await getAiManagedAsins({keyword,page:1});if(active && v===managedVersion)managed.value=data.data.list}catch(e){if(active && v===managedVersion)error.value=e.response?.data?.message || '托管商品读取失败'}finally{if(active && v===managedVersion)managedLoading.value=false}}
+function filterProducts(){managedId.value='';loadSources();searchManaged()}
+async function searchManaged(keyword=''){const v=++managedVersion;managedLoading.value=true;try{const {data}=await getAiProducts({q:keyword,managed:managedFilter.value,purpose:'tools'});if(active && v===managedVersion)managed.value=data.data.list}catch(e){if(active && v===managedVersion)error.value=e.response?.data?.message || '商品读取失败'}finally{if(active && v===managedVersion)managedLoading.value=false}}
 /** 商品变化后核对可用冻结资料和真实调用；只获取目录，不自动试查。 */
 async function loadSources(){
   selectedManaged.value=managed.value.find(m=>m.id===managedId.value) || null
@@ -64,7 +66,7 @@ async function loadSources(){
   if(!managedId.value)return
   sourceLoading.value=true
   try{
-    const {data}=await getAiToolSources(props.tool.name,{managed_id:managedId.value})
+    const {data}=await getAiToolSources(props.tool.name,{product_id:managedId.value})
     if(!active || v!==sourceVersion)return
     sources.value=data.data
     if(data.data.suggested_report_end)reportDate.value=data.data.suggested_report_end
@@ -78,7 +80,7 @@ async function read(){
   if(!canRead.value)return
   const v=++readVersion;reading.value=true;error.value='';output.value=null
   try{
-    let body={managed_id:managedId.value,mode:mode.value}
+    let body={product_id:managedId.value,mode:mode.value}
     if(mode.value==='actual'){
       const c=sources.value.calls.find(c=>`${c.message_id}:${c.call_id}`===callKey.value)
       body={...body,message_id:c.message_id,call_id:c.call_id}

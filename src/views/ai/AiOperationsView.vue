@@ -1,6 +1,6 @@
 <template>
   <main class="managed-workbench">
-    <header class="managed-heading"><div><span class="eyebrow">AI STORE MANAGEMENT</span><h1>托管 ASIN</h1><p>自然语言交流，AI按需查询ERP，形成计划与连续观察。</p></div><div class="heading-actions"><el-tag type="warning" effect="plain">DeepSeek真实分析 · Amazon正式执行</el-tag><el-button :disabled="!canAssign" @click="router.push('/tools/ai-operations/prompts')">提示词管理</el-button><el-button :disabled="!canAssign" @click="router.push('/tools/ai-operations/tools')">AI工具管理</el-button><el-button type="primary" :disabled="!canAssign" :title="canAssign?'预约ASIN全部子SKU给AI运营':'需要AI托管权限'" @click="showAdd">＋ 添加托管ASIN</el-button></div></header>
+    <header class="managed-heading"><div><span class="eyebrow">AI STORE MANAGEMENT</span><h1>托管 ASIN</h1><p>自然语言交流，AI按需查询ERP，形成计划与连续观察。</p></div><div class="heading-actions"><el-tag type="warning" effect="plain">DeepSeek真实分析 · Amazon正式执行</el-tag><el-button type="primary" :disabled="!canAssign" :title="canAssign?'预约ASIN全部子SKU给AI运营':'需要AI托管权限'" @click="showAdd">＋ 添加托管ASIN</el-button></div></header>
     <section class="schedule-card"><div class="schedule-clock">18:30 <small>北京时间 · 每日</small></div><div><strong>自然任务 → 工具查询 → 优化计划 → 每日自动执行 / 人工确认执行</strong><p>同ASIN统一排队；问答历史超限时另行压缩摘要。DeepSeek按实际调用计费；工具过程仅本次分析使用，不重复加入下次聊天。</p></div></section>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <section class="managed-card">
@@ -23,7 +23,7 @@
       <el-empty v-if="!loading && !rows.length" description="尚无托管商品，添加ASIN后可开始真实AI分析与正式执行" />
       <div class="managed-footer"><span>共 {{ total }} 个托管ASIN · 开启/恢复会预约全部子SKU给AI；15:00前变更次日生效，15:00起后天生效。暂停仅停止任务，不自动交回人工。</span><el-pagination v-if="total>20" v-model:current-page="page" :page-size="20" :total="total" layout="prev, pager, next" @current-change="load(false)" /></div>
     </section>
-    <el-dialog v-model="chatVisible" title="ASIN · AI运营对话" width="92vw" top="3vh" :fullscreen="!wideScreen" append-to-body destroy-on-close :close-on-click-modal="false" class="ai-shared-chat-dialog"><AiManagedConversation v-if="chatVisible && chatTarget" :product="chatTarget" :initial-session-id="chatSessionId" :initial-plan-id="chatPlanId" /></el-dialog>
+    <AiConversationDialog ref="chatDialog"/>
     <el-dialog v-if="selected" v-model="historyVisible" title="统一优化历史" width="min(1280px, calc(100% - 28px))" top="5vh" append-to-body class="ai-managed-history" :close-on-click-modal="false" @closed="closeHistory">
     <section class="daily-history">
       <div class="managed-heading"><div><span class="eyebrow">OPTIMIZATION HISTORY</span><h2>{{ selected.product_name || selected.asin }} · 统一优化历史</h2><p>{{ selected.asin }} · 每日自动优化、人工方案及其执行结果；普通讨论不列入，多批确认不重复计为多个方案。</p></div><el-button :loading="historyLoading" @click="loadHistory">刷新优化历史</el-button></div>
@@ -58,17 +58,17 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Clock, VideoPlay, QuestionFilled, ChatDotRound } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import AiOperationDetail from '@/components/AiOperationDetail.vue'
-import AiManagedConversation from '@/components/AiManagedConversation.vue'
+import AiConversationDialog from '@/components/ai/conversation/AiConversationDialog.vue'
 import { getUserPermissions, getAiOperationsOptions, getAiManagedAsins, addAiManagedAsin, updateAiManagedAsin, getAiManagedRuns, runAiManagedAsin } from '@/services/api.js'
 const router=useRouter(),userCodes=getUserPermissions(),canViewAll=userCodes.includes('performance:view_all'),canAssign=userCodes.includes('ai_operations:manage')
 /** 跳到同店铺、同AI人员的绩效筛选，不更改绩效数据或重新分析。 */
 function viewPerformance(row){router.push({path:'/performance',query:{shop_id:String(row.shop_id),user_id:String(row.executor_user_id)}})}
 const wideScreen=ref(window.innerWidth>700)
-const chatVisible=ref(false),chatTarget=ref(null),chatSessionId=ref(''),chatPlanId=ref('')
+const chatDialog=ref(null)
 /** 从托管行独立打开跨日对话，不触发AI或每日流程。 */
-function openChat(row){chatTarget.value=row;chatSessionId.value='';chatPlanId.value='';chatVisible.value=true}
+function openChat(row){chatDialog.value?.open({shop_id:row.shop_id,asin:row.asin})}
 /** 从每日详情定位原会话与方案，关闭旧弹框避免三层滚动。 */
-function openLinkedChat(info){const row=rows.value.find(r=>String(r.id)===String(info.managed_id)) || selected.value;if(!row)return;openChat(row);chatSessionId.value=String(info.conversation_id);chatPlanId.value=String(info.plan_id);detailVisible.value=false;historyVisible.value=false}
+function openLinkedChat(info){const row=rows.value.find(r=>String(r.id)===String(info.managed_id)) || selected.value;if(!row)return;chatDialog.value?.open({shop_id:row.shop_id,asin:row.asin},{sessionId:String(info.conversation_id),planId:String(info.plan_id)});detailVisible.value=false;historyVisible.value=false}
 /** 配套归属与启停操作收进菜单，仍使用原权限和提示。 */
 function moreAction(command,row){if(command==='sync')syncOwner(row);else if(command==='toggle')toggle(row)}
 /** 跟随窗口宽度切换列表固定操作列，不改变弹框的当前记录。 */
@@ -161,7 +161,7 @@ async function initialize(){
   await load()
 }
 /** 离开页签时关闭所有弹框，使未完成请求失效。 */
-function stop(){active=false;revision++;historyRevision++;optionRevision++;loading.value=false;historyLoading.value=false;optionsLoading.value=false;detailVisible.value=false;historyVisible.value=false;addVisible.value=false;chatVisible.value=false}
+function stop(){active=false;revision++;historyRevision++;optionRevision++;loading.value=false;historyLoading.value=false;optionsLoading.value=false;detailVisible.value=false;historyVisible.value=false;addVisible.value=false}
 /** 首次挂载绑定尺寸变化并初始化列表。 */
 function mount(){window.addEventListener('resize',resize);initialize()}
 /** 销毁时释放窗口监听器，避免页签重复注册。 */

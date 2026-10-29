@@ -1,6 +1,6 @@
 <template>
   <main class="prompt-page" v-loading="loading">
-    <header><div><small>AI OPERATIONS · PROMPTS</small><h1>提示词管理</h1><p>维护ERP给AI的固定要求、任务额度与阶段提醒。修改后发布，仅影响新任务。</p></div><nav><el-button @click="router.push('/tools/ai-operations')">返回托管ASIN</el-button><el-button @click="router.push('/tools/ai-operations/tools')">AI工具管理</el-button></nav></header>
+    <header><div><small>AI OPERATIONS · PROMPTS</small><h1>提示词管理</h1><p>维护ERP给AI的固定要求、任务额度与阶段提醒。修改后发布，仅影响新任务。</p></div><nav><el-button @click="router.push('/ai/operations')">返回托管ASIN</el-button><el-button @click="router.push('/ai/tools')">AI工具管理</el-button></nav></header>
     <el-alert v-if="error" :title="error" type="error" :closable="false"/>
     <section v-if="config" class="prompt-guide"><strong>{{ versionId?'生效版本 #'+versionId:'系统默认版 · 尚未人工发布' }} <el-tag v-if="dirty" type="warning" size="small">有未发布编辑</el-tag></strong><p>{{ note }}</p><p>两种模式的资料查询、历史问答和摘要相同。讨论直接自然回答；生成方案最终需校验结构化计划，允许零改动，人工确认后才执行。</p><p>历史只续传自然问题、AI最终回答及其压缩摘要；工具结果只在本任务中使用，分析过程默认折叠。超过30组或60KB会额外请求DeepSeek压缩较早问答，近期原话保留。</p><p v-if="legacy">旧格式草稿/版本仍保留，本页不会将其恢复成旧资料首包。</p></section>
     <div v-if="config" class="prompt-toolbar"><el-button :disabled="saving" @click="refresh">刷新配置</el-button><el-button :disabled="saving" @click="showVersions">发布历史</el-button><el-button :disabled="saving" @click="showPreview">免费请求预览</el-button><el-button type="primary" :loading="saving" :disabled="!dirty" @click="publish">保存并生效</el-button></div>

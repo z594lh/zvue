@@ -1,6 +1,6 @@
 <template>
   <main class="ai-tool-preview-page" v-loading="loading">
-    <header class="preview-page-header"><el-button @click="router.push('/tools/ai-operations/tools')">← 返回工具目录</el-button><div><h1>{{ tool?.label || '工具数据预览' }}</h1><p>{{ context || '保留系统导航与页签，只读核对工具实际返回的数据。' }}</p></div><el-tag type="info" effect="plain">只读 · 不调用AI</el-tag></header>
+    <header class="preview-page-header"><el-button @click="router.push('/ai/tools')">← 返回工具目录</el-button><div><h1>{{ tool?.label || '工具数据预览' }}</h1><p>{{ context || '保留系统导航与页签，只读核对工具实际返回的数据。' }}</p></div><el-tag type="info" effect="plain">只读 · 不调用AI</el-tag></header>
     <el-alert v-if="error" :title="error" type="error" :closable="false"/>
     <AiToolDataBrowser v-if="tool" :key="tool.name" :tool="tool" @context-change="context=$event"/>
     <el-empty v-else-if="!loading && !error" description="该工具不存在或不是可预览的查询工具，请返回工具目录选择。"/>

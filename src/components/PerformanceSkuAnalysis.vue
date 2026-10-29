@@ -120,9 +120,8 @@
             <div class="analysis-tools-guide">
               <h4>选择适合你的分析方式</h4>
               <p><strong>下载数据文件</strong><br>整理该 SKU 的经营与自动广告数据，生成 Markdown 文件。下载后，可将文件交给你常用的免费 AI 工具分析。</p>
-              <p><strong>AI 分析</strong><br>直接调用 DeepSeek API，自动生成经营诊断和具体调整建议，在系统内查看或下载结果。{{ aiCostHint }}</p>
-              <p><strong>查看分析结果</strong><br>点击打开最近一次可查看的分析；悬浮右侧菜单可进入历史列表。成功结果保存在数据库，刷新页面后仍可查看。</p>
-              <p class="analysis-tools-note">两种方式使用相同资料：最近 3 天逐日及 7 / 15 / 30 天汇总，以表格截止日为准，不随上方展示周期改变。查看、下载已有结果不再调用 API。</p>
+              <p><strong>AI对话</strong><br>打开ASIN对话，按需查询经营资料，可继续讨论或生成方案。发送才计费。</p>
+              <p class="analysis-tools-note">下载文件使用固定历史窗口；AI对话按问题查询资料，所选周期会准备到问题草稿中。实际查询范围可展开分析过程核对。</p>
               <p class="analysis-tools-note">请使用公司允许的 AI 工具处理业务数据；广告调整仍由你确认后操作。</p>
             </div>
           </el-popover>
@@ -133,15 +132,7 @@
             <span><el-button size="small" plain :icon="Download" :loading="exportingSku === row.seller_sku"
               :disabled="!canExport || dataLoading || !!exportingSku" @click="downloadMarkdown(row)">下载数据文件</el-button></span>
           </el-tooltip>
-          <el-tooltip :content="canAi ? `由 DeepSeek API 生成一份新的经营建议并保存历史。${aiCostHint}` : '需要 SKU AI经营分析及广告资料导出权限，授权后刷新页面。'" placement="top">
-            <span class="analysis-ai-action"><el-button size="small" type="primary" plain :icon="MagicStick" :loading="aiLoading && aiBusySku === row.seller_sku"
-              :disabled="!canAi || dataLoading || !!aiBusySku || !!aiReadSku || !!exportingSku" @click="startAIAnalysis(row)">AI 分析</el-button></span>
-          </el-tooltip>
-          <el-dropdown split-button size="small" :icon="View" trigger="hover" class="analysis-view-action"
-            :disabled="!canAi || dataLoading || !!aiBusySku || !!aiReadSku" @click="readAIResult(row)" @command="openAIHistory(row)">
-            查看分析结果
-            <template #dropdown><el-dropdown-menu><el-dropdown-item command="history" :icon="Clock">查看历史</el-dropdown-item></el-dropdown-menu></template>
-          </el-dropdown>
+          <el-tooltip content="进入ASIN共享对话，按需查询资料；打开不计费，发送才分析。" placement="top"><span><el-button size="small" type="primary" plain :icon="ChatDotRound" :disabled="!canAi || dataLoading" @click="openChat(row)">AI对话</el-button></span></el-tooltip>
           </div>
         </template>
       </el-table-column>
@@ -153,86 +144,18 @@
     <template #footer><el-button @click="dataVisible = false">关闭</el-button></template>
   </el-dialog>
 
-  <el-dialog v-model="historyVisible" :title="`${historyMeta.product_name || historyMeta.seller_sku || ''} · 历史分析记录`" width="min(1180px, 96vw)" class="ownership-dialog sku-analysis-dialog" top="5vh" @close="invalidateHistory">
-    <div class="analysis-history-heading"><span class="workbench-sku">{{ historyMeta.seller_sku }}</span><span>按生成时间倒序 · 仅展示当前权限可查看的记录 · 点击一行查看详情</span></div>
-    <el-alert v-if="historyError" :title="historyError" type="error" :closable="false" show-icon />
-    <el-table v-loading="historyLoading" :data="historyResult.list" class="workbench-table analysis-history-table" stripe max-height="520" @row-click="openHistoryRecord">
-      <el-table-column prop="id" label="记录 ID" width="90" />
-      <el-table-column label="生成时间（本地）" width="180"><template #default="{ row }">{{ historyTime(row.generated_at) }}</template></el-table-column>
-      <el-table-column prop="report_date" label="报表截止日" width="115" />
-      <el-table-column label="操作人" width="110"><template #default="{ row }">{{ row.created_by_name || `用户 ${row.created_by}` }}</template></el-table-column>
-      <el-table-column label="可信度" width="90"><template #default="{ row }"><el-tag :type="confidenceType[row.confidence]" size="small" effect="light">{{ confidenceLabel[row.confidence] }}</el-tag></template></el-table-column>
-      <el-table-column label="分析结论" min-width="300"><template #default="{ row }"><div class="analysis-history-summary">{{ simplifyAdTerms(row.summary) }}</div></template></el-table-column>
-      <el-table-column label="详情" width="90" fixed="right" align="center"><template #default="{ row }"><el-button size="small" plain :icon="View" :disabled="!!aiReadSku" @click.stop="openHistoryRecord(row)">查看</el-button></template></el-table-column>
-      <template #empty><el-empty :description="historyLoading ? '正在读取分析记录…' : historyError ? '读取未完成，请查看提示' : '暂无历史分析，点击“AI 分析”生成第一份建议'" :image-size="65" /></template>
-    </el-table>
-    <div class="analysis-result-footer"><span>查看历史不调用 AI；历史竞价及建议为生成时快照，仅用于复盘。</span>
-      <el-pagination v-model:current-page="historyPage" v-model:page-size="historyPageSize" :page-sizes="[10, 20, 50]" :total="historyResult.total" :disabled="historyLoading" layout="total,sizes,prev,pager,next" @current-change="loadHistory" @size-change="resizeHistory" />
-    </div>
-    <template #footer><el-button @click="historyVisible = false">关闭</el-button></template>
-  </el-dialog>
-
-  <el-dialog v-model="aiVisible" :title="`${aiMeta.product_name || aiMeta.seller_sku || ''} · AI 经营建议`" width="min(1180px, 96vw)" class="ownership-dialog sku-analysis-dialog analysis-ai-dialog"
-    top="4vh" :close-on-click-modal="false" @close="closeAIResult">
-    <template #header="{ titleId, titleClass }"><div class="analysis-ai-titlebar">
-      <span :id="titleId" :class="titleClass">{{ aiMeta.product_name || aiMeta.seller_sku || '' }} · AI 经营建议</span>
-      <el-dropdown trigger="click" :disabled="!aiResult || aiLoading" @command="downloadAIResult">
-        <el-button size="small" plain :icon="Download" :disabled="!aiResult || aiLoading">下载 AI 分析文档<el-icon class="analysis-download-arrow"><ArrowDown /></el-icon></el-button>
-        <template #dropdown><el-dropdown-menu><el-dropdown-item command="md">Markdown（.md）</el-dropdown-item><el-dropdown-item command="txt">纯文本（.txt）</el-dropdown-item></el-dropdown-menu></template>
-      </el-dropdown>
-    </div></template>
-    <div class="analysis-ai-heading">
-      <div><span class="workbench-sku">{{ aiMeta.seller_sku }}</span><span class="analysis-ai-date">截止 {{ aiMeta.report_date }}</span></div>
-      <el-tag v-if="aiResult" :type="confidenceType[aiResult.analysis.confidence]" effect="light">结论可信度：{{ confidenceLabel[aiResult.analysis.confidence] }}</el-tag>
-    </div>
-    <el-alert title="AI 提供经营建议，不自动修改广告。成功结果会保存到历史记录，也可下载留存；历史报价为生成时快照，请勿当作当前设置直接执行。" type="info" :closable="false" show-icon />
-    <el-alert v-if="aiResult?.history_warning" :title="aiResult.history_warning" type="warning" :closable="false" show-icon />
-    <div v-if="aiLoading" class="analysis-ai-loading"><el-icon class="is-loading"><Loading /></el-icon><h3>{{ aiReading ? '正在读取分析结果' : '正在分析经营数据与自动广告' }}</h3><p>{{ aiReading ? '读取已保存的结果，不调用 AI。' : '最近 3 天逐日 · 7 / 15 / 30 天汇总，请稍候，无需重复提交。' }}</p></div>
-    <el-alert v-if="aiError" :title="aiError" type="error" :closable="false" show-icon />
-    <div v-if="aiResult" class="analysis-ai-content">
-      <section class="analysis-ai-summary"><div class="analysis-ai-section-title"><el-icon><MagicStick /></el-icon><h3>核心结论</h3></div><p>{{ aiResult.analysis.summary }}</p>
-        <div class="analysis-ai-meta">{{ aiResult.model }} · 生成时间（UTC）：{{ aiResult.generated_at }}<span v-if="aiResult.history_id"> · 记录 {{ aiResult.history_id }}</span><span v-if="aiResult.usage?.total_tokens != null"> · 本次 {{ aiResult.usage.total_tokens.toLocaleString() }} tokens</span></div>
-      </section>
-      <section v-if="aiResult.analysis.diagnostics.length"><div class="analysis-ai-section-title"><el-icon><DataAnalysis /></el-icon><h3>诊断与依据</h3></div>
-        <el-collapse v-model="expandedDiagnostics" class="analysis-ai-diagnostics"><el-collapse-item v-for="(item, index) in aiResult.analysis.diagnostics" :key="index" :name="index" :title="item.title"><p>{{ item.judgment }}</p><ul><li v-for="(evidence, i) in item.evidence" :key="i">{{ evidence }}</li></ul></el-collapse-item></el-collapse>
-      </section>
-      <section><div class="analysis-ai-section-title"><el-icon><DataAnalysis /></el-icon><h3>具体竞价试验方案</h3><span>人工审核 · 不自动调价</span></div>
-        <h4 class="analysis-bid-subtitle">定向竞价调整</h4>
-        <el-table v-if="aiResult.analysis.bid_adjustments?.length" :data="aiResult.analysis.bid_adjustments" class="workbench-table analysis-bid-table" stripe>
-          <el-table-column label="作用对象" min-width="215"><template #default="{ row }"><strong>{{ row.target_name }}</strong><div class="analysis-previous">活动 {{ row.campaign_id }}<br>广告组 {{ row.ad_group_id }}<br>定向 {{ row.target_id }}</div></template></el-table-column>
-          <el-table-column label="当前竞价" width="100" align="right"><template #default="{ row }">${{ formatValue(row.current_bid, 'money') }}</template></el-table-column>
-          <el-table-column label="建议试验价" width="110" align="right"><template #default="{ row }"><strong>${{ formatValue(row.suggested_bid, 'money') }}</strong><div class="analysis-previous">{{ row.change_percent > 0 ? '+' : '' }}{{ row.change_percent }}%</div></template></el-table-column>
-          <el-table-column prop="reason" label="依据 / 共享影响" min-width="260" />
-          <el-table-column label="复查 / 停止条件" min-width="250"><template #default="{ row }"><div>{{ row.review_window }}</div><div class="analysis-bid-stop">{{ row.stop_condition }}</div></template></el-table-column>
-        </el-table>
-        <p v-else class="analysis-no-adjustment">本次没有可核实的定向改价建议，不代表必须调整。</p>
-        <h4 class="analysis-bid-subtitle">广告位加价比例调整</h4>
-        <p class="analysis-placement-hint">比例作用于整个活动及其所有 SKU；0% 为无额外加价，不是停投。请避免同时大幅修改基础竞价和广告位比例。</p>
-        <el-table v-if="aiResult.analysis.placement_adjustments?.length" :data="aiResult.analysis.placement_adjustments" class="workbench-table analysis-bid-table analysis-placement-table" stripe>
-          <el-table-column label="活动 / 广告位" min-width="215"><template #default="{ row }"><strong>{{ row.placement_name || placementLabel[row.placement] || row.placement }}</strong><div class="analysis-previous">活动 {{ row.campaign_id }}</div></template></el-table-column>
-          <el-table-column label="当前加价" width="100" align="right"><template #default="{ row }">{{ row.current_percentage }}%</template></el-table-column>
-          <el-table-column label="建议比例" width="130" align="right"><template #default="{ row }"><strong>{{ row.suggested_percentage }}%</strong><div class="analysis-previous">{{ row.change_points > 0 ? '+' : '' }}{{ row.change_points }} 个百分点</div></template></el-table-column>
-          <el-table-column prop="reason" label="依据 / 活动共享影响" min-width="260" />
-          <el-table-column label="复查 / 停止条件" min-width="250"><template #default="{ row }"><div>{{ row.review_window }}</div><div class="analysis-bid-stop">{{ row.stop_condition }}</div></template></el-table-column>
-        </el-table>
-        <p v-else class="analysis-no-adjustment">本次没有可核实的广告位比例建议；资料或样本不足时保持观察。</p>
-      </section>
-      <section v-if="aiBriefNotes" class="analysis-ai-notes"><div class="analysis-ai-section-title"><el-icon><WarningFilled /></el-icon><h3>简短补充</h3></div><p>{{ aiBriefNotes }}</p></section>
-    </div>
-    <template #footer><span class="analysis-ai-footer-note">查看和下载已有结果无需重新分析；需要更新建议时，可点击“重新分析”。</span>
-      <el-button v-if="aiResult || aiError" :icon="MagicStick" :disabled="!!aiBusySku || !canAi || !dataVisible" @click="startAIAnalysis(aiMeta, true)">重新分析</el-button><el-button @click="aiVisible = false">关闭</el-button>
-    </template>
-  </el-dialog>
+  <AiConversationDialog ref="chatDialog"/>
 </template>
 
 <script setup>
 import { computed, nextTick, onDeactivated, onUnmounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Bottom, Check, Clock, DataAnalysis, Download, Loading, MagicStick, Plus, QuestionFilled, Rank, Search, Setting, Top, View, WarningFilled } from '@element-plus/icons-vue'
-import { analyzePerformanceSkuWithAI, exportPerformanceAnalysisMarkdown, getPerformanceAIHistory, getPerformanceAIHistoryResult, getLatestPerformanceAIResult, getPerformanceAnalysisCandidates, getPerformanceAnalysisConfig, getPerformanceAnalysisData, savePerformanceAnalysisConfig } from '@/services/api.js'
+import { ElMessage } from 'element-plus'
+import { Bottom, Check, DataAnalysis, Download, Plus, QuestionFilled, Rank, Search, Setting, Top, ChatDotRound } from '@element-plus/icons-vue'
+import { exportPerformanceAnalysisMarkdown, getPerformanceAnalysisCandidates, getPerformanceAnalysisConfig, getPerformanceAnalysisData, savePerformanceAnalysisConfig } from '@/services/api.js'
+import AiConversationDialog from '@/components/ai/conversation/AiConversationDialog.vue'
 import { performanceColorGuide, performanceMetricAttrs } from '@/utils/performanceMetricTone.js'
 
-const analysisProps = defineProps({ canExport: { type: Boolean, default: false }, canAi: { type: Boolean, default: false } })
+defineProps({ canExport: { type: Boolean, default: false }, canAi: { type: Boolean, default: false } })
 
 // 两个弹框共享负责人/店铺上下文，但各自有请求序号；关闭/切人后旧响应不能覆写新结果。
 const base = ref({}), ownerName = ref(''), context = ref(null)
@@ -245,37 +168,13 @@ const dataVisible = ref(false), dataLoading = ref(false), dataError = ref(''), d
 const dataSearch = ref(''), page = ref(1), pageSize = ref(20), sortBy = ref('seller_sku'), sortOrder = ref('asc'), tableKey = ref(0)
 const changeMetric = ref(''), changeDirection = ref('')
 const exportingSku = ref('')
-const aiVisible = ref(false), aiLoading = ref(false), aiError = ref(''), aiResult = ref(null), aiMeta = ref({}), aiBusySku = ref('')
-const aiReading = ref(false), aiReadSku = ref(''), historyVisible = ref(false), historyLoading = ref(false), historyError = ref(''), historyMeta = ref({})
-const historyResult = ref({ list: [], total: 0 }), historyPage = ref(1), historyPageSize = ref(20)
-const expandedDiagnostics = ref([])
-const confidenceLabel = { high: '高', medium: '中', low: '低' }, confidenceType = { high: 'success', medium: 'warning', low: 'info' }
-const placementLabel = { PLACEMENT_TOP: '搜索结果顶部（首页）', PLACEMENT_REST_OF_SEARCH: '搜索结果其余位置', PLACEMENT_PRODUCT_PAGE: '商品页面' }
-// 费用由用户提供为参考值，非计价配置；不会改变API实际计费或自动发起报销。
-const aiCostHint = '单次约 ¥0.05，费用后续按公司流程报销；实际费用随数据量略有变化。'
-// 仅保留简短后续说明；关键资料缺口/服务端移除警告必须可见，不能因精简而隐藏。
-const aiBriefNotes = computed(() => {
-  const result = aiResult.value?.analysis
-  if (!result) return ''
-  const note = result.brief_notes || (result.action_plan || []).slice(0, 1).map(item => `${item.action}；${item.monitor}；${item.stop_condition}`).join('')
-  return [...new Set([note, ...(result.data_gaps || [])].filter(Boolean))].join('；')
-})
+const chatDialog=ref(null)
+const openChat = row => chatDialog.value?.open({...base.value,seller_sku:row.seller_sku,entry:'performance',report_date:dataResult.value?.report_date,days:period.value})
 const periods = [1, 3, 7, 14, 30]
-let contextVersion = 0, configVersion = 0, candidateVersion = 0, dataVersion = 0, exportVersion = 0, aiVersion = 0, aiReadVersion = 0, historyVersion = 0, candidateTimer = null, tagObserver = null
+let contextVersion = 0, configVersion = 0, candidateVersion = 0, dataVersion = 0, exportVersion = 0, candidateTimer = null, tagObserver = null
 const errorMessage = err => err.response?.data?.message || err.message || '操作失败'
 /** 简化广告说明的展示术语；兼容旧接口/历史文案，不改变字段、数字或统计规则。 */
 const simplifyAdTerms = value => String(value ?? '').replace(/广告归因/g, '广告').replace(/归因销售额/g, '广告销售额').replace(/归因订单数/g, '广告订单数').replace(/归因回补/g, '数据补充').replace(/归因修订/g, '数据更新').replace(/归因延迟/g, '数据延迟').replace(/归因成熟/g, '数据稳定').replace(/归因窗口/g, '统计窗口').replace(/归因/g, '统计')
-/** 仅复制转换AI说明字段，保留原始历史、身份/名称、建议数值与其他结构不变。 */
-const simplifyAIResult = result => {
-  const textFields = new Set(['summary', 'title', 'judgment', 'evidence', 'reason', 'review_window', 'stop_condition', 'brief_notes', 'data_gaps', 'action', 'monitor', 'risk', 'success_criteria', 'target_or_signal'])
-  const copy = (value, key) => {
-    if (typeof value === 'string') return textFields.has(key) ? simplifyAdTerms(value) : value
-    if (Array.isArray(value)) return value.map(item => copy(item, key))
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([field, item]) => [field, copy(item, field)]))
-    return value
-  }
-  return { ...result, analysis: copy(result.analysis), history_warning: simplifyAdTerms(result.history_warning) }
-}
 const metricLabel = key => allMetrics.value.find(item => item.key === key)?.label || key
 const displayMetrics = computed(() => metricKeys.value.map(key => allMetrics.value.find(item => item.key === key)).filter(Boolean))
 const analysisColorGuide = `${performanceColorGuide}\n本期缺日报时，仅展示灰色已记录小计，暂不判断状态；其他绝对金额不设置统一颜色门槛。`
@@ -318,9 +217,8 @@ const invalidateConfig = () => {
   clearTimeout(candidateTimer); tagObserver?.disconnect(); tagObserver = null
 }
 const invalidateData = () => {
-  dataVersion++; exportVersion++; aiVersion++; dataLoading.value = false; exportingSku.value = ''
-  closeAIResult(); aiLoading.value = false; aiError.value = ''; aiResult.value = null
-  historyVisible.value = false; invalidateHistory()
+  dataVersion++; exportVersion++; dataLoading.value = false; exportingSku.value = ''
+
   // 不能清掉仍在途的收费请求状态；关闭窗口不等于服务器取消，直到finally完成才允许再提交。
 }
 const close = () => { contextVersion++; invalidateConfig(); invalidateData(); configVisible.value = false; dataVisible.value = false }
@@ -517,155 +415,6 @@ const downloadMarkdown = async row => {
   }
 }
 
-/** 关闭结果弹框使在途只读请求失效；不取消已发送的生成请求或删除数据库记录。 */
-const closeAIResult = () => {
-  aiVisible.value = false; aiReadVersion++; aiReadSku.value = ''
-  if (aiReading.value) { aiLoading.value = false; aiReading.value = false }
-}
-
-/** 服务端存UTC，历史列表按浏览器本地时间展示；保留原始生成时间供结果下载核查。 */
-const historyTime = value => {
-  if (!value) return '—'
-  const raw = String(value).replace(' ', 'T'), date = new Date(/Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
-}
-
-/** 点击主按钮读取最近可查看记录；历史行传入ID读取快照，不传展示周期/配置版本。 */
-const readAIResult = async (row, recordId = null) => {
-  if (!analysisProps.canAi || aiBusySku.value || aiReadSku.value || !dataVisible.value) return
-  // 存储故障的降级结果只保留当前窗口，允许重新打开下载；不伪装成数据库历史。
-  if (recordId === null && aiResult.value?.history_saved === false && aiResult.value.seller_sku === row.seller_sku) {
-    aiMeta.value = { ...row, report_date: aiResult.value.report_date }; aiError.value = ''; expandedDiagnostics.value = []; aiVisible.value = true; return
-  }
-  const current = contextVersion, requestId = ++aiReadVersion
-  const params = { ...base.value, seller_sku: row.seller_sku }
-  aiMeta.value = { ...row }; aiResult.value = null; aiError.value = ''; expandedDiagnostics.value = []
-  aiReadSku.value = row.seller_sku; aiReading.value = true; aiLoading.value = true; aiVisible.value = true
-  try {
-    const response = recordId === null ? await getLatestPerformanceAIResult(params) : await getPerformanceAIHistoryResult(recordId, params)
-    if (current !== contextVersion || requestId !== aiReadVersion || !dataVisible.value) return
-    aiResult.value = simplifyAIResult(response.data.data)
-    aiMeta.value = { seller_sku: aiResult.value.seller_sku, product_name: aiResult.value.product_name || row.product_name, report_date: aiResult.value.report_date }
-  } catch (err) {
-    if (current !== contextVersion || requestId !== aiReadVersion) return
-    if (err.response?.status === 404) { closeAIResult(); ElMessage.info(errorMessage(err)) }
-    else aiError.value = errorMessage(err)
-  } finally {
-    if (current === contextVersion && requestId === aiReadVersion) { aiReadSku.value = ''; aiReading.value = false; aiLoading.value = false }
-  }
-}
-
-/** 关闭/切换上下文后丢弃旧列表响应；历史仅做服务端分页，不加载全部结果JSON。 */
-const invalidateHistory = () => { historyVersion++; historyLoading.value = false }
-const loadHistory = async () => {
-  if (!historyVisible.value || !dataVisible.value) return
-  const current = contextVersion, requestId = ++historyVersion
-  historyLoading.value = true; historyError.value = ''
-  try {
-    const response = await getPerformanceAIHistory({ ...base.value, seller_sku: historyMeta.value.seller_sku, page: historyPage.value, page_size: historyPageSize.value })
-    if (current !== contextVersion || requestId !== historyVersion || !historyVisible.value) return
-    historyResult.value = response.data.data
-  } catch (err) {
-    if (current === contextVersion && requestId === historyVersion) { historyError.value = errorMessage(err); historyResult.value = { list: [], total: 0 } }
-  } finally {
-    if (current === contextVersion && requestId === historyVersion) historyLoading.value = false
-  }
-}
-const openAIHistory = row => {
-  if (!analysisProps.canAi || aiBusySku.value || aiReadSku.value) return
-  historyMeta.value = { seller_sku: row.seller_sku, product_name: row.product_name }
-  historyPage.value = 1; historyResult.value = { list: [], total: 0 }; historyVisible.value = true; loadHistory()
-}
-const resizeHistory = () => { historyPage.value = 1; loadHistory() }
-const openHistoryRecord = row => { if (!historyLoading.value) readAIResult(historyMeta.value, row.id) }
-
-/** 将当前已生成的AI结果导出为Markdown/纯文本；不下载输入资料、不发请求、不重新计费。
- * 折叠诊断导出时保留全部依据。Markdown对模型文本转义，避免名称/建议变成图片或HTML。
- * 旧结果兼容缺省新字段；只导出当前精简版内容，不恢复被删除的长篇行动卡片。
- */
-const downloadAIResult = extension => {
-  if (!aiResult.value || aiLoading.value || !['md', 'txt'].includes(extension)) return
-  const result = aiResult.value, analysis = result.analysis, markdown = extension === 'md', lines = []
-  const text = value => {
-    const raw = String(value ?? '—').replace(/\r\n?/g, '\n')
-    return markdown ? raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&') : raw
-  }
-  const heading = (value, level = 2) => lines.push(`${markdown ? '#'.repeat(level) + ' ' : ''}${text(value)}`, '')
-  const paragraph = value => lines.push(text(value), '')
-  const table = (headers, rows) => {
-    // TXT采用标签化记录，长中文说明不会因制表符/换行错列；Markdown保留可阅读表格。
-    if (!markdown) {
-      rows.forEach(row => { row.forEach((value, index) => lines.push(`${headers[index]}：${text(value)}`)); lines.push('') })
-      return
-    }
-    const rowLine = row => `| ${row.map(value => text(value).replace(/\n/g, '<br>')).join(' | ')} |`
-    lines.push(rowLine(headers), `| ${headers.map(() => '---').join(' | ')} |`, ...rows.map(rowLine), '')
-  }
-  heading(`${aiMeta.value.product_name || aiMeta.value.seller_sku} · AI 经营建议`, 1)
-  paragraph(`SKU：${aiMeta.value.seller_sku}；报表截止日：${aiMeta.value.report_date}；结论可信度：${confidenceLabel[analysis.confidence]}`)
-  paragraph(`模型：${result.model}；生成时间（UTC）：${result.generated_at}`)
-  if (result.history_id) paragraph(`历史记录 ID：${result.history_id}`)
-  paragraph('AI 建议仅供人工审核，不自动修改广告；以下为已生成结果，下载不再次调用 AI。')
-  heading('核心结论'); paragraph(analysis.summary)
-  if (analysis.diagnostics?.length) {
-    heading('诊断与依据')
-    analysis.diagnostics.forEach(item => {
-      heading(item.title, 3); paragraph(item.judgment)
-      item.evidence.forEach(value => lines.push(`${markdown ? '- ' : '依据：'}${text(value)}`)); lines.push('')
-    })
-  }
-  heading('具体竞价试验方案')
-  heading('定向竞价调整', 3)
-  if (analysis.bid_adjustments?.length) table(['活动 / 广告组 / 定向', '当前竞价', '建议试验价', '变化', '依据 / 共享影响', '复查', '停止条件'],
-    analysis.bid_adjustments.map(row => [`${row.campaign_id} / ${row.ad_group_id} / ${row.target_name}（${row.target_id}）`, `$${formatValue(row.current_bid, 'money')}`, `$${formatValue(row.suggested_bid, 'money')}`, `${row.change_percent > 0 ? '+' : ''}${row.change_percent}%`, row.reason, row.review_window, row.stop_condition]))
-  else paragraph('本次没有可核实的定向改价建议，不代表必须调整。')
-  heading('广告位加价比例调整', 3)
-  paragraph('比例作用于整个活动及所有 SKU；0% 为无额外加价，不是停投。避免同时大幅修改基础竞价和广告位比例。')
-  if (analysis.placement_adjustments?.length) table(['活动 / 广告位', '当前加价', '建议比例', '变化', '依据 / 活动共享影响', '复查', '停止条件'],
-    analysis.placement_adjustments.map(row => [`${row.campaign_id} / ${row.placement_name || placementLabel[row.placement] || row.placement}`, `${row.current_percentage}%`, `${row.suggested_percentage}%`, `${row.change_points > 0 ? '+' : ''}${row.change_points} 个百分点`, row.reason, row.review_window, row.stop_condition]))
-  else paragraph('本次没有可核实的广告位比例建议；资料或样本不足时保持观察。')
-  if (aiBriefNotes.value) { heading('简短补充'); paragraph(aiBriefNotes.value) }
-  const blob = new Blob([lines.join('\n')], { type: `${markdown ? 'text/markdown' : 'text/plain'};charset=utf-8` })
-  const url = URL.createObjectURL(blob), link = document.createElement('a')
-  const sku = String(aiMeta.value.seller_sku || 'SKU').replace(/[^\w.-]/g, '_').slice(0, 100)
-  link.href = url; link.download = `${sku}_AI经营建议_截至${aiMeta.value.report_date}${result.history_id ? `_记录${result.history_id}` : ''}.${extension}`
-  document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000)
-  ElMessage.success('AI 分析文档已保存，可随时查看')
-}
-
-/** 人工确认才发送收费POST，资料在服务端生成，不上传名称/原文/任意模型。
- * 每次生成均需确认，成功结果由服务端持久化；查看入口独立GET，不再隐式依赖内存缓存。
- * 全程阻止二次点击，关闭/切人后旧结果不可覆写或弹回，新请求不自动重试。
- */
-const startAIAnalysis = async (row, force = false) => {
-  if (!analysisProps.canAi || aiBusySku.value || aiReadSku.value || dataLoading.value || !dataResult.value) return
-  const meta = { seller_sku: row.seller_sku, product_name: row.product_name, report_date: dataResult.value.report_date }
-  const current = contextVersion, requestId = ++aiVersion
-  const params = { ...base.value, seller_sku: row.seller_sku, report_date: meta.report_date, config_version: savedVersion.value, confirm_ai: true }
-  aiBusySku.value = row.seller_sku
-  let sent = false
-  try {
-    await ElMessageBox.confirm(`使用 DeepSeek 分析 ${row.seller_sku} 截至 ${meta.report_date} 的经营与自动广告数据，生成优化建议。${aiCostHint}建议仅供参考，不会自动调整广告。`, force ? '更新 AI 分析' : '开始 AI 分析', { type: 'info', confirmButtonText: force ? '重新分析' : '开始分析', cancelButtonText: '取消', closeOnClickModal: false })
-    if (current !== contextVersion || requestId !== aiVersion || !dataVisible.value) return
-    aiMeta.value = meta; aiResult.value = null; aiError.value = ''; expandedDiagnostics.value = []; aiLoading.value = true; aiVisible.value = true
-    sent = true
-    const response = await analyzePerformanceSkuWithAI(params)
-    if (current !== contextVersion || requestId !== aiVersion || !dataVisible.value) return
-    aiResult.value = simplifyAIResult(response.data.data)
-    if (historyVisible.value && historyMeta.value.seller_sku === row.seller_sku) { historyPage.value = 1; loadHistory() }
-    if (!aiVisible.value) ElMessage.success(aiResult.value.history_saved === false ? 'AI 分析已完成，但未能保存历史，请保持当前窗口并下载结果' : 'AI 分析已完成并保存，可点击“查看分析结果”查看')
-  } catch (err) {
-    if (!sent || current !== contextVersion || requestId !== aiVersion) return
-    // 失败仍保留具体原因和手动重试说明；费用在工具指引/确认中说明，不重复警示。
-    aiError.value = err.response ? errorMessage(err).replace(/；(?:本次请求|AI请求|请求)可能已计费(?:，重试前请确认)?/g, '').replace(/，未自动重试/g, '，可稍后手动重试')
-      : 'AI 分析暂未完成，请检查网络后再试。系统没有自动重复提交请求。'
-    if (!aiVisible.value) ElMessage.error(aiError.value)
-  } finally {
-    // 同一组件至多一个在途AI请求；切上下文也要在请求完成后解除收费防重复。
-    aiBusySku.value = ''
-    if (current === contextVersion && requestId === aiVersion) aiLoading.value = false
-  }
-}
 onUnmounted(close)
 onDeactivated(close)
 defineExpose({ openConfig, openData, close })
@@ -745,14 +494,6 @@ defineExpose({ openConfig, openData, close })
 .analysis-tool-actions { display:flex; flex-direction:column; align-items:stretch; gap:6px; width:128px; margin:0 auto; }
 .analysis-tool-actions>span { display:flex; }
 .analysis-tool-actions>span>.el-button { width:100%; margin:0; }
-.analysis-view-action { width:100%; margin:0; vertical-align:middle; }
-.analysis-view-action :deep(.el-button-group) { display:flex; width:100%; }
-.analysis-view-action :deep(.el-button-group>.el-button:first-child) { flex:1; min-width:0; padding:5px 8px; }
-.analysis-view-action :deep(.el-dropdown__caret-button) { flex:0 0 28px; padding:5px 6px; }
-.analysis-history-heading { display:flex; align-items:center; flex-wrap:wrap; gap:18px; margin-bottom:16px; }
-.analysis-history-heading>span:last-child { color:#8b98aa; font-size:12px; }
-.analysis-history-summary { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.8; color:#576a84; }
-.analysis-history-table :deep(.el-table__row) { cursor:pointer; }
 .analysis-tools-heading { display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .analysis-tools-help.el-button { width:20px; height:20px; padding:0; color:#8b98aa; }
 .analysis-tools-guide { font-size:13px; line-height:1.8; color:#576a84; font-weight:400; text-align:left; }
@@ -760,47 +501,6 @@ defineExpose({ openConfig, openData, close })
 .analysis-tools-guide p { margin:10px 0; }
 .analysis-tools-guide strong { color:#344b68; }
 .analysis-tools-guide .analysis-tools-note { color:#8b98aa; font-size:12px; }
-.analysis-ai-titlebar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding-right:20px; }
-.analysis-ai-titlebar>.el-dialog__title { min-width:0; overflow-wrap:anywhere; }
-.analysis-download-arrow { margin-left:6px; }
-.analysis-ai-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
-.analysis-ai-date { margin-left:18px; font-size:12px; color:#8897ac; }
-.analysis-ai-loading { padding:42px 16px; text-align:center; color:#758ba9; }
-.analysis-ai-loading>.el-icon { font-size:28px; color:#5484df; }
-.analysis-ai-loading h3 { font-size:16px; margin:14px 0 8px; color:#405878; }
-.analysis-ai-loading p { font-size:12px; }
-.analysis-ai-content { padding-right:6px; }
-.analysis-ai-content>section { margin:22px 0; }
-.analysis-ai-section-title { display:flex; align-items:center; gap:8px; color:#4974b8; margin-bottom:12px; }
-.analysis-ai-section-title h3 { margin:0; font-size:15px; color:#344b68; }
-.analysis-ai-section-title>span { margin-left:auto; color:#8b98aa; font-size:12px; }
-.analysis-ai-summary { background:#f1f6ff; border:1px solid #dfebfd; border-radius:10px; padding:18px; }
-.analysis-ai-content p,.analysis-ai-content li,.analysis-ai-content dd { font-size:13px; color:#576a84; line-height:1.9; white-space:pre-line; overflow-wrap:anywhere; }
-.analysis-ai-summary p { font-size:14px; color:#344b68; }
-.analysis-ai-meta { color:#8b98aa; font-size:11px; }
-.analysis-ai-diagnostics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:start; border:0; }
-.analysis-ai-diagnostics :deep(.el-collapse-item) { border:1px solid #e6edf5; background:#fafcfe; border-radius:8px; overflow:hidden; }
-.analysis-ai-diagnostics :deep(.el-collapse-item__header) { height:auto; min-height:48px; padding:12px 16px; background:transparent; color:#344b68; font-size:14px; font-weight:600; line-height:1.6; border:0; overflow-wrap:anywhere; }
-.analysis-ai-diagnostics :deep(.el-collapse-item__wrap) { background:transparent; border:0; }
-.analysis-ai-diagnostics :deep(.el-collapse-item__content) { padding:0 16px 14px; }
-.analysis-ai-diagnostics p { margin-top:0; }
-.analysis-ai-content h4 { margin:0; font-size:14px; color:#344b68; overflow-wrap:anywhere; }
-.analysis-ai-content ul { margin:8px 0 0; padding-left:20px; }
-.analysis-ai-content .analysis-bid-subtitle { margin:18px 0 10px; font-size:13px; }
-.analysis-ai-content .analysis-placement-hint,.analysis-ai-content .analysis-no-adjustment { font-size:12px; color:#8b98aa; }
-.analysis-bid-table :deep(.cell) { white-space:normal; overflow-wrap:anywhere; line-height:1.8; }
-.analysis-bid-stop { margin-top:8px; color:#9b783e; }
-.analysis-ai-notes { padding:14px 16px; border-radius:8px; border:1px solid #f0e3c6; background:#fffbf2; }
-.analysis-ai-notes p { margin:0; }
-.analysis-ai-footer-note { display:block; text-align:left; color:#8b98aa; font-size:12px; margin-bottom:10px; }
 :deep(.el-alert) { margin-bottom:12px; }
-@media(max-width:700px) { .analysis-ai-diagnostics { grid-template-columns:1fr; } }
 @media(max-width:700px) { .analysis-metric-options { grid-template-columns:repeat(2,minmax(0,1fr)); }.analysis-result-search { margin-left:0; width:100%; }.analysis-result-heading { flex-wrap:wrap; }.analysis-section-heading { align-items:flex-start; } }
-</style>
-
-<style>
-/* AI建议可能较长：只滚动正文，始终保留标题、关闭及重新分析按钮。 */
-.analysis-ai-dialog.el-dialog { max-height:92vh; display:flex; flex-direction:column; }
-.analysis-ai-dialog .el-dialog__header,.analysis-ai-dialog .el-dialog__footer { flex-shrink:0; }
-.analysis-ai-dialog .el-dialog__body { min-height:0; overflow:auto; }
 </style>

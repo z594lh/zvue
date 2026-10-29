@@ -1,7 +1,7 @@
 <template>
   <div class="ownership-workbench performance-page">
     <header class="workbench-heading"><div><div class="workbench-eyebrow">FINANCE · TEAM PERFORMANCE</div><h1>人员绩效</h1><p>直接使用 SKU 日报，按当天历史负责人汇总。</p></div>
-      <div class="workbench-header-actions"><el-button v-if="canPreviewFacts" @click="$router.push('/tools/ai-operations')">AI托管 · ASIN列表</el-button><el-tag type="info" effect="plain">真实数据 · 经营指标</el-tag></div>
+      <div class="workbench-header-actions"><el-button v-if="canAiChat" @click="$router.push('/ai/chat')">AI对话</el-button><el-tag type="info" effect="plain">真实数据 · 经营指标</el-tag></div>
     </header>
     <el-alert :title="notice" type="info" :closable="false" show-icon />
     <section class="workbench-card"><div class="workbench-filters">
@@ -88,7 +88,7 @@ import { useOperationGuide } from '@/utils/operationGuide'
 import { getUserPermissions, getMyPerformance, getUsersPerformance, getListingPerformanceConfig, getPerformanceOwners } from '@/services/api.js'
 
 const codes = getUserPermissions()
-const canPreviewFacts = codes.includes('ai_operations:manage')
+const canAiChat = codes.includes('ai_chat:use')
 const canAll = codes.includes('performance:view_all')
 const chartCurrency=ref(null), route=useRoute()
 const shopList = ref([])

@@ -67,8 +67,6 @@ export const runAiManagedAsin = (id) => api.post(`/ai-operations/managed/${encod
 export const getAiManagedRun = (id) => api.get(`/ai-operations/runs/${encodeURIComponent(id)}`, { timeout: 20000 });
 export const getAiOptimizationDetail = (source,id) => api.get(`/ai-operations/history/${encodeURIComponent(source)}/${encodeURIComponent(id)}`,{timeout:20000});
 // 独立共享会话：所有GET只读；新建仅归档/切换，不调用AI、不重跑当天任务。
-export const getAiConversations = (id, params) => api.get(`/ai-operations/managed/${encodeURIComponent(id)}/conversations`, { params, timeout: 20000 });
-export const createAiConversation = (id, data) => api.post(`/ai-operations/managed/${encodeURIComponent(id)}/conversations`, data, { timeout: 20000 });
 export const getAiConversationMessages = (id, params) => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/messages`, { params, timeout: 20000 });
 export const getAiConversationOriginal = (id, message) => api.get(`/ai-operations/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(message)}`, { timeout: 20000 });
 // 工具目录管理只修改新任务可见性；会话记忆读取不会触发付费摘要。
@@ -113,11 +111,7 @@ export const getPerformanceAnalysisData = (params) => api.get('/performance/anal
 // 仅下载固定窗口的单SKU资料，不调用付费AI；错误响应也是Blob，由组件解析业务提示。
 export const exportPerformanceAnalysisMarkdown = (params) => api.get('/performance/analysis/export', { params, responseType: 'blob', timeout: 90000 });
 // 独立确认的收费AI调用；不自动重试，不上传浏览器自定义文档/模型。
-export const analyzePerformanceSkuWithAI = (data) => api.post('/performance/analysis/ai', data, { timeout: 105000 });
 // AI结果历史只读接口：查看列表/最近记录/详情均不调用模型，不传配置版本或当前报表日期。
-export const getPerformanceAIHistory = (params) => api.get('/performance/analysis/ai/history', { params });
-export const getLatestPerformanceAIResult = (params) => api.get('/performance/analysis/ai/latest', { params });
-export const getPerformanceAIHistoryResult = (id, params) => api.get(`/performance/analysis/ai/history/${id}`, { params });
 
 // 工具栏运营日报：独立权限、本人填写；保存统计快照，不调用AI或调整广告。
 export const getDailyReportConfig = () => api.get('/daily-reports/config');
@@ -2034,3 +2028,6 @@ export const deleteMenu = (id) => {
 };
 
 
+
+// 业务服务目录复用同一鉴权客户端，不创建第二套拦截器。
+export { api };
