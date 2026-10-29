@@ -13,8 +13,9 @@
 </template>
 
 <script setup>
-import {computed,onBeforeUnmount,onMounted,ref} from 'vue'
-import {onBeforeRouteLeave,useRouter} from 'vue-router'
+import {computed,onBeforeUnmount,onDeactivated,onMounted,ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {useTabProtection} from '@/composables/workspace/useTabProtection'
 import {ElMessageBox,ElMessage} from 'element-plus'
 import {getAiPrompts,publishAiPrompts,getAiPromptVersions,previewAiPrompts} from '@/services/api'
 import {conversationTime as time} from '@/utils/aiOperationConversation'
@@ -47,7 +48,7 @@ async function showVersions(){versionsVisible.value=true;versionsLoading.value=t
 async function copyVersion(row){if(await mayDiscard()){config.value=copy(row.config);versionsVisible.value=false;ElMessage.info('已复制版本 #'+row.id+'，请检查后保存并生效')}}
 /** 离页后忽略迟到响应，不显示旧页面结果。 */
 function stop(){active=false;previewRevision++}
-onBeforeRouteLeave(mayDiscard);onMounted(load);onBeforeUnmount(stop)
+useTabProtection({protected:()=>dirty.value || saving.value,confirm:()=>!saving.value && mayDiscard(),retainOnSwitch:()=>!saving.value});onMounted(load);onDeactivated(()=>{previewVisible.value=false;versionsVisible.value=false});onBeforeUnmount(stop)
 </script>
 
 <style scoped>

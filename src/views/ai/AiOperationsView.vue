@@ -77,7 +77,7 @@ const shops=ref([]),rows=ref([]),total=ref(0),page=ref(1),keyword=ref(''),shopFi
 const selected=ref(null),runs=ref([]),historyTotal=ref(0),historyPage=ref(1),historyLoading=ref(false),historyError=ref('')
 const historyVisible=ref(false),detailVisible=ref(false),selectedRun=ref(null)
 const addVisible=ref(false),addShop=ref(null),addAsin=ref(''),rawProducts=ref([]),optionsLoading=ref(false),adding=ref(false),addError=ref(''),runningId=ref(''),changingId=ref('')
-let revision=0,historyRevision=0,optionRevision=0,active=true,initialized=false
+let revision=0,historyRevision=0,optionRevision=0,active=true,initialized=false,disposed=false,needsReload=false
 /** 用中文展示当前会话任务阶段。 */
 function stateName(state){return {queued:'统一队列等待中',running:'处理中',awaiting_confirmation:'方案待确认',unknown:'结果待核实',cancelled:'已取消',preparing:'整理资料',analyzing:'AI分析中',executing:'执行回读中',completed:'优化完成',partial:'部分待核对',failed:'执行异常',paused:'已停止'}[state] || state}
 /** 提取可展示的异常，超时明确提示勿重复发起付费请求。 */
@@ -86,6 +86,8 @@ function message(error){return error.response?.data?.message || (error.code==='E
 const products=computed(()=>{const map=new Map();for(const p of rawProducts.value){if(!map.has(p.asin))map.set(p.asin,{...p,skus:[]});map.get(p.asin).skus.push(p.sku)}return [...map.values()]})
 /** 按当前筛选分页读取托管列表，过期响应不覆盖新列表。 */
 async function load(reset=false){
+  if(!active){needsReload=true;return}
+  needsReload=false
   const current=++revision;loading.value=true;error.value=''
   if(reset)page.value=1
   try{const {data}=await getAiManagedAsins({page:page.value,keyword:keyword.value,shop_id:shopFilter.value || undefined,enabled:enabledFilter.value ?? undefined});if(current===revision && active){rows.value=data.data.list;total.value=data.data.total}}
@@ -157,17 +159,17 @@ async function runToday(row){
 async function initialize(){
   if(initialized)return
   initialized=true
-  try{const {data}=await getAiOperationsOptions();if(active)shops.value=data.data.shops}catch(e){if(active)error.value=message(e)}
-  await load()
+  try{const {data}=await getAiOperationsOptions();if(!disposed)shops.value=data.data.shops}catch(e){if(active)error.value=message(e)}
+  if(!disposed)await load()
 }
 /** 离开页签时关闭所有弹框，使未完成请求失效。 */
-function stop(){active=false;revision++;historyRevision++;optionRevision++;loading.value=false;historyLoading.value=false;optionsLoading.value=false;detailVisible.value=false;historyVisible.value=false;addVisible.value=false}
+function stop(){needsReload=needsReload || loading.value || adding.value || !!runningId.value || !!changingId.value;active=false;revision++;historyRevision++;optionRevision++;loading.value=false;historyLoading.value=false;optionsLoading.value=false;detailVisible.value=false;historyVisible.value=false;addVisible.value=false}
 /** 首次挂载绑定尺寸变化并初始化列表。 */
 function mount(){window.addEventListener('resize',resize);initialize()}
 /** 销毁时释放窗口监听器，避免页签重复注册。 */
-function unmount(){stop();window.removeEventListener('resize',resize)}
-/** 回到缓存页签只刷新列表，不重开之前关闭的弹框。 */
-function resume(){if(!active){active=true;load()}}
+function unmount(){disposed=true;stop();window.removeEventListener('resize',resize)}
+/** 已完成的列表直接复用；仅补回离页时中断的读取或尚待核对的操作，不重开弹框。 */
+function resume(){if(!active){active=true;if(needsReload)load()}}
 onMounted(mount);onDeactivated(stop);onBeforeUnmount(unmount);onActivated(resume)
 </script>
 

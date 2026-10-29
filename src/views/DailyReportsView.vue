@@ -98,8 +98,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount, onActivated, onDeactivated, ref } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { computed, onMounted, onBeforeUnmount, onDeactivated, ref } from 'vue'
+import { useTabProtection } from '@/composables/workspace/useTabProtection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowRight, Check, CopyDocument, Delete, Download, EditPen, MagicStick, QuestionFilled, Refresh, Search, View } from '@element-plus/icons-vue'
 import { getDailyReportConfig, getDailyReports, getCurrentDailyReport, getDailyReport, previewDailyReport, saveDailyReport, deleteDailyReport } from '@/services/api'
@@ -314,14 +314,14 @@ async function downloadImage() {
 
 /** 离开页面/刷新保护未保存文字；在途保存不承诺被取消，返回后重新查询。 */
 function beforeUnload(event) { if (dirty() || saving.value) { event.preventDefault(); event.returnValue = '' } }
-onBeforeRouteLeave(async () => await confirmDiscard())
+useTabProtection({protected:()=>dirty() || saving.value || opening.value,confirm:confirmDiscard})
 // 页面在系统多页签中可能缓存，失活时必须关闭Teleport弹框并隔离旧请求。
 onDeactivated(() => {
-  listVersion++; editorVersion++; detailVersion++
+  // 列表只读请求可以填入本实例缓存；仅隔离即将关闭的编辑及详情请求。
+  editorVersion++; detailVersion++
   editorVisible.value = false; detailVisible.value = false; copyVisible.value = false
-  opening.value = false; loading.value = false
+  opening.value = false
 })
-onActivated(() => { if (!initializing.value) loadList() })
 onBeforeUnmount(() => { disposed = true; listVersion++; editorVersion++; detailVersion++; window.removeEventListener('beforeunload', beforeUnload) })
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)

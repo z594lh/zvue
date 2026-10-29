@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { computed,onBeforeUnmount,onMounted,ref } from 'vue'
+import { computed,onBeforeUnmount,onDeactivated,onMounted,ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox,ElMessage } from 'element-plus'
 import { Connection } from '@element-plus/icons-vue'
@@ -47,7 +47,7 @@ function reset(){if(!chosen.value)return;form.value={...form.value,enabled:true,
 async function save(){if(saving.value || !chosen.value)return;try{await ElMessageBox.confirm('仅影响后续新任务的工具可见性和说明；不影响在途任务，也不会立即调用AI。','保存工具',{confirmButtonText:'确认保存',cancelButtonText:'取消'})}catch{return}saving.value=true;saveError.value='';try{const payload={...form.value,reset:form.value.reset && form.value.description===chosen.value.default_description && form.value.enabled};const {data}=await updateAiTool(chosen.value.name,payload);if(active){rows.value=data.data.list;visible.value=false;ElMessage.success('工具已保存，后续新任务生效')}}catch(e){if(active)saveError.value=e.response?.data?.message || '工具保存未完成，请刷新核对'}finally{if(active)saving.value=false}}
 /** 离页后不显示迟到请求结果。 */
 function stop(){active=false}
-onMounted(load);onBeforeUnmount(stop)
+onMounted(load);onDeactivated(()=>{visible.value=false});onBeforeUnmount(stop)
 </script>
 
 <style scoped>

@@ -4,22 +4,24 @@
     <div class="tab-list" ref="tabListRef" :class="{ 'no-anim': noAnim }" @wheel.prevent="onWheel">
       <div
         v-for="tab in tabs"
-        :key="tab.path"
+        :key="tab.id"
+        :data-tab-path="tab.path"
         class="tab-item"
-        :class="{ active: activePath === tab.path, dragging: draggingPath === tab.path }"
+        :class="{ active: activeId === tab.id, dragging: draggingPath === tab.id, pending: navigationTarget === tab.fullPath }"
         :style="tabStyle(tab)"
-        :ref="el => setTabRef(tab.path, el)"
+        :ref="el => setTabRef(tab.id, el)"
         @mousedown="onTabMouseDown($event, tab)"
         @contextmenu.prevent="openContextMenu($event, tab)"
-        @mouseup.middle.prevent="removeTab(tab.path)"
+        @mouseup.middle.prevent="removeTab(tab.id)"
       >
         <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
-        <span class="tab-refresh" :class="{ invisible: activePath !== tab.path }" @click.stop="refreshTab(tab.path)" title="刷新">↻</span>
-        <span class="tab-close" @click.stop="removeTab(tab.path)" title="关闭">&#x2715;</span>
+        <span class="tab-refresh" :class="{ invisible: activeId !== tab.id }" @click.stop="refreshTab(tab.id)" title="刷新">↻</span>
+        <span class="tab-close" @click.stop="removeTab(tab.id)" title="关闭">&#x2715;</span>
       </div>
     </div>
     <span class="tab-scroll-btn tab-scroll-right" @click.stop="scrollTabs(200)" v-if="showRightArrow">›</span>
 
+    <span v-if="pendingTabAction || (navigationTarget && navigationTarget!==$route.fullPath)" class="tab-pending-status" role="status">{{ pendingTabAction?'正在处理…':'正在打开…' }}</span>
     <!-- 右键菜单 -->
     <Teleport to="body">
       <div
@@ -41,6 +43,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTabs } from '@/composables/useTabs.js'
+import { navigationTarget } from '@/composables/workspace/tabState'
 
 export default {
   name: 'TabBar',
@@ -50,7 +53,8 @@ export default {
     const {
       tabs,
       activePath,
-      addTab,
+      activeId,
+      pendingTabAction,
       removeTab,
       refreshTab,
       closeOther,
@@ -85,20 +89,21 @@ export default {
     function setTabRef(path, el) {
       if (el) {
         tabRefs[path] = el
-      }
+      } else delete tabRefs[path]
     }
 
     function switchTab(tab) {
-      if (route.path !== tab.path) {
+      if (pendingTabAction.value) return
+      if (route.fullPath !== tab.fullPath) {
         router.push(tab.fullPath)
       }
     }
 
     function tabStyle(tab) {
-      if (tab.path === draggingPath.value) {
+      if (tab.id === draggingPath.value) {
         return { transform: `translateX(${dragDx.value}px)` }
       }
-      const s = shifts.value[tab.path]
+      const s = shifts.value[tab.id]
       return s ? { transform: `translateX(${s}px)` } : null
     }
 
@@ -106,7 +111,7 @@ export default {
       if (e.button !== 0) return
       if (e.target.closest('.tab-close, .tab-refresh')) return
       switchTab(tab)
-      pressPath = tab.path
+      pressPath = tab.id
       pressStartX = e.clientX
       dragMoved = false
       document.addEventListener('mousemove', onDragMove)
@@ -114,9 +119,9 @@ export default {
     }
 
     function beginDrag() {
-      startIndex = tabs.value.findIndex(t => t.path === pressPath)
+      startIndex = tabs.value.findIndex(t => t.id === pressPath)
       rects = tabs.value.map(t => {
-        const r = tabRefs[t.path].getBoundingClientRect()
+        const r = tabRefs[t.id].getBoundingClientRect()
         return { left: r.left, width: r.width, center: r.left + r.width / 2 }
       })
       stepWidth = rects[startIndex].width + 2
@@ -145,7 +150,7 @@ export default {
       const ns = {}
       for (let k = 0; k < rects.length; k++) {
         if (k === startIndex) continue
-        const path = tabs.value[k].path
+        const path = tabs.value[k].id
         if (k > startIndex && k <= currentTarget) ns[path] = -stepWidth
         else if (k < startIndex && k >= currentTarget) ns[path] = stepWidth
         else ns[path] = 0
@@ -206,22 +211,22 @@ export default {
     }
 
     function handleClose() {
-      if (contextMenu.value.tab) removeTab(contextMenu.value.tab.path)
+      if (contextMenu.value.tab) removeTab(contextMenu.value.tab.id)
       closeContextMenu()
     }
 
     function handleCloseOther() {
-      if (contextMenu.value.tab) closeOther(contextMenu.value.tab.path)
+      if (contextMenu.value.tab) closeOther(contextMenu.value.tab.id)
       closeContextMenu()
     }
 
     function handleCloseRight() {
-      if (contextMenu.value.tab) closeRight(contextMenu.value.tab.path)
+      if (contextMenu.value.tab) closeRight(contextMenu.value.tab.id)
       closeContextMenu()
     }
 
     function handleCloseLeft() {
-      if (contextMenu.value.tab) closeLeft(contextMenu.value.tab.path)
+      if (contextMenu.value.tab) closeLeft(contextMenu.value.tab.id)
       closeContextMenu()
     }
 
@@ -231,7 +236,7 @@ export default {
 
     function scrollActiveIntoView() {
       nextTick(() => {
-        const el = tabRefs[activePath.value]
+        const el = tabRefs[activeId.value]
         const container = tabListRef.value
         if (!el || !container) return
         const elLeft = el.offsetLeft
@@ -248,7 +253,6 @@ export default {
 
     // 路由变化时新增/更新页签（fullPath 含 query，确保页签记住最新参数）
     watch(() => route.fullPath, () => {
-      addTab(route)
       scrollActiveIntoView()
     }, { immediate: true })
 
@@ -275,6 +279,8 @@ export default {
     })
 
     onUnmounted(() => {
+      document.removeEventListener('mousemove', onDragMove)
+      document.removeEventListener('mouseup', onDragEnd)
       document.removeEventListener('click', onClickOutside)
       window.removeEventListener('resize', onResize)
       tabListRef.value?.removeEventListener('scroll', checkArrows)
@@ -283,6 +289,9 @@ export default {
     return {
       tabs,
       activePath,
+      activeId,
+      pendingTabAction,
+      navigationTarget,
       removeTab,
       refreshTab,
       tabListRef,
@@ -310,6 +319,7 @@ export default {
 </script>
 
 <style scoped>
+.tab-item.pending{box-shadow:inset 0 -2px #8ca9ee}.tab-pending-status{align-self:center;flex-shrink:0;padding:0 12px;font-size:11px;color:#7189af}
 .tab-bar {
   display: flex;
   align-items: center;

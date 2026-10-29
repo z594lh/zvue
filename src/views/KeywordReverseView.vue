@@ -100,7 +100,7 @@ const shownWords=computed(()=>(data.value.word_frequency || []).filter(w=>Array.
 const valueOf=(key,value)=>spriteValue(reverseMetrics.find(m=>m.key===key) || {type:'text'},value)
 const growthClass=value=>hasValue(value)?Number(value)>0?'kr-positive':Number(value)<0?'kr-negative':'':''
 const validAsins=values=>Array.isArray(values)?values.filter(v=>/^[A-Z0-9]{10}$/.test(v)):[]
-let disposed=false,active=true,revision=0,optionsRevision=0,optionsPage=1,optionsSearch='',timer=null,lastRouteKey=''
+let disposed=false,active=true,revision=0,optionsRevision=0,optionsPage=1,optionsSearch='',timer=null,lastRouteKey='',resumeQuery=false,resumeOptions=false
 let optionsLoadedKey='',optionsRequestKey=''
 let boundBody=null,tableObserver=null,measureFrame=null
 
@@ -122,6 +122,7 @@ watch([activeAsin,()=>data.value.list,()=>tableColumns.value.map(c=>c.key).join(
 watch(scrollTrack,()=>nextTick(syncTrack))
 
 async function load(){
+  resumeQuery=false
   if(!activeAsin.value || !active || disposed)return
   const request=++revision;loading.value=true;error.value='';selectedRows.value=[];table.value?.clearSelection()
   const ranges=Object.fromEntries(Object.entries(applied.value.ranges).filter(([,b])=>b.min!=='' || b.max!==''))
@@ -137,6 +138,7 @@ function syncRoute(){
   const asin=String(route.query.asin || '').trim().toUpperCase(),task=String(route.query.task_id || ''),routeShop=String(route.query.shop_id || ''),key=asin+':'+task+':'+routeShop
   if(key===lastRouteKey)return
   lastRouteKey=key
+  resumeQuery=false
   const changed=asin!==activeAsin.value;asinInput.value=asin;shopId.value=/^\d+$/.test(String(route.query.shop_id || ''))?String(route.query.shop_id):'';pickedAsin.value=''
   revision++;data.value={};error.value='';loading.value=false
   if(!asin){activeAsin.value='';return}
@@ -158,6 +160,7 @@ function searchOptions(query){
 }
 async function loadOptions(append=false){
   if(disposed || !active)return
+  resumeOptions=false
   clearTimeout(timer);timer=null
   const key=optionsKey()
   if(!append && ((optionsLoadedKey===key && !optionsLoading.value && !optionsError.value) || (optionsRequestKey===key && optionsLoading.value)))return
@@ -181,8 +184,9 @@ function copyWords(){copyText((selectedRows.value.length?selectedRows.value:data
 function exportPage(){const columns=data.value.columns || [],rows=data.value.list || [],url=URL.createObjectURL(new Blob([reverseCsv(rows,columns)],{type:'text/csv;charset=utf-8;'})),link=document.createElement('a');link.href=url;link.download=`${activeAsin.value}_${data.value.snapshot?.record_date || 'snapshot'}_第${page.value}页.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 watch(()=>[route.path,route.query.asin,route.query.task_id,route.query.shop_id],syncRoute,{immediate:true})
 onMounted(()=>{window.addEventListener('resize',resizeTable);resizeTable()})
-onActivated(()=>{active=true;window.addEventListener('resize',resizeTable);syncRoute();resizeTable();if(!shops.value.length && !optionsLoading.value)loadOptions()})
-onDeactivated(()=>{active=false;revision++;optionsRevision++;loading.value=false;optionsLoading.value=false;lastRouteKey='';columnsOpen.value=false;clearTimeout(timer);disconnectScroller();window.removeEventListener('resize',resizeTable)})
+// 保留完成的查询和分页；仅补查离页时被中断的请求，不重置URL查询标记。
+onActivated(()=>{active=true;window.addEventListener('resize',resizeTable);syncRoute();resizeTable();if(resumeQuery && !loading.value)load();if(resumeOptions || (optionsLoadedKey!==optionsKey() && !optionsLoading.value))loadOptions()})
+onDeactivated(()=>{resumeQuery=resumeQuery || loading.value;resumeOptions=resumeOptions || optionsLoading.value || !!timer;active=false;revision++;optionsRevision++;loading.value=false;optionsLoading.value=false;columnsOpen.value=false;tasksVisible.value=false;clearTimeout(timer);timer=null;disconnectScroller();window.removeEventListener('resize',resizeTable)})
 onBeforeUnmount(()=>{disposed=true;active=false;revision++;optionsRevision++;clearTimeout(timer);disconnectScroller();window.removeEventListener('resize',resizeTable)})
 nextTick(()=>{if(!activeAsin.value)loadOptions()})
 </script>

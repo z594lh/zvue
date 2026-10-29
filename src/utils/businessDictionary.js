@@ -28,10 +28,10 @@ export function applyDictionary(snapshot){
 export async function loadBusinessDictionary(force=false){
   if(!localStorage.getItem('auth_token'))return
   if(pending)return pending
-  if(!force && dictionaryState.ready && Date.now()<expires)return
+  if(!force && Date.now()<expires)return
   pending=(async()=>{
     try{const {data}=await getBusinessDictionary();applyDictionary(data.data)}
-    catch{dictionaryState.warning='业务字典读取失败，未识别名称保留原代码；请刷新或联系管理员。'}
+    catch{expires=Date.now()+15000;dictionaryState.warning='业务字典读取失败，未识别名称保留原代码；请刷新或联系管理员。'}
     finally{pending=null}
   })()
   return pending

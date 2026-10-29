@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { dictionaryLabel,loadBusinessDictionary } from '@/utils/businessDictionary'
+import { dictionaryLabel,dictionaryState,loadBusinessDictionary } from '@/utils/businessDictionary'
+import { captureWorkspaceScroll, navigationTarget } from '@/composables/workspace/tabState'
 import HomeView from '../views/HomeView.vue'
 import JsonTools from '../views/JsonToolstView.vue'
 import AiImageView from '../views/AiImageView.vue'
@@ -53,7 +54,7 @@ const routes = [
     path: '/performance',
     name: 'Performance',
     component: () => import('../views/PerformanceView.vue'),
-    meta: { title: '人员绩效', componentName: 'PerformanceView' }
+    meta: { title: '人员绩效', componentName: 'PerformanceView', tabPolicy:{evictable:true} }
   },
   {
     path: '/',
@@ -247,49 +248,49 @@ const routes = [
     path: '/cpc/campaigns',
     name: 'CpcCampaigns',
     component: () => import('../views/cpc/CampaignList.vue'),
-    meta: { title: 'CPC广告活动', componentName: 'CpcCampaigns' }
+    meta: { title: 'CPC广告活动', componentName: 'CpcCampaigns', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/campaigns/:id/detail',
     name: 'CpcCampaignDetail',
     component: () => import('../views/cpc/CampaignDetail.vue'),
-    meta: { title: 'CPC广告活动详情', componentName: 'CpcCampaignDetail' }
+    meta: { title: 'CPC广告活动详情', componentName: 'CpcCampaignDetail', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/campaigns/create',
     name: 'CpcCreateCampaign',
     component: () => import('../views/cpc/CreateCampaign.vue'),
-    meta: { title: '创建广告活动', componentName: 'CpcCreateCampaign' }
+    meta: { title: '创建广告活动', componentName: 'CpcCreateCampaign', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/campaigns/:id/create-group',
     name: 'CpcCreateGroup',
     component: () => import('../views/cpc/CreateGroup.vue'),
-    meta: { title: '添加广告组', componentName: 'CpcCreateGroup' }
+    meta: { title: '添加广告组', componentName: 'CpcCreateGroup', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/campaigns/:id/groups/:adGroupId',
     name: 'CpcGroupDetail',
     component: () => import('../views/cpc/GroupDetail.vue'),
-    meta: { title: 'CPC广告组详情', componentName: 'CpcGroupDetail' }
+    meta: { title: 'CPC广告组详情', componentName: 'CpcGroupDetail', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/days/:type/:id',
     name: 'CpcDailyData',
     component: () => import('../views/cpc/DailyData.vue'),
-    meta: { title: 'CPC分日数据', componentName: 'CpcDailyData' }
+    meta: { title: 'CPC分日数据', componentName: 'CpcDailyData', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/days/summary',
     name: 'CpcDailyDataSummary',
     component: () => import('../views/cpc/DailyData.vue'),
-    meta: { title: 'CPC汇总分日数据', componentName: 'CpcDailyDataSummary' }
+    meta: { title: 'CPC汇总分日数据', componentName: 'CpcDailyDataSummary', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/cpc/structure',
     name: 'CpcStructure',
     component: () => import('../views/cpc/CpcStructure.vue'),
-    meta: { title: 'CPC广告结构', componentName: 'CpcStructure' }
+    meta: { title: 'CPC广告结构', componentName: 'CpcStructure', tabPolicy:{group:'cpc'} }
   },
   {
     path: '/system/cron-tasks',
@@ -337,7 +338,7 @@ const routes = [
     name: 'AiToolPreview',
     component: () => import('../views/ai/AiToolPreview.vue'),
     props: true,
-    meta: { title: 'AI工具 · 数据预览', componentName: 'AiToolPreview', aiPermission:'ai_tools:manage' },
+    meta: { title: 'AI工具 · 数据预览', componentName: 'AiToolPreview', aiPermission:'ai_tools:manage', tabPolicy:{evictable:true} },
     // 工具代码只定位白名单工具，Nav页签名称使用共享字典的中文名称。
     beforeEnter(to){to.meta.title='AI工具 · '+dictionaryLabel('ai.tool',to.params.toolName,'数据预览')}
   },
@@ -345,13 +346,13 @@ const routes = [
     path: '/tools/keyword-reverse',
     name: 'KeywordReverse',
     component: () => import('../views/KeywordReverseView.vue'),
-    meta: { title: '关键词反查', componentName: 'KeywordReverseView' }
+    meta: { title: '关键词反查', componentName: 'KeywordReverseView', tabPolicy:{evictable:true} }
   },
   {
     path: '/tools/competitor-data',
     name: 'CompetitorData',
     component: () => import('../views/CompetitorDataView.vue'),
-    meta: { title: '竞品数据', componentName: 'CompetitorDataView' }
+    meta: { title: '竞品数据', componentName: 'CompetitorDataView', tabPolicy:{evictable:true} }
   },
   {
     path: '/system/ui-config',
@@ -388,8 +389,13 @@ const router = createRouter({
 const publicPaths = ['/', '/json', '/login', '/403', '/company', '/fanyi']
 
 router.beforeEach(async (to, from, next) => {
-  // 登录后的首个业务页共用同一字典；读取失败保留原码，不控制业务枚举或允许列表。
-  if (isAuthenticated()) await loadBusinessDictionary()
+  captureWorkspaceScroll()
+  navigationTarget.value=to.fullPath
+  // 首次准备名称快照；已有快照或失败提示时后台更新，慢字典不阻塞页签切换。
+  if (isAuthenticated()) {
+    const refreshDictionary = loadBusinessDictionary()
+    if (!dictionaryState.ready && !dictionaryState.warning) await refreshDictionary
+  }
   // 1. 未登录检查
   if (!publicPaths.includes(to.path) && !isAuthenticated()) {
     next({ path: '/login', query: { redirect: to.fullPath } })
@@ -436,4 +442,6 @@ router.beforeEach(async (to, from, next) => {
   next()
 })
 
+router.afterEach(to=>{if(navigationTarget.value===to.fullPath)navigationTarget.value=''})
+router.onError(()=>{navigationTarget.value=''})
 export default router

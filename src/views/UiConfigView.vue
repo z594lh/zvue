@@ -46,7 +46,7 @@ export default { name: 'UiConfigView' }
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabProtection } from '@/composables/workspace/useTabProtection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUiConfigManagement, saveUiConfig, resetUiConfig, getUiConfigHistory } from '@/services/api.js'
 import { applyUiConfig } from '@/services/uiConfig.js'
@@ -124,7 +124,7 @@ async function resetAll() {
   } catch (e) {ElMessage.error(message(e))}
   finally {saving.value = false}
 }
-onBeforeRouteLeave(async () => !busy.value && await confirmDiscard())
+useTabProtection({protected:()=>dirty.value || busy.value,confirm:async()=>!busy.value && await confirmDiscard(),retainOnSwitch:()=>!busy.value})
 onMounted(() => {loadConfig();loadHistory()})
 </script>
 

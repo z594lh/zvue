@@ -1,188 +1,36 @@
-import { ref, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { isNavigationFailure, useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { tabs, cachedViews, pendingTabAction, excludedPaths, addTab, approveTabs, approveNavigation, withTabAction, refreshInstance, currentTab } from './workspace/tabState'
 
-// 模块级共享状态，确保所有组件实例共用同一份数据
-const tabs = ref([])
-const cachedViews = ref([])
-const refreshKeys = ref({})
-
-const excludedPaths = ['/', '/login', '/403', '/json', '/company', '/fanyi']
-
-export function useTabs() {
-  const router = useRouter()
-  const route = useRoute()
-
-  const activePath = computed(() => route.path)
-
-  function findTabIndex(path) {
-    return tabs.value.findIndex(t => t.path === path)
-  }
-
-  function getComponentName(toRoute) {
-    return toRoute.meta?.componentName || toRoute.name
-  }
-
-  function getTitle(toRoute) {
-    return toRoute.meta?.title || toRoute.name || toRoute.path
-  }
-
-  function addTab(toRoute) {
-    if (excludedPaths.includes(toRoute.path)) return
-
-    const isCpc = toRoute.path.startsWith('/cpc/')
-
-    // CPC 广告模块所有子路由共用一个页签
-    if (isCpc) {
-      const otherCpcTabs = tabs.value.filter(t => t.path.startsWith('/cpc/') && t.path !== toRoute.path)
-      otherCpcTabs.forEach(t => {
-        const ci = cachedViews.value.indexOf(t.componentName)
-        if (ci !== -1) cachedViews.value.splice(ci, 1)
-      })
-      tabs.value = tabs.value.filter(t => !t.path.startsWith('/cpc/') || t.path === toRoute.path)
-    }
-
-    const exists = findTabIndex(toRoute.path)
-    if (exists !== -1) {
-      tabs.value[exists].fullPath = toRoute.fullPath
-      tabs.value[exists].query = toRoute.query
-      return
-    }
-
-    const compName = getComponentName(toRoute)
-    tabs.value.push({
-      path: toRoute.path,
-      fullPath: toRoute.fullPath,
-      title: getTitle(toRoute),
-      componentName: compName,
-      query: toRoute.query,
-      closable: true
-    })
-
-    if (compName && !cachedViews.value.includes(compName)) {
-      cachedViews.value.push(compName)
-    }
-  }
-
-  function removeTab(path) {
-    const idx = findTabIndex(path)
-    if (idx === -1) return
-
-    const tab = tabs.value[idx]
-    const compName = tab.componentName
-
-    tabs.value.splice(idx, 1)
-
-    const cacheIdx = cachedViews.value.indexOf(compName)
-    if (cacheIdx !== -1) {
-      cachedViews.value.splice(cacheIdx, 1)
-    }
-
-    if (path === route.path) {
-      if (tabs.value.length > 0) {
-        const nextTab = tabs.value[Math.min(idx, tabs.value.length - 1)]
-        router.push(nextTab.fullPath)
-      } else {
-        router.push('/')
+/** 先检查及导航，成功后提交；取消操作不删除页签或缓存。 */
+export function useTabs(){
+  const router=useRouter(),route=useRoute()
+  const activePath=computed(()=>route.path),activeId=computed(()=>currentTab(route)?.id)
+  const byPath=key=>tabs.value.find(tab=>typeof key==='number'?tab.id===key:tab.path===key)
+  const perform=action=>withTabAction(action).catch(()=>{ElMessage.error('页签操作未完成，原页面已保留，请重试');return false})
+  async function closeTabs(selected,preferred){
+    if(!selected.length)return true
+    return perform(async()=>{
+      const originalRoute=route.fullPath
+      if(!await approveTabs(selected,'close'))return false
+      if(route.fullPath!==originalRoute || selected.some(tab=>!tabs.value.some(item=>item.id===tab.id)))return false
+      const removed=new Set(selected.map(tab=>tab.id)),remaining=tabs.value.filter(tab=>!removed.has(tab.id)),active=currentTab(route)
+      if(active && removed.has(active.id)){
+        approveNavigation(selected)
+        const original=tabs.value.findIndex(tab=>tab.id===active.id),target=preferred || remaining[Math.min(original,remaining.length-1)]
+        const result=await router.push(target?.fullPath || '/')
+        if(isNavigationFailure(result))return false
       }
-    }
-  }
-
-  function moveTab(path, toIndex) {
-    const fromIdx = findTabIndex(path)
-    if (fromIdx === -1) return
-    const arr = tabs.value.slice()
-    const [moved] = arr.splice(fromIdx, 1)
-    const clamped = Math.max(0, Math.min(toIndex, arr.length))
-    if (clamped === fromIdx) return
-    arr.splice(clamped, 0, moved)
-    tabs.value = arr
-  }
-
-  function refreshTab(path) {
-    refreshKeys.value = {
-      ...refreshKeys.value,
-      [path]: (refreshKeys.value[path] || 0) + 1
-    }
-  }
-
-  function closeOther(path) {
-    const keep = tabs.value.find(t => t.path === path)
-    if (!keep) return
-
-    tabs.value.filter(t => t.path !== path).forEach(t => {
-      const ci = cachedViews.value.indexOf(t.componentName)
-      if (ci !== -1) cachedViews.value.splice(ci, 1)
+      tabs.value=tabs.value.filter(tab=>!removed.has(tab.id));return true
     })
-
-    tabs.value = tabs.value.filter(t => t.path === path)
-
-    if (path !== route.path) {
-      router.push(path)
-    }
   }
-
-  function closeRight(path) {
-    const idx = findTabIndex(path)
-    if (idx === -1) return
-
-    const rightTabs = tabs.value.slice(idx + 1)
-    rightTabs.forEach(t => {
-      const ci = cachedViews.value.indexOf(t.componentName)
-      if (ci !== -1) cachedViews.value.splice(ci, 1)
-    })
-
-    tabs.value.splice(idx + 1)
-
-    if (route.path !== path && tabs.value.findIndex(t => t.path === route.path) === -1) {
-      router.push(path)
-    }
-  }
-
-  function closeLeft(path) {
-    const idx = findTabIndex(path)
-    if (idx === -1) return
-
-    const leftTabs = tabs.value.slice(0, idx)
-    leftTabs.forEach(t => {
-      const ci = cachedViews.value.indexOf(t.componentName)
-      if (ci !== -1) cachedViews.value.splice(ci, 1)
-    })
-
-    tabs.value.splice(0, idx)
-
-    if (findTabIndex(route.path) === -1) {
-      router.push(path)
-    }
-  }
-
-  function closeAll() {
-    tabs.value.forEach(t => {
-      const ci = cachedViews.value.indexOf(t.componentName)
-      if (ci !== -1) cachedViews.value.splice(ci, 1)
-    })
-    tabs.value = []
-    router.push('/')
-  }
-
-  function getTabKey(path) {
-    const rk = refreshKeys.value[path] || 0
-    return path + (rk ? '__' + rk : '')
-  }
-
-  return {
-    tabs,
-    cachedViews,
-    refreshKeys,
-    activePath,
-    excludedPaths,
-    addTab,
-    removeTab,
-    refreshTab,
-    closeOther,
-    closeRight,
-    closeLeft,
-    closeAll,
-    moveTab,
-    getTabKey
-  }
+  const removeTab=path=>{const tab=byPath(path);return closeTabs(tab?[tab]:[])}
+  async function refreshTab(path){const tab=byPath(path);if(!tab)return false;return perform(async()=>{if(!await approveTabs([tab],'refresh'))return false;if(!tabs.value.some(item=>item.id===tab.id))return false;refreshInstance(tab);return true})}
+  function moveTab(path,toIndex){const item=byPath(path),index=tabs.value.indexOf(item);if(index<0)return;const next=[...tabs.value],tab=next.splice(index,1)[0];next.splice(Math.max(0,Math.min(toIndex,next.length)),0,tab);tabs.value=next}
+  function closeOther(path){const keep=byPath(path);return keep?closeTabs(tabs.value.filter(tab=>tab.id!==keep.id),keep):false}
+  function closeRight(path){const index=tabs.value.indexOf(byPath(path));return index<0?false:closeTabs(tabs.value.slice(index+1),byPath(path))}
+  function closeLeft(path){const index=tabs.value.indexOf(byPath(path));return index<0?false:closeTabs(tabs.value.slice(0,index),byPath(path))}
+  const closeAll=()=>closeTabs([...tabs.value])
+  return {tabs,cachedViews,pendingTabAction,activePath,activeId,excludedPaths,addTab,removeTab,refreshTab,closeOther,closeRight,closeLeft,closeAll,moveTab}
 }

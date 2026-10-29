@@ -63,7 +63,7 @@
 <script>export default {name:'SellerspriteConfigView'}</script>
 <script setup>
 // 两类采集的配置容器：关键词与竞品独立页签，分别调用各自API。
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Search, Refresh, DataAnalysis, Picture, CopyDocument } from '@element-plus/icons-vue'
@@ -92,7 +92,7 @@ function openEdit(row){editing.value=row.id;form.value={...row,enabled:!!row.ena
 function body(value){return {enabled:value.enabled?1:0,priority:value.priority,remark:value.remark,version:value.version,marketplace:'US'}}
 async function save(){if(saving.value)return;saving.value=true;try{if(editing.value){await updateSellerspriteKeywordAsin(editing.value,body(form.value));ElMessage.success('配置已保存')}else{const res=await addSellerspriteKeywordAsins({...body(form.value),asins:form.value.asins});ElMessage.success(`新增${res.data.data.created}条，已有${res.data.data.existing}条保持原设置`)}visible.value=false;await load()}catch(err){ElMessage.error(message(err))}finally{saving.value=false}}
 async function toggle(row,value){if(saving.value)return;saving.value=true;busyId.value=row.id;try{await updateSellerspriteKeywordAsin(row.id,{...body(row),enabled:value?1:0});ElMessage.success(value?'已启用下一轮采集':'已停用新采集，历史数据保留');await load()}catch(err){error.value=message(err);ElMessage.error(error.value)}finally{saving.value=false;busyId.value=null}}
-onMounted(load);onBeforeUnmount(()=>{disposed=true;revision++})
+onMounted(load);onDeactivated(()=>{visible.value=false;tasksVisible.value=false});onBeforeUnmount(()=>{disposed=true;revision++})
 </script>
 <style scoped>
 .sprite-task-date{margin-left:8px;font-size:11px;color:#8b9ab0}.sprite-task-reason{font-size:12px;line-height:1.7;color:#ae6454;margin:7px 0;overflow-wrap:anywhere}

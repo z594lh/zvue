@@ -50,7 +50,7 @@
 <script setup>
 // 查竞品独立配置、报告进度和商品快照，不读取关键词任务。
 // 查竞品独立页面：仅操作ERP配置和读取快照，不在浏览器触发网站采集。
-import { ref,onMounted,onBeforeUnmount,watch } from 'vue'
+import { ref,onMounted,onBeforeUnmount,onDeactivated,watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getSellerspriteCompetitorAsins,addSellerspriteCompetitorAsins,updateSellerspriteCompetitorAsin,getSellerspriteCompetitorTasks,getSellerspriteCompetitorSnapshot } from '@/services/api'
 const emit=defineEmits(['busy'])
@@ -70,7 +70,7 @@ async function toggle(row,value){if(saving.value)return;saving.value=true;try{aw
 function showTasks(asin){tasksAsin.value=asin;taskPage.value=1;tasksVisible.value=true;loadTasks()}
 async function loadTasks(){const n=++taskRevision;taskLoading.value=true;taskError.value='';try{const r=await getSellerspriteCompetitorTasks(tasksAsin.value,{page:taskPage.value});if(disposed||n!==taskRevision)return;tasks.value=r.data.data.list;taskTotal.value=r.data.data.total}catch(e){if(!disposed&&n===taskRevision){taskError.value=message(e);tasks.value=[]}}finally{if(!disposed&&n===taskRevision)taskLoading.value=false}}
 async function details(row){detailLoading.value=true;try{const r=await getSellerspriteCompetitorSnapshot(row.id);detailRows.value=Object.entries(JSON.parse(r.data.data.raw_row_json)).map(([name,value])=>({name,value:value??'未提供'}));detailVisible.value=true}catch(e){ElMessage.error(message(e))}finally{detailLoading.value=false}}
-onMounted(load);onBeforeUnmount(()=>{disposed=true;revision++;taskRevision++;emit('busy',false)})
+onMounted(load);onDeactivated(()=>{editingVisible.value=false;tasksVisible.value=false;detailVisible.value=false;taskRevision++});onBeforeUnmount(()=>{disposed=true;revision++;taskRevision++;emit('busy',false)})
 </script>
 <style scoped>
 .competitor-panel{background:white;border:1px solid #e8edf5;border-radius:12px;padding:20px}.tools{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}.tools .el-input{width:300px}.tools .el-select{width:150px}p{margin:5px 0}.date{margin-left:8px}small{color:#8492a6;overflow-wrap:anywhere}.error{font-size:12px;color:#c45656;overflow-wrap:anywhere}.el-pagination{margin-top:18px;justify-content:flex-end}.el-alert{margin-bottom:12px}@media(max-width:600px){.competitor-panel{padding:12px}.tools .el-input{width:100%}}

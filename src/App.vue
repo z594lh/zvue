@@ -3,9 +3,7 @@
     <NavBar v-if="showTabBar" />
     <TabBar v-if="showTabBar" />
     <router-view v-slot="{ Component, route }">
-      <keep-alive :include="cachedViews">
-        <component :is="Component" :key="getTabKey(route.path)" />
-      </keep-alive>
+      <TabViewport :component="Component" :route="route" />
     </router-view>
     <footer v-if="uiConfig.footer_text" class="app-brand-footer">{{ uiConfig.footer_text }}</footer>
   </div>
@@ -17,18 +15,20 @@ import { uiConfig, loadUiConfig } from '@/services/uiConfig.js'
 import { useRoute } from 'vue-router'
 import NavBar from '@/components/Navbar.vue'
 import TabBar from '@/components/TabBar.vue'
+import TabViewport from '@/components/workspace/TabViewport.vue'
 import { useTabs } from '@/composables/useTabs.js'
 
 export default {
   name: 'App',
   components: {
     NavBar,
-    TabBar
+    TabBar,
+    TabViewport
   },
   setup() {
     const route = useRoute()
     onMounted(() => { loadUiConfig() })
-    const { cachedViews, excludedPaths, getTabKey } = useTabs()
+    const { excludedPaths } = useTabs()
 
     const showTabBar = computed(() => {
       return !excludedPaths.includes(route.path)
@@ -37,8 +37,6 @@ export default {
     return {
       uiConfig,
       showTabBar,
-      cachedViews,
-      getTabKey
     }
   }
 }

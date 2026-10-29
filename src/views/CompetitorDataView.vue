@@ -129,13 +129,14 @@ const ratio=(value,showSign=false)=>!present(value)?'—':Number.isFinite(Number
 const growthClass=value=>present(value)?Number(value)>0?'cd-positive':Number(value)<0?'cd-negative':'':''
 const rawValue=value=>!present(value)?'—':typeof value==='object'?JSON.stringify(value):String(value)
 const amazonUrl=asin=>/^[A-Z0-9]{10}$/.test(asin || '')?`https://www.amazon.com/dp/${asin}`:undefined
-let disposed=false,revision=0,optionsRevision=0,historyRevision=0,optionsPage=1,optionQuery='',optionsSearch='',timer,lastRouteKey=''
+let disposed=false,revision=0,optionsRevision=0,historyRevision=0,optionsPage=1,optionQuery='',optionsSearch='',timer,lastRouteKey='',resumeQuery=false
 
 /** 图片只接受报告中的Amazon图片域名，拒绝危险协议和任意外部主机。 */
 function imageUrl(value){try{const url=new URL(value);return url.protocol==='https:' && /(^|\.)(media-amazon\.com|ssl-images-amazon\.com|images-amazon\.com)$/.test(url.hostname)?url.href:''}catch{return ''}}
 
 /** 保留0与空值区别；只有统计表展示格式化，不改写接口返回的原始字段。 */
 async function load(){
+  resumeQuery=false
   const token=++revision;loading.value=true;error.value='';selected.value=[]
   try{const {data:response}=await getCompetitorData({asin:activeAsin.value || undefined,task_id:taskId.value || undefined,page:page.value,page_size:10,sort:sort.value,direction:direction.value});if(disposed || token!==revision)return;data.value=response.data}
   catch(err){if(!disposed && token===revision){data.value={};error.value=err.response?.data?.message || '竞品数据读取失败，请重新查询'}}
@@ -146,6 +147,7 @@ async function load(){
 function applyRoute(){
   if(disposed || route.path!=='/tools/competitor-data')return
   const key=JSON.stringify([route.query.asin,route.query.task_id]);if(key===lastRouteKey)return;lastRouteKey=key
+  resumeQuery=false
   const asin=typeof route.query.asin==='string'?route.query.asin.trim().toUpperCase():''
   const task=typeof route.query.task_id==='string'?route.query.task_id:''
   if((route.query.asin && !/^[A-Z0-9]{10}$/.test(asin)) || (route.query.task_id && (!asin || !/^\d{1,12}$/.test(task)))){++revision;loading.value=false;data.value={};error.value='ASIN或快照编号无效';return}
@@ -194,8 +196,9 @@ function openHistory(asin){historyAsin.value=asin;historyPage.value=1;historyRow
 async function loadHistory(){const token=++historyRevision;historyLoading.value=true;historyError.value='';try{const {data:response}=await getCompetitorDataHistory(historyAsin.value,{page:historyPage.value});if(disposed || token!==historyRevision)return;historyRows.value=response.data.list;historyTotal.value=response.data.total}catch(err){if(!disposed && token===historyRevision){historyRows.value=[];historyTotal.value=0;historyError.value=err.response?.data?.message || '采集历史读取失败'}}finally{if(!disposed && token===historyRevision)historyLoading.value=false}}
 function viewSnapshot(row){historyVisible.value=false;router.push({path:'/tools/competitor-data',query:{asin:historyAsin.value,task_id:row.id}})}
 watch(()=>route.fullPath,applyRoute,{immediate:true})
-onActivated(applyRoute)
-onDeactivated(()=>{++revision;++optionsRevision;++historyRevision;loading.value=false;optionsLoading.value=false;historyLoading.value=false;lastRouteKey='';clearTimeout(timer);sourceVisible.value=false;historyVisible.value=false})
+// 普通恢复复用结果；URL真正变化或读取中断时才查询。
+onActivated(()=>{applyRoute();if(resumeQuery && !loading.value)load()})
+onDeactivated(()=>{resumeQuery=resumeQuery || loading.value;++revision;++optionsRevision;++historyRevision;loading.value=false;optionsLoading.value=false;historyLoading.value=false;clearTimeout(timer);sourceVisible.value=false;historyVisible.value=false})
 onBeforeUnmount(()=>{disposed=true;++revision;++optionsRevision;++historyRevision;clearTimeout(timer)})
 </script>
 
