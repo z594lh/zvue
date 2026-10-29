@@ -16,8 +16,8 @@
       </aside>
       <main class="chat-main">
         <div class="chat-context" v-if="session"><strong>{{ session.title || `运营会话 ${session.generation}` }}</strong><span>问答检查点 v{{ session.revision }} · {{ session.state==='archived'?'只读归档':'当前共享对话' }}</span><el-button link type="primary" @click="readMemory">会话记忆</el-button></div>
-        <div ref="scroller" class="chat-scroll">
-          <el-button v-if="moreMessages" link :loading="messagesLoading" @click="loadMessages(true)">加载更早消息</el-button>
+        <div ref="scroller" class="chat-scroll" @scroll.passive="onHistoryScroll" @wheel.passive="armHistoryScroll" @touchmove.passive="armHistoryScroll" @keydown="armHistoryKey" tabindex="0" aria-label="对话消息，向上滚动查看更早消息">
+          <div v-if="moreMessages" class="history-loader"><el-button round :loading="messagesLoading" :disabled="messagesLoading" @click="loadMessages(true)">{{ messagesLoading?'正在加载更早消息':'查看更早消息' }}</el-button><small>向上滚动可自动加载</small></div>
           <el-empty v-if="!items.length && !messagesLoading" :description="session?'新会话尚无消息；下次每日例行将在这里留下记录':'暂无会话，可新建或等待下一次每日例行'" />
           <template v-for="(item,index) in timeline" :key="item.id">
             <div v-if="!index || day(item.created_at)!==day(timeline[index-1].created_at)" class="chat-day">{{ day(item.created_at) }} · 北京时间</div>
@@ -32,7 +32,17 @@
                   <details v-if="item.task?.status==='completed' && item.task.result?.type==='propose_plan' && item.task.result.response_message_id===item.id" class="plan-details"><summary>本次优化计划 · 查看 / 确认执行</summary><AiActionConfirmation :task="item.task" :viewer-id="viewerId" :current="session?.state==='active' && selectedId===currentId && !!capabilities.confirm_execution" :enabled="!!product.enabled" :worker-online="!!worker.online" @updated="poll" /></details>
                   <AiToolRounds v-if="item.nativeTrace" :session-id="selectedId" :message-id="item.id" :version="`${item.records.at(-1)?.id}:${item.task?.status}`" @original="readOriginal"/>
 
-                  <details v-if="!item.legacy && item.records.length" class="message-inspector"><summary>上下文与原始 JSON<small>（{{ item.records.length }} 条原始记录）</small></summary><section v-for="record in item.records" :key="record.id" class="audit-record"><header><strong>{{ record.title }}</strong><time>{{ time(record.created_at) }} 北京时间</time></header><details v-if="record.text" class="record-content"><summary>展开完整提问／记录正文</summary><div class="technical-content">{{ record.text }}</div></details><p v-if="record.interaction" class="attachment-note">配置 {{ record.interaction.version_id?'#'+record.interaction.version_id:'系统初始版' }} · {{ record.delivery_note }}</p><small v-if="record.usage" class="message-usage">输入 {{ record.usage.prompt_tokens ?? '未知' }} / 输出 {{ record.usage.completion_tokens ?? '未知' }} token<template v-if="record.usage.prompt_cache_hit_tokens!=null"> · 缓存命中 {{ record.usage.prompt_cache_hit_tokens }}</template></small><button v-if="record.has_original!==false" class="message-file" @click="readOriginal(record)"><span>JSON</span><strong>{{ record.attachment_name }}</strong><small>查看完整请求、上下文与原始记录 ↗</small></button></section></details>
+                  <details v-if="!item.legacy && item.records.length" class="message-inspector">
+                    <summary>上下文与原始 JSON<small>（{{ item.records.length }} 条原始记录）</small></summary>
+                    <section v-for="record in item.records" :key="record.id" class="audit-record">
+                      <header><strong>{{ record.title }}</strong><time>{{ time(record.created_at) }} 北京时间</time></header>
+                      <details v-if="record.text" class="record-content"><summary>展开完整提问／记录正文</summary><div class="technical-content">{{ record.text }}</div><button type="button" class="collapse-inspector" @click="collapseDetails">收起记录正文 <span aria-hidden="true">⌃</span></button></details>
+                      <p v-if="record.interaction" class="attachment-note">配置 {{ record.interaction.version_id?'#'+record.interaction.version_id:'系统初始版' }} · {{ record.delivery_note }}</p>
+                      <small v-if="record.usage" class="message-usage">输入 {{ record.usage.prompt_tokens ?? '未知' }} / 输出 {{ record.usage.completion_tokens ?? '未知' }} token<template v-if="record.usage.prompt_cache_hit_tokens!=null"> · 缓存命中 {{ record.usage.prompt_cache_hit_tokens }}</template></small>
+                      <button v-if="record.has_original!==false" class="message-file" @click="readOriginal(record)"><span>JSON</span><strong>{{ record.attachment_name }}</strong><small>查看完整请求、上下文与原始记录 ↗</small></button>
+                    </section>
+                    <button type="button" class="collapse-inspector" @click="collapseDetails">收起上下文与原始 JSON <span aria-hidden="true">⌃</span></button>
+                  </details>
                 </div>
               </div>
             </article>
@@ -77,6 +87,13 @@ const canCompose=computed(()=>capabilities.value.human_chat && session.value?.st
 const canSend=computed(()=>canCompose.value && worker.value.online && draft.value.trim() && !sending.value && !retryToken.value)
 let active=true,messageRevision=0,originalRevision=0,entryPrepared=false
 let timer=null,polling=false
+let historyScrollArmed=false,lastScrollTop=0
+/** 仅用户滚轮、触摸或键盘向上浏览触发，程序定位和折叠不连带拉取历史。 */
+function armHistoryScroll(){historyScrollArmed=true}
+/** 底部按钮只收起所属层级，保留标题位置及键盘焦点，不触发历史自动加载。 */
+async function collapseDetails(event){const panel=event.currentTarget.closest('details');if(!panel)return;historyScrollArmed=false;panel.open=false;await nextTick();if(!active || !panel.isConnected)return;const summary=panel.querySelector(':scope > summary');summary?.focus({preventScroll:true});summary?.scrollIntoView({block:'nearest',inline:'nearest'})}
+function armHistoryKey(event){if(['ArrowUp','PageUp','Home'].includes(event.key))armHistoryScroll()}
+function onHistoryScroll(){const top=scroller.value?.scrollTop || 0;const upward=top<lastScrollTop;lastScrollTop=top;if(historyScrollArmed && upward && top<72 && moreMessages.value && !messagesLoading.value && !loading.value){historyScrollArmed=false;loadMessages(true)}}
 const time=conversationTime
 /** 统一按北京时间分组，不用服务器日期或浏览器本地时区。 */
 function day(value){return time(value).split(' ')[0]}
@@ -93,7 +110,8 @@ async function loadSessions(older=false){
 async function select(id){persistDraft();memoryVisible.value=false;memoryInfo.value=null;selectedId.value=id;items.value=[];expanded.value={};pendingTasks.value=[];newMessages.value=false;retryToken.value=null;restoreDraft();if(!entryPrepared && props.initialQuestion){if(!draft.value)draft.value=props.initialQuestion;entryPrepared=true}await loadMessages()}
 /** 分页读取消息，并在向上加载时保留用户原来的阅读位置。 */
 async function loadMessages(older=false){
-  if(!selectedId.value)return
+  if(!selectedId.value || (older && (messagesLoading.value || !moreMessages.value)))return
+  historyScrollArmed=false
   const revision=++messageRevision;messagesLoading.value=true;error.value=''
   const previous=scroller.value?.scrollHeight || 0,scrollTop=scroller.value?.scrollTop || 0
   try{
@@ -102,7 +120,7 @@ async function loadMessages(older=false){
     items.value=older?[...data.data.list,...items.value]:data.data.list;moreMessages.value=data.data.has_more
     pendingTasks.value=data.data.pending_tasks || []
     await nextTick()
-    if(scroller.value)scroller.value.scrollTop=older?scrollTop+scroller.value.scrollHeight-previous:scroller.value.scrollHeight
+    if(scroller.value){scroller.value.scrollTop=older?scrollTop+scroller.value.scrollHeight-previous:scroller.value.scrollHeight;lastScrollTop=scroller.value.scrollTop}
     return true
   }catch(e){if(active && revision===messageRevision)error.value=failure(e);return false}
   finally{if(active && revision===messageRevision)messagesLoading.value=false}
@@ -223,6 +241,8 @@ onMounted(async()=>{await refresh();if(active)timer=setInterval(poll,4000)});onB
 </script>
 
 <style scoped>
+.collapse-inspector{display:flex;align-items:center;gap:8px;width:100%;margin-top:12px;padding:11px 12px;border:1px solid #e4ebf5;border-radius:7px;background:#f7f9fc;color:#4876ad;text-align:left;font-size:12px;cursor:pointer}.collapse-inspector:hover{background:#edf4fd;border-color:#cbdcf3}.collapse-inspector:focus-visible{outline:2px solid #8db8f0;outline-offset:2px}
+.chat-scroll{overflow-anchor:none}.chat-scroll:focus-visible{outline:2px solid #c4d9f7;outline-offset:-2px}.history-loader{display:flex;flex-direction:column;align-items:center;gap:7px;padding:6px 0 20px}.history-loader .el-button{color:#5680b6;background:#f5f8fe;border-color:#dfe8f5;font-size:12px;padding:8px 18px}.history-loader small{font-size:10px;color:#96a6bb}
 .managed-chat{height:78vh;display:flex;flex-direction:column;color:#334d68;min-height:380px}.chat-top{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:0 0 18px;border-bottom:1px solid #e8edf4}.chat-top strong{font-size:16px}.chat-top small{display:block;font-size:11px;color:#8797ab;margin-top:8px}.chat-top>div:last-child{display:flex;flex-shrink:0}.chat-layout{display:flex;min-height:0;flex:1;padding-top:14px;gap:20px}.chat-sessions{width:210px;flex-shrink:0;overflow:auto;border-right:1px solid #e8edf4;padding-right:15px}.section-caption{font-size:11px;color:#8b9db4}.session-item{display:block;text-align:left;width:100%;border:1px solid transparent;background:white;border-radius:9px;padding:12px;margin:8px 0;cursor:pointer;color:#4c6079}.session-item.selected{border-color:#cbdcf7;background:#f0f5ff}.session-item strong{font-size:13px;margin-right:7px}.session-item small{display:block;font-size:10px;color:#8495ae;margin-top:8px}.chat-main{display:flex;flex-direction:column;flex:1;min-width:0}.chat-context{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;padding:0 0 10px}.chat-context>span{color:#8696aa}.chat-scroll{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:8px 8px 25px}.chat-day{text-align:center;color:#98a4b4;font-size:11px;margin:12px 0 22px}.shared-message{display:flex;gap:12px;margin-bottom:24px;max-width:94%;min-width:0}.shared-message.erp{margin-left:auto;flex-direction:row-reverse}.shared-avatar{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:#147d75;color:white;display:flex;align-items:center;justify-content:center;font-size:11px}.erp .shared-avatar{background:#4279d8}.shared-content{min-width:0;flex:1}.message-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;margin-bottom:8px;color:#8b9aad}.message-meta strong{color:#465d7a}.erp .message-meta{justify-content:flex-end}.shared-bubble{border:1px solid #e5ebf4;border-radius:4px 13px 13px;padding:16px 18px;background:white}.erp .shared-bubble{background:#edf4ff;border-color:#dce8fb;border-radius:13px 4px 13px 13px}.message-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;font-size:13px}.message-body.collapsed{display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden}.message-file{display:flex;align-items:center;gap:10px;flex-wrap:wrap;text-align:left;background:#ffffffb0;border:1px solid #dfe7f2;border-radius:8px;padding:12px;margin-top:14px;cursor:pointer;max-width:100%;color:#527292}.message-file>span{font-size:10px;background:#eaf1fd;padding:6px}.message-file strong{font-size:12px}.message-file small{font-size:10px;color:#91a3ba}.message-usage{display:block;font-size:10px;color:#91a3ba;margin-top:6px}.chat-composer{padding-top:12px;border-top:1px solid #e8edf4}.chat-composer>div:last-child{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:7px}.chat-composer small{font-size:11px;color:#8f9bae}.original-content{white-space:pre-wrap;overflow-wrap:anywhere;max-height:65vh;overflow:auto;font-size:12px;line-height:1.8;padding:12px;background:#f5f7fb}@media(max-width:700px){.managed-chat{height:calc(100dvh - 105px);min-height:0}.chat-top{flex-wrap:wrap;padding-bottom:10px}.chat-top strong{font-size:13px}.chat-layout{flex-direction:column;gap:10px}.chat-sessions{width:100%;max-height:110px;border-right:0;display:flex;gap:6px;overflow:auto;padding:0;flex-shrink:0}.section-caption{display:none}.session-item{min-width:170px;width:170px;margin:0}.session-item small{font-size:9px}.chat-context{gap:6px;font-size:10px}.shared-message{max-width:100%;gap:7px}.shared-avatar{width:27px;height:27px;font-size:9px}.shared-bubble{padding:11px}.message-meta{gap:4px}.message-body{font-size:12px}.message-file{padding:8px}.chat-composer small{font-size:10px}}
 .chat-main{min-height:0}.chat-composer{flex-shrink:0}
 .chat-mode{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:9px}.chat-mode small{color:#8095af}.mode-help{width:16px;height:16px;border:1px solid #9daec3;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#8095af;cursor:help}

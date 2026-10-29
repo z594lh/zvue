@@ -1,6 +1,6 @@
 <template>
-  <details class="tool-rounds" @toggle="toggle">
-    <summary>分析过程 · 按轮查看<span v-if="info">{{ info.model_rounds }} 轮AI请求 · {{ info.tool_calls }} 次工具调用</span></summary>
+  <details ref="panel" class="tool-rounds" @toggle="toggle">
+    <summary tabindex="0">分析过程 · 按轮查看<span v-if="info">{{ info.model_rounds }} 轮AI请求 · {{ info.tool_calls }} 次工具调用</span></summary>
     <section class="round-list" v-loading="loading">
       <div class="round-toolbar"><small>{{ info?.note || '展开后只读已保存的查询过程，不重新调用AI。' }}</small><div><el-button link @click="original(messageId,'当前关联消息原文')">关联消息原文</el-button><el-button link type="primary" :loading="loading" @click="load">刷新过程</el-button></div></div>
       <el-alert v-if="error" :title="error" type="error" :closable="false"/>
@@ -21,15 +21,19 @@
         <footer><small v-if="round.has_request">输入 {{ number(round.usage.prompt_tokens) }} / 输出 {{ number(round.usage.completion_tokens) }} token · 缓存命中 {{ number(round.usage.prompt_cache_hit_tokens) }}</small><div><el-button v-if="round.request_id" link @click="original(round.request_id,'ERP请求与上下文')">ERP请求原文</el-button><el-button v-if="round.response_id" link @click="original(round.response_id,'AI公开回复与工具请求')">AI回复原文</el-button><el-button v-if="round.result_id" link @click="original(round.result_id,'工具查询返回')">工具返回原文</el-button></div></footer>
       </article>
     </section>
+    <button type="button" class="collapse-rounds" @click="collapse">收起分析过程 <span aria-hidden="true">⌃</span></button>
   </details>
 </template>
 
 <script setup>
-import { onBeforeUnmount,ref,watch } from 'vue'
+import { nextTick,onBeforeUnmount,ref,watch } from 'vue'
 import { getAiToolRounds } from '@/services/api'
 import { conversationTime as time } from '@/utils/aiOperationConversation'
 const props=defineProps({sessionId:{type:String,required:true},messageId:{type:String,required:true},version:{type:String,default:''}})
 const emit=defineEmits(['original']),opened=ref(false),loading=ref(false),error=ref(''),info=ref(null),expanded=ref({})
+const panel=ref(null)
+/** 底部直接收起，并把折叠后的标题保留在可视区域，避免阅读位置跳到别条消息。 */
+async function collapse(){if(!panel.value)return;panel.value.open=false;opened.value=false;await nextTick();const summary=panel.value?.querySelector('summary');summary?.focus({preventScroll:true});summary?.scrollIntoView({block:'nearest',inline:'nearest'})}
 let active=true,revision=0
 /** 读取完整作业的真实轮次，不受外层聊天20条分页影响，也不触发模型请求。 */
 async function load(){const id=++revision;loading.value=true;error.value='';try{const {data}=await getAiToolRounds(props.sessionId,props.messageId);if(active && revision===id)info.value=data.data}catch(e){if(active && revision===id)error.value=e.response?.data?.message || '分析过程读取失败'}finally{if(active && revision===id)loading.value=false}}
@@ -53,5 +57,6 @@ watch(()=>props.version,changed);onBeforeUnmount(stop)
 </script>
 
 <style scoped>
+.collapse-rounds{display:flex;align-items:center;gap:8px;width:100%;margin-top:12px;padding:11px 12px;border:1px solid #e4ebf5;border-radius:7px;background:#f7f9fc;color:#4876ad;text-align:left;font-size:12px;cursor:pointer}.collapse-rounds:hover{background:#edf4fd;border-color:#cbdcf3}.collapse-rounds:focus-visible{outline:2px solid #8db8f0;outline-offset:2px}.tool-rounds>summary:focus-visible{outline:2px solid #8db8f0;outline-offset:3px}
 .tool-rounds{margin-top:15px;border-top:1px solid #dfe7f4;padding-top:12px;color:#42618a;font-size:12px}.tool-rounds>summary{cursor:pointer;font-weight:600;color:#397bc1;line-height:1.8}.tool-rounds>summary span{font-size:10px;font-weight:400;margin-left:10px;color:#8a9db9}.round-list{margin-top:12px;min-height:50px}.round-toolbar{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;color:#8a9db9;line-height:1.7}.round-card{border:1px solid #dde7f3;background:#fff;border-radius:9px;margin-top:12px;padding:14px}.round-card>header{display:flex;justify-content:space-between;gap:8px;align-items:center}.round-card time{font-size:10px;color:#8b9bb2}.round-speech{margin:12px 0;background:#f6f9fd;padding:10px 12px;border-radius:6px}.round-speech p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;margin:5px 0 0}.clamped{display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden}.round-speech small,.round-tools>small{font-size:10px;color:#8b9bb2}.tool-call{border-left:3px solid #adcaf2;padding:10px 12px;margin-top:9px;background:#fafcff;overflow-wrap:anywhere}.tool-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.tool-call p{line-height:1.8;margin:7px 0}.tool-call>small,.round-card footer>small{color:#899db7;font-size:10px}.tool-result{color:#5b7392}.query-children{padding-left:18px;font-size:11px}.query-children li{margin-top:9px;line-height:1.8}.query-children span{margin:0 7px;color:#8093ae}.query-children p{margin:2px 0}.round-card footer{margin-top:12px;border-top:1px solid #edf1f7;padding-top:9px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.round-card footer .el-button{font-size:10px}.empty{font-size:11px;color:#8b9bb2;line-height:1.8}@media(max-width:650px){.round-card{padding:10px}.round-card>header{align-items:flex-start;flex-direction:column}.round-toolbar{flex-wrap:wrap}.tool-rounds>summary span{display:block;margin-left:14px}.query-children{padding-left:12px}}
 </style>
